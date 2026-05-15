@@ -1,0 +1,45 @@
+# --- Secrets — never commit ---
+/config.yaml
+/token.txt
+/tokens.txt
+.env
+*.env
+!.env.example
+/master.key
+**/master.key
+
+# --- Local runtime state ---
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# --- Local-only Claude harness state ---
+.claude/
+
+# --- Build outputs ---
+/wangui
+/wangui-*
+/*.exe
+/cmd/wangui/web-dist/
+/web/dist/
+/web/node_modules/
+/tokengrab/build/bin/
+/tokengrab/frontend/node_modules/
+/tokengrab/frontend/dist/
+/tokengrab/frontend/wailsjs/
+/tmp/
+*.tar.gz
+
+# --- Duplicate fonts at repo root (real ones live in web/public/fonts/) ---
+/HarmonyOS_SansSC_Medium.ttf
+/JetBrainsMono-Regular.ttf
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+
+# --- Go ---
+*.test
+*.prof

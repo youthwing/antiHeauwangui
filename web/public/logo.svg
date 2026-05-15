@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Crescent moon, top-right -->
+  <path d="M20 3 A3 3 0 1 0 20 7.4 A2.2 2.2 0 0 1 20 3 Z" fill="#34d399" stroke="none" />
+  <!-- House: roof, walls, door -->
+  <path d="M3 14 L12 7 L21 14" />
+  <path d="M5 13 V21 H19 V13" />
+  <path d="M10 21 V16 H14 V21" />
+</svg>

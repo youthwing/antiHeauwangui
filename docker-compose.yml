@@ -1,0 +1,20 @@
+services:
+  wangui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wangui:latest
+    container_name: wangui
+    restart: unless-stopped
+    ports:
+      # host:container — change to "127.0.0.1:5555:5555" if you want loopback only
+      # and reverse-proxy from 1Panel / Nginx / Caddy.
+      - "5555:5555"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Asia/Shanghai
+      # Both must be set in .env (see .env.example). The `:?...` syntax makes
+      # docker compose refuse to start if either is missing.
+      WANGUI_ADMIN_PASS: ${WANGUI_ADMIN_PASS:?WANGUI_ADMIN_PASS must be set in .env}
+      WANGUI_MASTER_KEY: ${WANGUI_MASTER_KEY:?WANGUI_MASTER_KEY must be set in .env}

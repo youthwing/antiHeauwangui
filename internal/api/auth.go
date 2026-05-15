@@ -1,0 +1,96 @@
+package api
+
+import (
+	"context"
+	"encoding/base64"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+type Role struct {
+	RoleID   int    `json:"roleId"`
+	RoleCode string `json:"roleCode"`
+	RoleName string `json:"roleName"`
+}
+
+type User struct {
+	UserName      string `json:"userName"`
+	UserNumber    string `json:"userNumber"`
+	UserSection   string `json:"userSection"`
+	UserClass     string `json:"userClass"`
+	Gender        int    `json:"gender"`
+	UserAvatarURL string `json:"userAvatarUrl"`
+	AccountStatus int    `json:"accountStatus"`
+	UserStatus    int    `json:"userStatus"`
+	Roles         []Role `json:"roles"`
+}
+
+// GetUser fetches the current authenticated user. Returns an APIError(401/403)
+// when the token is invalid or expired.
+//
+// If the avatar URL is an http(s) URL, we eagerly fetch it with the same token
+// and re-encode it as a data: URI. Reason: the SPA can't pull the avatar
+// directly from the school's CDN — those endpoints require the school's auth
+// cookie / referer and 403 from a third-party origin. Inlining is the simplest
+// way to make `<img :src="userAvatarUrl">` just work in our front-end.
+//
+// Failure is non-fatal: we keep the original URL so Avatar.vue's onError
+// fallback still kicks in.
+func (c *Client) GetUser(ctx context.Context) (*User, error) {
+	var u User
+	if err := c.do(ctx, "GET", "/auth/user", nil, nil, &u); err != nil {
+		return nil, err
+	}
+	if strings.HasPrefix(u.UserAvatarURL, "http") {
+		if dataURI, err := c.fetchAsDataURI(ctx, u.UserAvatarURL); err == nil {
+			u.UserAvatarURL = dataURI
+		}
+	}
+	return &u, nil
+}
+
+// fetchAsDataURI downloads an asset with the client's token and Referer, then
+// returns a data: URI. Capped at 2 MiB so a broken endpoint can't blow up our
+// memory. Used to inline avatars; see GetUser for why.
+func (c *Client) fetchAsDataURI(ctx context.Context, url string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", c.UA)
+	req.Header.Set("Referer", "https://xhbcs.henau.edu.cn/")
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("avatar fetch: status %d", resp.StatusCode)
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+	if err != nil {
+		return "", err
+	}
+	mime := resp.Header.Get("Content-Type")
+	if mime == "" {
+		mime = http.DetectContentType(raw)
+	}
+	if i := strings.Index(mime, ";"); i >= 0 {
+		mime = strings.TrimSpace(mime[:i])
+	}
+	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(raw), nil
+}
+
+// Permissions returns the permission codes for the current user.
+func (c *Client) Permissions(ctx context.Context) ([]string, error) {
+	var p []string
+	if err := c.do(ctx, "GET", "/auth/permissions", nil, nil, &p); err != nil {
+		return nil, err
+	}
+	return p, nil
+}

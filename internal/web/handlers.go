@@ -1,0 +1,632 @@
+package web
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net"
+	"net/http"
+	"regexp"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"wangui/internal/api"
+	"wangui/internal/scheduler"
+	"wangui/internal/store"
+)
+
+var pinPattern = regexp.MustCompile(`^\d{4,6}$`)
+
+func validPin(s string) bool { return pinPattern.MatchString(s) }
+
+type handlers struct {
+	store     *store.Store
+	sched     *scheduler.Multi
+	log       *slog.Logger
+	adminPass string // plain text from env; empty means admin disabled
+
+	loginLimiter *rateLimiter // per-IP rate limit for POST /login (and /activate)
+}
+
+// ---------- POST /api/v1/login ----------
+// Lightweight returning-user login: 学号 + PIN. Rate-limited by IP.
+
+type loginReq struct {
+	UserNumber string `json:"userNumber"`
+	Pin        string `json:"pin"`
+}
+
+func (h *handlers) login(w http.ResponseWriter, r *http.Request) {
+	if !h.loginLimiter.allow(clientIP(r)) {
+		writeErr(w, http.StatusTooManyRequests, "尝试过于频繁，请稍后再试")
+		return
+	}
+	var req loginReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	number := strings.TrimSpace(req.UserNumber)
+	pin := strings.TrimSpace(req.Pin)
+	if number == "" || pin == "" {
+		writeErr(w, http.StatusBadRequest, "学号和 PIN 都不能为空")
+		return
+	}
+	// Always do a bcrypt compare to mask user existence (constant-time-ish).
+	u, err := h.store.FindByNumber(r.Context(), number)
+	const genericErr = "学号或 PIN 不正确，或账号尚未激活"
+	if err != nil {
+		// Burn a hash comparison anyway so timing doesn't leak enumeration.
+		_ = bcrypt.CompareHashAndPassword([]byte("$2a$10$abcdefghijklmnopqrstuv.dummyhashforsidechanneldefense"), []byte(pin))
+		writeErr(w, http.StatusUnauthorized, genericErr)
+		return
+	}
+	if len(u.PinHash) == 0 {
+		writeErr(w, http.StatusUnauthorized, "该账号未设置 PIN，请通过「激活」流程重新激活并设置")
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword(u.PinHash, []byte(pin)); err != nil {
+		writeErr(w, http.StatusUnauthorized, genericErr)
+		return
+	}
+	if u.IsDisabled {
+		writeErr(w, http.StatusForbidden, "该账号已被禁用，请联系管理员")
+		return
+	}
+	sess, err := h.store.CreateSession(r.Context(), u.UserID, false, 30*24*time.Hour)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "会话创建失败")
+		return
+	}
+	setSessionCookie(w, sessionCookie, sess.SessionID, sess.ExpiresAt)
+	h.log.Info("login ok", "user", u.UserID, "name", u.UserName)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func clientIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+		if i := strings.IndexByte(ip, ','); i >= 0 {
+			return strings.TrimSpace(ip[:i])
+		}
+		return strings.TrimSpace(ip)
+	}
+	// RemoteAddr includes the source port — strip it so all requests from
+	// the same IP share one rate-limit bucket.
+	if ip, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return ip
+	}
+	return r.RemoteAddr
+}
+
+// ---------- POST /api/v1/activate ----------
+// First-time registration: invite code + school JWT + disclaimer. Rate-limited by IP.
+
+type activateReq struct {
+	InviteCode         string `json:"inviteCode"`
+	Token              string `json:"token"`
+	Pin                string `json:"pin"`
+	DisclaimerAccepted bool   `json:"disclaimerAccepted"`
+}
+
+func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
+	if !h.loginLimiter.allow(clientIP(r)) {
+		writeErr(w, http.StatusTooManyRequests, "尝试过于频繁，请稍后再试")
+		return
+	}
+	var req activateReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if !req.DisclaimerAccepted {
+		writeErr(w, http.StatusBadRequest, "必须先同意免责声明")
+		return
+	}
+	code := strings.TrimSpace(strings.ToUpper(req.InviteCode))
+	if code == "" {
+		writeErr(w, http.StatusBadRequest, "邀请码不能为空")
+		return
+	}
+	tok := normalizeToken(req.Token)
+	if tok == "" {
+		writeErr(w, http.StatusBadRequest, "Token 不能为空")
+		return
+	}
+	pin := strings.TrimSpace(req.Pin)
+	if !validPin(pin) {
+		writeErr(w, http.StatusBadRequest, "PIN 必须是 4–6 位数字")
+		return
+	}
+	pinHash, err := bcrypt.GenerateFromPassword([]byte(pin), bcrypt.DefaultCost)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "PIN 哈希失败")
+		return
+	}
+	claims, err := parseJWT(tok)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if time.Until(claims.ExpiresAt()) < 5*time.Minute {
+		writeErr(w, http.StatusBadRequest, "Token 已过期或即将过期，请重新抓取")
+		return
+	}
+
+	// Verify token actually works against the school API.
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	c := api.New(tok)
+	su, err := c.GetUser(ctx)
+	if err != nil {
+		writeErr(w, http.StatusUnauthorized, "Token 校验失败: "+err.Error())
+		return
+	}
+
+	// Guard: if this user already has a different invite code bound, refuse.
+	// They must delete their account first to free the old code, then activate with the new one.
+	if existing, err := h.store.GetUser(ctx, claims.Iss); err == nil {
+		if existing.InviteCode != "" && existing.InviteCode != code {
+			writeErr(w, http.StatusForbidden,
+				"该学号已绑定邀请码 "+existing.InviteCode+"，不能再激活新邀请码。如需更换请先在「账号」页注销。")
+			return
+		}
+	}
+
+	// Atomically bind the invite code to this user_id.
+	if _, err := h.store.BindCode(ctx, code, claims.Iss); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeErr(w, http.StatusBadRequest, "邀请码不存在")
+			return
+		}
+		if errors.Is(err, store.ErrConflict) {
+			writeErr(w, http.StatusForbidden, err.Error())
+			return
+		}
+		h.log.Error("bind code failed", "err", err.Error())
+		writeErr(w, http.StatusInternalServerError, "邀请码绑定失败")
+		return
+	}
+
+	u := &store.User{
+		UserID:        claims.Iss,
+		UserName:      su.UserName,
+		UserNumber:    su.UserNumber,
+		UserSection:   su.UserSection,
+		UserClass:     su.UserClass,
+		UserAvatarURL: su.UserAvatarURL,
+		Token:         tok,
+		TokenExp:      claims.ExpiresAt(),
+		AutoSign:      true,
+		InviteCode:    code,
+		DeviceModel:   "iPhone",
+		DeviceSystem:  "iOS",
+		PinHash:       pinHash,
+	}
+	if err := h.store.UpsertUser(ctx, u); err != nil {
+		h.log.Error("upsert user failed", "err", err.Error())
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	// Ensure invite_code is set on a re-activation as well.
+	_ = h.store.SetInviteCode(ctx, claims.Iss, code)
+
+	sess, err := h.store.CreateSession(ctx, claims.Iss, false, 30*24*time.Hour)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "会话创建失败")
+		return
+	}
+	setSessionCookie(w, sessionCookie, sess.SessionID, sess.ExpiresAt)
+	h.log.Info("activate ok", "user", claims.Iss, "code", code, "name", su.UserName)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// ---------- GET /api/v1/me ----------
+
+func (h *handlers) me(w http.ResponseWriter, r *http.Request) {
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, "用户不存在")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	dto := meDTO(u)
+	// Enrich settings with dorm name (for display) when bound.
+	if u.DormID != nil {
+		if d, err := h.store.GetDorm(r.Context(), *u.DormID); err == nil {
+			if settings, ok := dto["settings"].(map[string]any); ok {
+				settings["dormName"] = d.Name
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func meDTO(u *store.User) map[string]any {
+	remaining := time.Until(u.TokenExp)
+	if remaining < 0 {
+		remaining = 0
+	}
+	return map[string]any{
+		"userId":        u.UserID,
+		"userName":      u.UserName,
+		"userNumber":    u.UserNumber,
+		"userSection":   u.UserSection,
+		"userClass":     u.UserClass,
+		"userAvatarUrl": u.UserAvatarURL,
+		"inviteCode":    u.InviteCode,
+		"isDisabled":    u.IsDisabled,
+		"hasPin":        len(u.PinHash) > 0,
+		"token": map[string]any{
+			"expiresAt":    u.TokenExp.Unix(),
+			"validUntil":   u.TokenExp.Format(time.RFC3339),
+			"remainingSec": int64(remaining.Seconds()),
+			"isValid":      time.Now().Before(u.TokenExp),
+		},
+		"settings": settingsDTO(u),
+	}
+}
+
+func settingsDTO(u *store.User) map[string]any {
+	return map[string]any{
+		"autoSign":       u.AutoSign,
+		"dormId":         u.DormID,
+		"latitude":       u.Lat,
+		"longitude":      u.Lng,
+		"address":        u.Address,
+		"city":           u.City,
+		"road":           u.Road,
+		"poi":            u.Poi,
+		"deviceModel":    u.DeviceModel,
+		"deviceSystem":   u.DeviceSystem,
+		"triggerMinute":  u.TriggerMinute,
+		"jitterSec":      u.JitterSec,
+		"retryCount":     u.RetryCount,
+		"retryGapMin":    u.RetryGapMin,
+		"savedLocations": json.RawMessage(u.SavedLocations),
+		"notifyEmail":    u.NotifyEmail,
+		"notifyEnabled":  u.NotifyEnabled,
+		"signDays":       u.SignDays,
+	}
+}
+
+// ---------- GET /api/v1/dorms ----------
+// Public-ish list (auth required): a user sees what dorms admin has curated.
+func (h *handlers) listDorms(w http.ResponseWriter, r *http.Request) {
+	dorms, err := h.store.ListDorms(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	out := make([]map[string]any, 0, len(dorms))
+	for _, d := range dorms {
+		out = append(out, map[string]any{
+			"id":                d.ID,
+			"name":              d.Name,
+			"latitude":          d.Latitude,
+			"longitude":         d.Longitude,
+			"address":           d.Address,
+			"city":              d.City,
+			"road":              d.Road,
+			"poi":               d.Poi,
+			"note":              d.Note,
+			"sendAddressFields": d.SendAddressFields,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ---------- PUT /api/v1/token ----------
+
+func (h *handlers) updateToken(w http.ResponseWriter, r *http.Request) {
+	uid := userIDOf(r)
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	tok := normalizeToken(req.Token)
+	if tok == "" {
+		writeErr(w, http.StatusBadRequest, "Token 不能为空")
+		return
+	}
+	claims, err := parseJWT(tok)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if claims.Iss != uid {
+		writeErr(w, http.StatusBadRequest, "Token 属于另一个账号，无法覆盖")
+		return
+	}
+	if time.Until(claims.ExpiresAt()) < 5*time.Minute {
+		writeErr(w, http.StatusBadRequest, "Token 已过期或即将过期")
+		return
+	}
+	c := api.New(tok)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	if _, err := c.GetUser(ctx); err != nil {
+		writeErr(w, http.StatusUnauthorized, "Token 校验失败: "+err.Error())
+		return
+	}
+	if err := h.store.UpdateToken(ctx, uid, tok, claims.ExpiresAt()); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "expiresAt": claims.Exp,
+	})
+}
+
+// ---------- GET / PUT /api/v1/settings ----------
+
+func (h *handlers) getSettings(w http.ResponseWriter, r *http.Request) {
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	writeJSON(w, http.StatusOK, settingsDTO(u))
+}
+
+type updateSettingsReq struct {
+	AutoSign       *bool            `json:"autoSign"`
+	DormID         *int64           `json:"dormId"`
+	DeviceModel    *string          `json:"deviceModel"`
+	DeviceSystem   *string          `json:"deviceSystem"`
+	TriggerMinute  *int             `json:"triggerMinute"`
+	JitterSec      *int             `json:"jitterSec"`
+	RetryCount     *int             `json:"retryCount"`
+	RetryGapMin    *int             `json:"retryGapMin"`
+	NotifyEmail    *string          `json:"notifyEmail"`
+	NotifyEnabled  *bool            `json:"notifyEnabled"`
+	SignDays       *int             `json:"signDays"`
+	// Legacy raw-coord fields, accepted for backwards compat / admin override.
+	Latitude       *float64         `json:"latitude"`
+	Longitude      *float64         `json:"longitude"`
+	Address        *string          `json:"address"`
+	City           *string          `json:"city"`
+	Road           *string          `json:"road"`
+	Poi            *string          `json:"poi"`
+	SavedLocations *json.RawMessage `json:"savedLocations"`
+}
+
+func (h *handlers) updateSettings(w http.ResponseWriter, r *http.Request) {
+	uid := userIDOf(r)
+	var req updateSettingsReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	u, err := h.store.GetUser(r.Context(), uid)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	if req.AutoSign != nil {
+		u.AutoSign = *req.AutoSign
+	}
+	// Dorm selection takes precedence over manual coords: looking up the dorm
+	// and snapshotting its coords into the user record.
+	if req.DormID != nil {
+		if *req.DormID == 0 {
+			// dormId=0 means unbind.
+			_ = h.store.SetUserDorm(r.Context(), uid, nil)
+			u.DormID = nil
+			u.Lat, u.Lng = 0, 0
+			u.Address, u.City, u.Road, u.Poi = "", "", "", ""
+		} else {
+			dorm, err := h.store.GetDorm(r.Context(), *req.DormID)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "宿舍楼不存在")
+				return
+			}
+			if err := h.store.SetUserDorm(r.Context(), uid, dorm); err != nil {
+				writeErr(w, http.StatusInternalServerError, "保存失败")
+				return
+			}
+			u.DormID = &dorm.ID
+			u.Lat, u.Lng = dorm.Latitude, dorm.Longitude
+			u.Address, u.City, u.Road, u.Poi = dorm.Address, dorm.City, dorm.Road, dorm.Poi
+		}
+	}
+	// Legacy raw-coord setters (still accepted, e.g. for admin override).
+	if req.Latitude != nil {
+		u.Lat = *req.Latitude
+	}
+	if req.Longitude != nil {
+		u.Lng = *req.Longitude
+	}
+	if req.Address != nil {
+		u.Address = *req.Address
+	}
+	if req.City != nil {
+		u.City = *req.City
+	}
+	if req.Road != nil {
+		u.Road = *req.Road
+	}
+	if req.Poi != nil {
+		u.Poi = *req.Poi
+	}
+	if req.DeviceModel != nil {
+		u.DeviceModel = *req.DeviceModel
+	}
+	if req.DeviceSystem != nil {
+		u.DeviceSystem = *req.DeviceSystem
+	}
+	if req.NotifyEmail != nil {
+		u.NotifyEmail = strings.TrimSpace(*req.NotifyEmail)
+	}
+	if req.NotifyEnabled != nil {
+		u.NotifyEnabled = *req.NotifyEnabled
+	}
+	if req.SignDays != nil {
+		if *req.SignDays < 0 || *req.SignDays > 127 {
+			writeErr(w, http.StatusBadRequest, "signDays 必须在 0–127 之间（7-bit 周一到周日）")
+			return
+		}
+		u.SignDays = *req.SignDays
+	}
+	if req.TriggerMinute != nil {
+		if *req.TriggerMinute < 0 || *req.TriggerMinute > 29 {
+			writeErr(w, http.StatusBadRequest, "triggerMinute 必须在 0–29 之间")
+			return
+		}
+		u.TriggerMinute = *req.TriggerMinute
+	}
+	if req.JitterSec != nil {
+		if *req.JitterSec < 0 || *req.JitterSec > 600 {
+			writeErr(w, http.StatusBadRequest, "jitterSec 必须在 0–600 之间")
+			return
+		}
+		u.JitterSec = *req.JitterSec
+	}
+	if req.RetryCount != nil {
+		if *req.RetryCount < 0 || *req.RetryCount > 5 {
+			writeErr(w, http.StatusBadRequest, "retryCount 必须在 0–5 之间")
+			return
+		}
+		u.RetryCount = *req.RetryCount
+	}
+	if req.RetryGapMin != nil {
+		if *req.RetryGapMin < 1 || *req.RetryGapMin > 15 {
+			writeErr(w, http.StatusBadRequest, "retryGapMin 必须在 1–15 之间")
+			return
+		}
+		u.RetryGapMin = *req.RetryGapMin
+	}
+	if req.SavedLocations != nil {
+		// Validate it's a JSON array.
+		var arr []store.SavedLocation
+		if err := json.Unmarshal(*req.SavedLocations, &arr); err != nil {
+			writeErr(w, http.StatusBadRequest, "savedLocations 不是合法 JSON 数组")
+			return
+		}
+		b, _ := json.Marshal(arr)
+		u.SavedLocations = string(b)
+	}
+	if err := h.store.UpdateSettings(r.Context(), u); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, settingsDTO(u))
+}
+
+// ---------- GET /api/v1/records ----------
+
+func (h *handlers) records(w http.ResponseWriter, r *http.Request) {
+	list, err := h.store.ListRecords(r.Context(), userIDOf(r), 100)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	out := make([]map[string]any, 0, len(list))
+	for _, rec := range list {
+		out = append(out, map[string]any{
+			"id":         rec.ID,
+			"ruleId":     rec.RuleID,
+			"status":     rec.Status,
+			"message":    rec.Message,
+			"occurredAt": rec.OccurredAt.Unix(),
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ---------- POST /api/v1/sign-now ----------
+
+func (h *handlers) signNow(w http.ResponseWriter, r *http.Request) {
+	uid := userIDOf(r)
+	u, err := h.store.GetUser(r.Context(), uid)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+	res := h.sched.SignOnce(ctx, u)
+	_ = h.store.AddRecord(ctx, &store.Record{
+		UserID: uid, RuleID: scheduler.DefaultRuleID,
+		Status: res.Status, Message: res.Message,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  res.Status,
+		"message": res.Message,
+	})
+}
+
+// ---------- PUT /api/v1/pin ----------
+
+type changePinReq struct {
+	OldPin string `json:"oldPin"`
+	NewPin string `json:"newPin"`
+}
+
+func (h *handlers) changePin(w http.ResponseWriter, r *http.Request) {
+	uid := userIDOf(r)
+	var req changePinReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if !validPin(req.NewPin) {
+		writeErr(w, http.StatusBadRequest, "新 PIN 必须是 4–6 位数字")
+		return
+	}
+	u, err := h.store.GetUser(r.Context(), uid)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	if len(u.PinHash) > 0 {
+		if err := bcrypt.CompareHashAndPassword(u.PinHash, []byte(strings.TrimSpace(req.OldPin))); err != nil {
+			writeErr(w, http.StatusUnauthorized, "旧 PIN 不正确")
+			return
+		}
+	}
+	newHash, err := bcrypt.GenerateFromPassword([]byte(strings.TrimSpace(req.NewPin)), bcrypt.DefaultCost)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "PIN 哈希失败")
+		return
+	}
+	if err := h.store.SetPinHash(r.Context(), uid, newHash); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// ---------- POST /api/v1/logout, DELETE /api/v1/me ----------
+
+func (h *handlers) logout(w http.ResponseWriter, r *http.Request) {
+	if ck, err := r.Cookie(sessionCookie); err == nil {
+		_ = h.store.DeleteSession(r.Context(), ck.Value)
+	}
+	clearCookie(w, sessionCookie)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// deleteMe wipes user data AND unbinds the invite code (so the user can re-activate).
+// Actually per design, invite codes are permanent — but if the user explicitly deletes
+// their account, freeing the code lets them re-bind to a fresh user_id. Acceptable.
+func (h *handlers) deleteMe(w http.ResponseWriter, r *http.Request) {
+	uid := userIDOf(r)
+	if err := h.store.DeleteUserAndUnbindCode(r.Context(), uid); err != nil {
+		writeErr(w, http.StatusInternalServerError, "注销失败")
+		return
+	}
+	clearCookie(w, sessionCookie)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}

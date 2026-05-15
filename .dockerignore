@@ -1,0 +1,48 @@
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# Editor / IDE
+.idea
+.vscode
+*.swp
+
+# Node modules — stage 1 will install fresh inside the image
+node_modules
+web/node_modules
+web/dist
+
+# Stale local build outputs — stage 1 produces a fresh SPA build
+cmd/wangui/web-dist
+
+# Sub-project, not part of the wangui server image
+tokengrab/
+
+# Local runtime state (sqlite, master.key, backups) — never bake into image
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Local secrets / configs
+.env
+config.yaml
+token.txt
+
+# Local logs
+*.log
+
+# Local binaries
+wangui
+wangui.exe
+wangui-linux
+*.tar.gz
+
+# Standalone font files — already embedded under web/public/fonts/
+/HarmonyOS_SansSC_Medium.ttf
+/JetBrainsMono-Regular.ttf
+
+# Docs that don't belong in the image
+*.md
+README*

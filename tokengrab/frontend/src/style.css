@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "HarmonyOS Sans SC";
+  src: url("/fonts/HarmonyOS_SansSC_Medium.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 400 700;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 400 700;
+}
+
+html, body {
+  font-family: "HarmonyOS Sans SC", system-ui, -apple-system, sans-serif;
+  background-color: rgb(9, 9, 11);   /* zinc-950 */
+  color: rgb(228, 228, 231);          /* zinc-200 */
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+}
+
+.font-mono-token {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.focus-ring:focus {
+  outline: none;
+  --tw-ring-color: rgb(52 211 153 / 0.5);
+  box-shadow: 0 0 0 2px var(--tw-ring-color);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.tg-spin { animation: spin 1s linear infinite; }

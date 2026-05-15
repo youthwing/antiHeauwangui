@@ -1,0 +1,162 @@
+import type {
+  Me,
+  Settings,
+  SignRecord,
+  InviteCode,
+  AdminUser,
+  AdminStats,
+  AdminLog,
+  Dorm,
+  AdminDorm,
+  DormUserBrief,
+  SmtpConfig,
+  SmtpUpdate,
+} from './types'
+
+async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch('/api/v1' + path, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `HTTP ${res.status}`)
+  }
+  if (res.status === 204) return undefined as T
+  const text = await res.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
+}
+
+export const api = {
+  // ---- Public (no auth) ----
+  login: (userNumber: string, pin: string) =>
+    request<{ ok: boolean }>('/login', {
+      method: 'POST',
+      body: JSON.stringify({ userNumber, pin }),
+    }),
+  activate: (inviteCode: string, token: string, pin: string, disclaimerAccepted: boolean) =>
+    request<{ ok: boolean }>('/activate', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode, token, pin, disclaimerAccepted }),
+    }),
+
+  // ---- User-scoped ----
+  me: () => request<Me>('/me'),
+  updateToken: (token: string) =>
+    request<{ ok: boolean; expiresAt: number }>('/token', {
+      method: 'PUT',
+      body: JSON.stringify({ token }),
+    }),
+  changePin: (oldPin: string, newPin: string) =>
+    request<{ ok: boolean }>('/pin', {
+      method: 'PUT',
+      body: JSON.stringify({ oldPin, newPin }),
+    }),
+  getSettings: () => request<Settings>('/settings'),
+  updateSettings: (s: Partial<Settings>) =>
+    request<Settings>('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(s),
+    }),
+  records: () => request<SignRecord[]>('/records'),
+  dorms: () => request<Dorm[]>('/dorms'),
+  signNow: () =>
+    request<{ status: string; message: string }>('/sign-now', { method: 'POST' }),
+  logout: () => request<{ ok: boolean }>('/logout', { method: 'POST' }),
+  deleteMe: () => request<{ ok: boolean }>('/me', { method: 'DELETE' }),
+}
+
+export const adminApi = {
+  login: (password: string) =>
+    request<{ ok: boolean }>('/rosekhlifa/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  logout: () => request<{ ok: boolean }>('/rosekhlifa/logout', { method: 'POST' }),
+  me: () => request<{ isAdmin: boolean }>('/rosekhlifa/me'),
+  stats: () => request<AdminStats>('/rosekhlifa/stats'),
+
+  listCodes: (params: {
+    status?: 'used' | 'unused'
+    search?: string
+    limit?: number
+    offset?: number
+  } = {}) => {
+    const q = new URLSearchParams()
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== '') q.set(k, String(v))
+    }
+    const qs = q.toString()
+    return request<InviteCode[]>('/rosekhlifa/codes' + (qs ? '?' + qs : ''))
+  },
+  createCodes: (count: number, note: string) =>
+    request<InviteCode[]>('/rosekhlifa/codes', {
+      method: 'POST',
+      body: JSON.stringify({ count, note }),
+    }),
+  updateCode: (code: string, patch: { note?: string; disabled?: boolean }) =>
+    request<InviteCode>('/rosekhlifa/codes/' + encodeURIComponent(code), {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    }),
+  deleteCode: (code: string) =>
+    request<{ ok: boolean }>('/rosekhlifa/codes/' + encodeURIComponent(code), {
+      method: 'DELETE',
+    }),
+
+  listUsers: (search = '', limit = 100) => {
+    const q = new URLSearchParams()
+    if (search) q.set('search', search)
+    q.set('limit', String(limit))
+    return request<AdminUser[]>('/rosekhlifa/users?' + q.toString())
+  },
+  getUser: (id: string) => request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id)),
+  updateUser: (id: string, patch: { isDisabled?: boolean; autoSign?: boolean }) =>
+    request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id), {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    }),
+  deleteUser: (id: string) =>
+    request<{ ok: boolean }>('/rosekhlifa/users/' + encodeURIComponent(id), {
+      method: 'DELETE',
+    }),
+  resetUserPin: (id: string, newPin?: string) =>
+    request<{ ok: boolean; newPin: string }>(
+      '/rosekhlifa/users/' + encodeURIComponent(id) + '/pin',
+      {
+        method: 'POST',
+        body: JSON.stringify({ newPin: newPin || '' }),
+      },
+    ),
+
+  logs: (limit = 100) => request<AdminLog[]>('/rosekhlifa/logs?limit=' + limit),
+
+  listDorms: () => request<AdminDorm[]>('/rosekhlifa/dorms'),
+  createDorm: (d: Partial<AdminDorm>) =>
+    request<AdminDorm>('/rosekhlifa/dorms', {
+      method: 'POST',
+      body: JSON.stringify(d),
+    }),
+  updateDorm: (id: number, d: Partial<AdminDorm>) =>
+    request<AdminDorm>('/rosekhlifa/dorms/' + id, {
+      method: 'PUT',
+      body: JSON.stringify(d),
+    }),
+  deleteDorm: (id: number) =>
+    request<{ ok: boolean }>('/rosekhlifa/dorms/' + id, { method: 'DELETE' }),
+  dormUsers: (id: number) =>
+    request<DormUserBrief[]>('/rosekhlifa/dorms/' + id + '/users'),
+
+  getSmtp: () => request<SmtpConfig>('/rosekhlifa/smtp'),
+  updateSmtp: (cfg: SmtpUpdate) =>
+    request<SmtpConfig & { ok: boolean }>('/rosekhlifa/smtp', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    }),
+  testSmtp: () =>
+    request<{ ok: boolean; sentTo: string }>('/rosekhlifa/smtp/test', {
+      method: 'POST',
+    }),
+}

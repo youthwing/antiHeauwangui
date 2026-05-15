@@ -1,0 +1,709 @@
+package web
+
+import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/bcrypt"
+
+	"wangui/internal/notify"
+	"wangui/internal/store"
+)
+
+const adminUserID = "__admin__"
+
+// POST /api/v1/admin/login
+func (h *handlers) adminLogin(w http.ResponseWriter, r *http.Request) {
+	if h.adminPass == "" {
+		writeErr(w, http.StatusServiceUnavailable, "管理员功能未启用 (未设置 WANGUI_ADMIN_PASS)")
+		return
+	}
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(req.Password), []byte(h.adminPass)) != 1 {
+		writeErr(w, http.StatusUnauthorized, "密码错误")
+		return
+	}
+	sess, err := h.store.CreateSession(r.Context(), adminUserID, true, 7*24*time.Hour)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "会话创建失败")
+		return
+	}
+	setSessionCookie(w, adminSessionCookie, sess.SessionID, sess.ExpiresAt)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// POST /api/v1/admin/logout
+func (h *handlers) adminLogout(w http.ResponseWriter, r *http.Request) {
+	if ck, err := r.Cookie(adminSessionCookie); err == nil {
+		_ = h.store.DeleteSession(r.Context(), ck.Value)
+	}
+	clearCookie(w, adminSessionCookie)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// GET /api/v1/admin/me  — used by frontend to check admin login state
+func (h *handlers) adminMe(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"isAdmin": true})
+}
+
+// GET /api/v1/admin/stats
+func (h *handlers) adminStats(w http.ResponseWriter, r *http.Request) {
+	totalUsers, _ := h.store.CountUsers(r.Context())
+	totalCodes, usedCodes, _ := h.store.CountCodes(r.Context())
+	today, _ := h.store.CountTodayRecords(r.Context())
+
+	// Token expiry warnings: count users whose token expires within 24h.
+	users, _ := h.store.ListUsers(r.Context(), store.UserListFilter{Limit: 500})
+	expiring := 0
+	disabled := 0
+	for _, u := range users {
+		if time.Until(u.TokenExp) < 24*time.Hour && !u.IsDisabled {
+			expiring++
+		}
+		if u.IsDisabled {
+			disabled++
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"users": map[string]any{
+			"total":    totalUsers,
+			"disabled": disabled,
+			"expiring": expiring,
+		},
+		"codes": map[string]any{
+			"total":  totalCodes,
+			"used":   usedCodes,
+			"unused": totalCodes - usedCodes,
+		},
+		"today": today,
+	})
+}
+
+// GET /api/v1/admin/codes
+func (h *handlers) adminListCodes(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	codes, err := h.store.ListAdminCodes(r.Context(), store.CodeFilter{
+		Status: q.Get("status"),
+		Search: q.Get("search"),
+		Limit:  atoiDefault(q.Get("limit"), 100),
+		Offset: atoiDefault(q.Get("offset"), 0),
+	})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	out := make([]map[string]any, 0, len(codes))
+	for _, c := range codes {
+		out = append(out, codeDTO(c))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// POST /api/v1/admin/codes
+func (h *handlers) adminCreateCodes(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Count int    `json:"count"`
+		Note  string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if req.Count <= 0 {
+		req.Count = 1
+	}
+	codes, err := h.store.CreateCodes(r.Context(), req.Count, req.Note, adminIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	out := make([]map[string]any, 0, len(codes))
+	for _, c := range codes {
+		out = append(out, codeDTO(c))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// PUT /api/v1/admin/codes/{code}
+func (h *handlers) adminUpdateCode(w http.ResponseWriter, r *http.Request) {
+	code := chi.URLParam(r, "code")
+	var req struct {
+		Note     *string `json:"note"`
+		Disabled *bool   `json:"disabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if err := h.store.UpdateCode(r.Context(), code, req.Note, req.Disabled); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	c, err := h.store.GetCode(r.Context(), code)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "邀请码不存在")
+		return
+	}
+	writeJSON(w, http.StatusOK, codeDTO(c))
+}
+
+// DELETE /api/v1/admin/codes/{code}
+func (h *handlers) adminDeleteCode(w http.ResponseWriter, r *http.Request) {
+	code := chi.URLParam(r, "code")
+	c, err := h.store.GetCode(r.Context(), code)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "邀请码不存在")
+		return
+	}
+	if c.Used() {
+		writeErr(w, http.StatusForbidden, "已绑定的邀请码不能删除，可改为禁用")
+		return
+	}
+	if err := h.store.DeleteCode(r.Context(), code); err != nil {
+		writeErr(w, http.StatusInternalServerError, "删除失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// GET /api/v1/admin/users
+func (h *handlers) adminListUsers(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	users, err := h.store.ListUsers(r.Context(), store.UserListFilter{
+		Search: q.Get("search"),
+		Limit:  atoiDefault(q.Get("limit"), 100),
+		Offset: atoiDefault(q.Get("offset"), 0),
+	})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	// Pre-fetch dorm names once to enrich the user rows without N+1 queries.
+	dormNames := map[int64]string{}
+	if dorms, err := h.store.ListDorms(r.Context()); err == nil {
+		for _, d := range dorms {
+			dormNames[d.ID] = d.Name
+		}
+	}
+	out := make([]map[string]any, 0, len(users))
+	for _, u := range users {
+		dto := adminUserDTO(u)
+		if u.DormID != nil {
+			dto["dormId"] = *u.DormID
+			if name, ok := dormNames[*u.DormID]; ok {
+				dto["dormName"] = name
+			}
+		}
+		out = append(out, dto)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// GET /api/v1/admin/dorms/{id}/users — list users bound to a dorm.
+func (h *handlers) adminDormUsers(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id 无效")
+		return
+	}
+	users, err := h.store.ListUsersByDorm(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	out := make([]map[string]any, 0, len(users))
+	for _, u := range users {
+		out = append(out, map[string]any{
+			"userId":      u.UserID,
+			"userName":    u.UserName,
+			"userNumber":  u.UserNumber,
+			"userSection": u.UserSection,
+			"userClass":   u.UserClass,
+			"isDisabled":  u.IsDisabled,
+			"autoSign":    u.AutoSign,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// GET /api/v1/admin/users/{id}
+func (h *handlers) adminGetUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	u, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeErr(w, http.StatusNotFound, "用户不存在")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	recs, _ := h.store.ListRecords(r.Context(), id, 50)
+	recDTOs := make([]map[string]any, 0, len(recs))
+	for _, rec := range recs {
+		recDTOs = append(recDTOs, map[string]any{
+			"id":         rec.ID,
+			"status":     rec.Status,
+			"message":    rec.Message,
+			"occurredAt": rec.OccurredAt.Unix(),
+		})
+	}
+	dto := adminUserDTO(u)
+	if u.DormID != nil {
+		dto["dormId"] = *u.DormID
+		if d, err := h.store.GetDorm(r.Context(), *u.DormID); err == nil {
+			dto["dormName"] = d.Name
+		}
+	}
+	dto["recentRecords"] = recDTOs
+	writeJSON(w, http.StatusOK, dto)
+}
+
+// PUT /api/v1/admin/users/{id}
+func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req struct {
+		IsDisabled *bool `json:"isDisabled"`
+		AutoSign   *bool `json:"autoSign"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	u, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	if req.IsDisabled != nil {
+		if err := h.store.SetDisabled(r.Context(), id, *req.IsDisabled); err != nil {
+			writeErr(w, http.StatusInternalServerError, "保存失败")
+			return
+		}
+		if *req.IsDisabled {
+			_ = h.store.DeleteSessionsForUser(r.Context(), id)
+		}
+		u.IsDisabled = *req.IsDisabled
+	}
+	if req.AutoSign != nil {
+		u.AutoSign = *req.AutoSign
+		if err := h.store.UpdateSettings(r.Context(), u); err != nil {
+			writeErr(w, http.StatusInternalServerError, "保存失败")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, adminUserDTO(u))
+}
+
+// DELETE /api/v1/admin/users/{id}
+func (h *handlers) adminDeleteUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := h.store.DeleteUserAndUnbindCode(r.Context(), id); err != nil {
+		writeErr(w, http.StatusInternalServerError, "删除失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// ---------- Admin dorm management ----------
+
+type adminDormReq struct {
+	Name              string  `json:"name"`
+	Latitude          float64 `json:"latitude"`
+	Longitude         float64 `json:"longitude"`
+	Address           string  `json:"address"`
+	City              string  `json:"city"`
+	Road              string  `json:"road"`
+	Poi               string  `json:"poi"`
+	Note              string  `json:"note"`
+	SendAddressFields bool    `json:"sendAddressFields"`
+}
+
+func (h *handlers) adminListDorms(w http.ResponseWriter, r *http.Request) {
+	dorms, err := h.store.ListDorms(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	out := make([]map[string]any, 0, len(dorms))
+	for _, d := range dorms {
+		used, _ := h.store.CountDormUsers(r.Context(), d.ID)
+		out = append(out, dormDTO(d, used))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *handlers) adminCreateDorm(w http.ResponseWriter, r *http.Request) {
+	var req adminDormReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		writeErr(w, http.StatusBadRequest, "名称不能为空")
+		return
+	}
+	if req.Latitude == 0 || req.Longitude == 0 {
+		writeErr(w, http.StatusBadRequest, "坐标必填")
+		return
+	}
+	d := &store.Dorm{
+		Name:              strings.TrimSpace(req.Name),
+		Latitude:          req.Latitude,
+		Longitude:         req.Longitude,
+		Address:           req.Address,
+		City:              req.City,
+		Road:              req.Road,
+		Poi:               req.Poi,
+		Note:              req.Note,
+		SendAddressFields: req.SendAddressFields,
+	}
+	if err := h.store.CreateDorm(r.Context(), d); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			writeErr(w, http.StatusConflict, "名称已存在")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, dormDTO(d, 0))
+}
+
+func (h *handlers) adminUpdateDorm(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id 无效")
+		return
+	}
+	var req struct {
+		Name              *string  `json:"name"`
+		Latitude          *float64 `json:"latitude"`
+		Longitude         *float64 `json:"longitude"`
+		Address           *string  `json:"address"`
+		City              *string  `json:"city"`
+		Road              *string  `json:"road"`
+		Poi               *string  `json:"poi"`
+		Note              *string  `json:"note"`
+		SendAddressFields *bool    `json:"sendAddressFields"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if err := h.store.UpdateDorm(r.Context(), id,
+		req.Name, req.Latitude, req.Longitude,
+		req.Address, req.City, req.Road, req.Poi, req.Note,
+		req.SendAddressFields); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			writeErr(w, http.StatusConflict, "名称已存在")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	d, err := h.store.GetDorm(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "宿舍楼不存在")
+		return
+	}
+	used, _ := h.store.CountDormUsers(r.Context(), id)
+	writeJSON(w, http.StatusOK, dormDTO(d, used))
+}
+
+func (h *handlers) adminDeleteDorm(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "id 无效")
+		return
+	}
+	used, _ := h.store.CountDormUsers(r.Context(), id)
+	if used > 0 {
+		writeErr(w, http.StatusForbidden,
+			"已有 "+strconv.Itoa(used)+" 个用户绑定此宿舍楼，不能删除")
+		return
+	}
+	if err := h.store.DeleteDorm(r.Context(), id); err != nil {
+		writeErr(w, http.StatusInternalServerError, "删除失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func dormDTO(d *store.Dorm, users int) map[string]any {
+	return map[string]any{
+		"id":                d.ID,
+		"name":              d.Name,
+		"latitude":          d.Latitude,
+		"longitude":         d.Longitude,
+		"address":           d.Address,
+		"city":              d.City,
+		"road":              d.Road,
+		"poi":               d.Poi,
+		"note":              d.Note,
+		"sendAddressFields": d.SendAddressFields,
+		"users":             users,
+		"createdAt":         d.CreatedAt.Unix(),
+		"updatedAt":         d.UpdatedAt.Unix(),
+	}
+}
+
+// ---------- Admin SMTP config ----------
+
+// GET /api/v1/rosekhlifa/smtp — returns config; password is masked.
+func (h *handlers) adminGetSMTP(w http.ResponseWriter, r *http.Request) {
+	cfg, err := h.store.GetSMTPConfig(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"enabled":     cfg.Enabled,
+		"host":        cfg.Host,
+		"port":        cfg.Port,
+		"username":    cfg.Username,
+		"from":        cfg.From,
+		"adminBcc":    cfg.AdminBcc,
+		"passwordSet": cfg.Password != "",
+	})
+}
+
+// PUT /api/v1/rosekhlifa/smtp — update; empty password keeps the existing one.
+func (h *handlers) adminUpdateSMTP(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Enabled  bool   `json:"enabled"`
+		Host     string `json:"host"`
+		Port     int    `json:"port"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+		From     string `json:"from"`
+		AdminBcc string `json:"adminBcc"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if req.Host == "" {
+		req.Host = "smtp.gmail.com"
+	}
+	if req.Port == 0 {
+		req.Port = 587
+	}
+	cfg := &store.SMTPConfig{
+		Enabled:  req.Enabled,
+		Host:     strings.TrimSpace(req.Host),
+		Port:     req.Port,
+		Username: strings.TrimSpace(req.Username),
+		// Gmail app passwords are shown grouped as "glht egbx rokr ktiu"
+		// (4×4 with spaces) but the real value has no whitespace at all.
+		// strings.Fields splits on any whitespace, then re-joins with "".
+		Password: strings.Join(strings.Fields(req.Password), ""),
+		From:     strings.TrimSpace(req.From),
+		AdminBcc: strings.TrimSpace(req.AdminBcc),
+	}
+	if err := h.store.SetSMTPConfig(r.Context(), cfg); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	// Re-read to send back current state.
+	saved, _ := h.store.GetSMTPConfig(r.Context())
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":          true,
+		"enabled":     saved.Enabled,
+		"host":        saved.Host,
+		"port":        saved.Port,
+		"username":    saved.Username,
+		"from":        saved.From,
+		"adminBcc":    saved.AdminBcc,
+		"passwordSet": saved.Password != "",
+	})
+}
+
+// POST /api/v1/rosekhlifa/smtp/test — send a real test email to adminBcc
+// (or username if no bcc). Uses the *currently-saved* config, not the form.
+func (h *handlers) adminTestSMTP(w http.ResponseWriter, r *http.Request) {
+	cfg, err := h.store.GetSMTPConfig(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	if cfg.Host == "" || cfg.Username == "" || cfg.Password == "" {
+		writeErr(w, http.StatusBadRequest, "SMTP 未完整配置（缺 host/username/password）")
+		return
+	}
+	target := cfg.AdminBcc
+	if target == "" {
+		target = cfg.Username
+	}
+	client := &notify.EmailClient{
+		Host: cfg.Host, Port: cfg.Port,
+		Username: cfg.Username, Password: cfg.Password, From: cfg.From,
+	}
+	if err := client.Send(notify.Message{
+		To:      target,
+		Subject: "[勿外传] SMTP 测试邮件",
+		Text:    "如果你收到了这封邮件，说明 SMTP 配置已生效。\n\n时间：" + time.Now().Format("2006-01-02 15:04:05"),
+		HTML: `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#fafafa;padding:24px;color:#18181b;">
+<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;">
+<div style="font-size:11px;color:#71717a;letter-spacing:.1em;text-transform:uppercase;">勿外传 · SMTP 测试</div>
+<h2 style="font-size:18px;margin:6px 0 12px 0;">✅ 配置已生效</h2>
+<p style="font-size:14px;color:#3f3f46;line-height:1.6;">如果你收到了这封邮件，说明 SMTP 设置正确，签到通知将正常发出。</p>
+<p style="font-size:12px;color:#a1a1aa;margin-top:18px;">时间 ` + time.Now().Format("2006-01-02 15:04:05") + `</p>
+</div></body></html>`,
+	}); err != nil {
+		writeErr(w, http.StatusBadGateway, "发送失败: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sentTo": target})
+}
+
+// GET /api/v1/admin/logs — recent sign records across all users
+func (h *handlers) adminLogs(w http.ResponseWriter, r *http.Request) {
+	limit := atoiDefault(r.URL.Query().Get("limit"), 100)
+	recs, err := h.store.ListAllRecords(r.Context(), limit)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	out := make([]map[string]any, 0, len(recs))
+	for _, rec := range recs {
+		out = append(out, map[string]any{
+			"id":         rec.ID,
+			"userId":     rec.UserID,
+			"userName":   rec.UserName,
+			"status":     rec.Status,
+			"message":    rec.Message,
+			"occurredAt": rec.OccurredAt.Unix(),
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ---------- DTOs ----------
+
+func codeDTO(c *store.InviteCode) map[string]any {
+	var bound *string
+	var boundAt *int64
+	if c.BoundUserID != nil {
+		bound = c.BoundUserID
+	}
+	if c.BoundAt != nil {
+		t := c.BoundAt.Unix()
+		boundAt = &t
+	}
+	return map[string]any{
+		"code":          c.Code,
+		"boundUserId":   bound,
+		"boundUserName": c.BoundUserName,
+		"boundAt":       boundAt,
+		"note":          c.Note,
+		"disabled":      c.Disabled,
+		"createdAt":     c.CreatedAt.Unix(),
+		"createdBy":     c.CreatedBy,
+		"used":          c.Used(),
+	}
+}
+
+// POST /api/v1/admin/users/{id}/pin — reset a user's login PIN.
+// If newPin is provided, validate (4–6 digits) and use it.
+// If newPin is empty, server generates a random 6-digit PIN.
+// Always logs out the user's existing sessions.
+func (h *handlers) adminResetUserPin(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req struct {
+		NewPin string `json:"newPin"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	pin := strings.TrimSpace(req.NewPin)
+	if pin == "" {
+		pin = generateNumericPin(6)
+	} else if !validPin(pin) {
+		writeErr(w, http.StatusBadRequest, "PIN 必须是 4–6 位数字")
+		return
+	}
+
+	if _, err := h.store.GetUser(r.Context(), id); err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(pin), bcrypt.DefaultCost)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "PIN 哈希失败")
+		return
+	}
+	if err := h.store.SetPinHash(r.Context(), id, hash); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	// Force re-login.
+	_ = h.store.DeleteSessionsForUser(r.Context(), id)
+	h.log.Info("admin reset pin", "target_user", id)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":     true,
+		"newPin": pin,
+	})
+}
+
+func generateNumericPin(n int) string {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand should not fail; fall back to deterministic
+		for i := range buf {
+			buf[i] = '0'
+		}
+		return string(buf)
+	}
+	out := make([]byte, n)
+	for i, b := range buf {
+		out[i] = '0' + b%10
+	}
+	return string(out)
+}
+
+func adminUserDTO(u *store.User) map[string]any {
+	return map[string]any{
+		"userId":      u.UserID,
+		"userName":    u.UserName,
+		"userNumber":  u.UserNumber,
+		"userSection": u.UserSection,
+		"userClass":   u.UserClass,
+		"inviteCode":  u.InviteCode,
+		"isDisabled":  u.IsDisabled,
+		"autoSign":    u.AutoSign,
+		"latitude":    u.Lat,
+		"longitude":   u.Lng,
+		"tokenExp":    u.TokenExp.Unix(),
+		"tokenValid":  time.Now().Before(u.TokenExp),
+		"createdAt":   u.CreatedAt.Unix(),
+		"updatedAt":   u.UpdatedAt.Unix(),
+	}
+}
+
+func atoiDefault(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return def
+	}
+	return n
+}

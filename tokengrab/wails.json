@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "wangui",
+  "outputfilename": "wangui",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "wangui (internal)"
+  },
+  "info": {
+    "companyName": "wangui",
+    "productName": "wangui",
+    "productVersion": "1.0.0",
+    "copyright": "internal use only",
+    "comments": "勿外传"
+  }
+}
