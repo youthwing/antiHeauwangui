@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import QRCode from 'qrcode'
 import {
   ArrowRight,
   AlertCircle,
-  HelpCircle,
   Shield,
   Eye,
   Lock,
@@ -15,11 +15,21 @@ import {
   KeyRound,
   Hash,
   ShieldCheck,
+  QrCode,
+  Copy,
+  RefreshCw,
 } from 'lucide-vue-next'
 import Logo from '../components/Logo.vue'
 import { api } from '../api'
 import { useAuth } from '../stores/auth'
 import { showToast } from '../lib/toast'
+import { copyText } from '../lib/clipboard'
+import {
+  buildWechatOauthAuthorizeUrl,
+  createWechatOauthState,
+  detectSchoolOauthInput,
+  HENAU_WECHAT_CALLBACK_EXAMPLE,
+} from '../lib/schoolOauth'
 
 const router = useRouter()
 const route = useRoute()
@@ -35,11 +45,15 @@ const loginPin = ref('')
 // Activate fields
 const inviteCode = ref('')
 const token = ref('')
+const callbackUrl = ref('')
 const pinA = ref('')
 const pinB = ref('')
 const agreed = ref(localStorage.getItem('wangui:disclaimer') === 'yes')
 const showDisclaimerDetail = ref(false)
-const showHelp = ref(false)
+const showLegacyToken = ref(false)
+const wechatQrDataUrl = ref('')
+const wechatState = ref(createWechatOauthState())
+const buildingWechatQr = ref(false)
 
 // Disclaimer must be expanded for a few seconds before the user is allowed
 // to tick the agreement box. If they've previously agreed (localStorage flag)
@@ -89,6 +103,13 @@ const disclaimerItems = [
 ]
 
 const isPinValid = (p: string) => /^\d{4,6}$/.test(p)
+const callbackDetection = computed(() => detectSchoolOauthInput(callbackUrl.value))
+const callbackLooksValid = computed(
+  () =>
+    callbackDetection.value.kind === 'code' ||
+    callbackDetection.value.kind === 'callback-url',
+)
+const callbackCodePreview = computed(() => shortCode(callbackDetection.value.code))
 
 const canSubmit = computed(() => {
   if (submitting.value) return false
@@ -97,7 +118,7 @@ const canSubmit = computed(() => {
   }
   return (
     inviteCode.value.trim().length > 0 &&
-    token.value.trim().length > 0 &&
+    (callbackLooksValid.value || token.value.trim().length > 0) &&
     isPinValid(pinA.value) &&
     pinA.value === pinB.value &&
     agreed.value
@@ -122,9 +143,13 @@ async function submit() {
     } else {
       await api.activate(
         inviteCode.value.trim().toUpperCase(),
-        token.value.trim(),
         pinA.value,
         true,
+        {
+          token: token.value.trim() || undefined,
+          oauthCode: callbackDetection.value.code || undefined,
+          callbackUrl: callbackUrl.value.trim() || undefined,
+        },
       )
       localStorage.setItem('wangui:disclaimer', 'yes')
       showToast('ok', '激活成功')
@@ -150,11 +175,46 @@ function pinDigits(s: string): string {
   return s.replace(/\D/g, '').slice(0, 6)
 }
 
+function shortCode(s: string): string {
+  if (!s) return ''
+  if (s.length <= 14) return s
+  return `${s.slice(0, 6)}...${s.slice(-6)}`
+}
+
+async function refreshWechatQr() {
+  buildingWechatQr.value = true
+  try {
+    wechatState.value = createWechatOauthState()
+    const url = buildWechatOauthAuthorizeUrl(wechatState.value)
+    wechatQrDataUrl.value = await QRCode.toDataURL(url, {
+      width: 240,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+    })
+  } catch (e: any) {
+    wechatQrDataUrl.value = ''
+    showToast('err', e?.message || '二维码生成失败')
+  } finally {
+    buildingWechatQr.value = false
+  }
+}
+
+async function copyWechatUrl() {
+  const ok = await copyText(buildWechatOauthAuthorizeUrl(wechatState.value))
+  showToast(ok ? 'ok' : 'err', ok ? '授权链接已复制' : '复制失败，请手动长按二维码')
+}
+
+async function copyCallbackExample() {
+  const ok = await copyText(HENAU_WECHAT_CALLBACK_EXAMPLE)
+  showToast(ok ? 'ok' : 'err', ok ? '回调链接示例已复制' : '复制失败')
+}
+
 onMounted(async () => {
   await auth.init()
+  await refreshWechatQr()
 
-  // tokengrab hands tokens off via URL fragment to keep them out of the
-  // server's access log / Referer header. Format:
+  // Legacy tokengrab handoff keeps the JWT in the URL fragment so it does not
+  // land in Referer headers or server access logs. Format:
   //   #activate=<token>&code=<invite>  (URLSearchParams-style)
   const rawHash = window.location.hash.replace(/^#/, '')
   const params = rawHash ? new URLSearchParams(rawHash) : null
@@ -187,6 +247,7 @@ onMounted(async () => {
   if (tok) {
     mode.value = 'activate'
     token.value = tok
+    showLegacyToken.value = true
     if (code) inviteCode.value = code
   }
 })
@@ -290,7 +351,7 @@ onMounted(async () => {
 
         <!-- Activate form -->
         <div v-else class="p-6">
-          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-5">首次使用，用邀请码 + 学校 Token 激活，并设置登录 PIN</p>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-5">首次使用，用邀请码 + 微信扫码登录晚归页面完成激活，并设置登录 PIN</p>
 
           <div class="space-y-4">
             <div>
@@ -309,32 +370,124 @@ onMounted(async () => {
 
             <div>
               <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
-                <KeyRound class="w-3.5 h-3.5" />
-                学校 Token
+                <QrCode class="w-3.5 h-3.5" />
+                微信扫码获取学校 Token
               </label>
-              <textarea
-                v-model="token"
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token h-24 resize-none text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring"
-              />
+              <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+                <div class="flex flex-col sm:flex-row gap-4">
+                  <div class="shrink-0 self-center sm:self-start">
+                    <div class="w-36 h-36 rounded-xl bg-white ring-1 ring-black/[0.06] p-2 flex items-center justify-center overflow-hidden">
+                      <img
+                        v-if="wechatQrDataUrl"
+                        :src="wechatQrDataUrl"
+                        alt="微信扫码授权二维码"
+                        class="w-full h-full object-contain"
+                      />
+                      <div v-else class="text-[11px] text-zinc-400 text-center px-2">
+                        {{ buildingWechatQr ? '生成中…' : '二维码生成失败' }}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <ol class="text-[11px] text-zinc-500 dark:text-zinc-400 space-y-1.5 list-decimal list-inside leading-relaxed">
+                      <li>用手机微信扫描左侧二维码，进入学校晚归页面并完成授权。</li>
+                      <li>授权成功后，页面会跳到 <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">https://xhbcs.henau.edu.cn/?code=...</code>。</li>
+                      <li>把这个回调链接或里面的 <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">code</code> 粘贴到下面输入框。</li>
+                      <li>提交后服务器会直接向学校接口换取 JWT，不需要再抓包。</li>
+                    </ol>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        @click="copyWechatUrl"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                      >
+                        <Copy class="w-3 h-3" />
+                        复制授权链接
+                      </button>
+                      <button
+                        type="button"
+                        @click="refreshWechatQr"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                      >
+                        <RefreshCw class="w-3 h-3" />
+                        刷新二维码
+                      </button>
+                      <button
+                        type="button"
+                        @click="copyCallbackExample"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                      >
+                        <Copy class="w-3 h-3" />
+                        复制回调链接示例
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3 rounded-2xl bg-emerald-500/[0.08] ring-1 ring-emerald-500/30 p-4 shadow-[0_10px_30px_rgba(16,185,129,0.08)]">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <label class="flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      <KeyRound class="w-4 h-4 text-emerald-400" />
+                      把手机里的回调链接或 code 直接贴这里
+                    </label>
+                    <p class="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      支持整段 <code class="bg-white/80 dark:bg-zinc-900/80 px-1 rounded text-zinc-700 dark:text-zinc-300">https://xhbcs.henau.edu.cn/?code=...</code>
+                      、只复制
+                      <code class="bg-white/80 dark:bg-zinc-900/80 px-1 rounded text-zinc-700 dark:text-zinc-300">?code=...</code>
+                      ，或直接贴纯
+                      <code class="bg-white/80 dark:bg-zinc-900/80 px-1 rounded text-zinc-700 dark:text-zinc-300">code</code>
+                      。
+                    </p>
+                  </div>
+                </div>
+                <textarea
+                  v-model="callbackUrl"
+                  placeholder="示例：https://xhbcs.henau.edu.cn/?code=001B8Zfa1NMRHL0m65la1gbfBa3B8ZFy&state=STATE#/checkin"
+                  class="mt-3 w-full bg-white dark:bg-zinc-950 ring-2 ring-emerald-500/25 focus:!ring-emerald-500/55 rounded-xl px-3 py-3 h-32 resize-none text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring"
+                />
+                <div
+                  v-if="callbackDetection.kind === 'callback-url'"
+                  class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/12 px-2.5 py-1.5 text-[11px] text-emerald-500"
+                >
+                  <Check class="w-3.5 h-3.5" />
+                  已识别整段回调链接，将自动提取 code：{{ callbackCodePreview }}
+                </div>
+                <div
+                  v-else-if="callbackDetection.kind === 'code'"
+                  class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/12 px-2.5 py-1.5 text-[11px] text-emerald-500"
+                >
+                  <Check class="w-3.5 h-3.5" />
+                  已识别为 code：{{ callbackCodePreview }}
+                </div>
+                <div
+                  v-else-if="callbackDetection.kind === 'invalid' && callbackUrl.trim()"
+                  class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-500/12 px-2.5 py-1.5 text-[11px] text-amber-400"
+                >
+                  <AlertCircle class="w-3.5 h-3.5" />
+                  没识别到 code。请粘贴整段回调链接、`?code=...` 或纯 code。
+                </div>
+              </div>
+
               <button
-                @click="showHelp = !showHelp"
+                @click="showLegacyToken = !showLegacyToken"
                 type="button"
-                class="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-500 dark:hover:text-zinc-400 dark:text-zinc-300 transition-colors"
+                class="mt-2 text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
               >
-                <HelpCircle class="w-3 h-3" />
-                <span>怎么获取 Token？</span>
+                {{ showLegacyToken ? '收起手动 JWT 兜底' : '高级选项：手动粘贴 JWT' }}
               </button>
               <Transition name="expand">
-                <ol
-                  v-if="showHelp"
-                  class="mt-2 overflow-hidden text-[11px] text-zinc-500 dark:text-zinc-400 space-y-1.5 list-decimal list-inside leading-relaxed bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] rounded-lg p-3"
+                <div
+                  v-if="showLegacyToken"
+                  class="mt-2 overflow-hidden rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
                 >
-                  <li>跟管理员要 <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">wangui.exe</code>（配套抓取工具）。</li>
-                  <li>电脑微信打开晚归签到入口、正常登录。</li>
-                  <li>双击 <code class="text-zinc-700 dark:text-zinc-300">wangui.exe</code> → 点「开始抓取」→ 回微信按 <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">Ctrl+R</code> 刷新一下。</li>
-                  <li>Token 自动复制到剪贴板，回到本页粘贴到上面的输入框即可。</li>
-                </ol>
+                  <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2">仅在扫码流程异常时使用，直接粘贴学校 JWT。</p>
+                  <textarea
+                    v-model="token"
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token h-24 resize-none text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring"
+                  />
+                </div>
               </Transition>
             </div>
 

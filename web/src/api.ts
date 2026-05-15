@@ -13,6 +13,12 @@ import type {
   SmtpUpdate,
 } from './types'
 
+export interface SchoolAuthPayload {
+  token?: string
+  callbackUrl?: string
+  oauthCode?: string
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch('/api/v1' + path, {
     credentials: 'include',
@@ -36,18 +42,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ userNumber, pin }),
     }),
-  activate: (inviteCode: string, token: string, pin: string, disclaimerAccepted: boolean) =>
+  activate: (
+    inviteCode: string,
+    pin: string,
+    disclaimerAccepted: boolean,
+    auth: SchoolAuthPayload,
+  ) =>
     request<{ ok: boolean }>('/activate', {
       method: 'POST',
-      body: JSON.stringify({ inviteCode, token, pin, disclaimerAccepted }),
+      body: JSON.stringify({ inviteCode, pin, disclaimerAccepted, ...auth }),
     }),
 
   // ---- User-scoped ----
   me: () => request<Me>('/me'),
-  updateToken: (token: string) =>
+  updateToken: (auth: SchoolAuthPayload) =>
     request<{ ok: boolean; expiresAt: number }>('/token', {
       method: 'PUT',
-      body: JSON.stringify({ token }),
+      body: JSON.stringify(auth),
     }),
   changePin: (oldPin: string, newPin: string) =>
     request<{ ok: boolean }>('/pin', {

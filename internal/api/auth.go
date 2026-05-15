@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,26 @@ type User struct {
 	AccountStatus int    `json:"accountStatus"`
 	UserStatus    int    `json:"userStatus"`
 	Roles         []Role `json:"roles"`
+}
+
+type OAuth2LoginData struct {
+	AccessToken string `json:"accessToken"`
+	IsNewUser   bool   `json:"isNewUser"`
+}
+
+// OAuth2Login exchanges a WeChat OAuth callback code for the school's JWT.
+func (c *Client) OAuth2Login(ctx context.Context, code string) (*OAuth2LoginData, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, errors.New("oauth2 code is empty")
+	}
+	var out OAuth2LoginData
+	if err := c.do(ctx, http.MethodPost, "/auth/oauth2/login", nil, map[string]string{
+		"code": code,
+	}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // GetUser fetches the current authenticated user. Returns an APIError(401/403)

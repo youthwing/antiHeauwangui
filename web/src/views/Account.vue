@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import QRCode from 'qrcode'
 import {
   KeyRound,
   Ticket,
@@ -12,21 +13,29 @@ import {
   XCircle,
   ShieldCheck,
   AlertCircle,
+  QrCode,
+  RefreshCw,
 } from 'lucide-vue-next'
 import { useAuth } from '../stores/auth'
 import { api } from '../api'
 import { formatDateTime, formatRemaining, tokenProgressPercent, tokenProgressColor } from '../lib/format'
 import { showToast } from '../lib/toast'
 import { copyText } from '../lib/clipboard'
+import { buildWechatOauthAuthorizeUrl, createWechatOauthState } from '../lib/schoolOauth'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuth()
 
 const newToken = ref('')
+const callbackUrl = ref('')
 const savingToken = ref(false)
 const tokenSectionRef = ref<HTMLElement | null>(null)
 const tokenPrefilledFlash = ref(false)
+const showLegacyToken = ref(false)
+const wechatQrDataUrl = ref('')
+const wechatState = ref(createWechatOauthState())
+const buildingWechatQr = ref(false)
 
 const oldPin = ref('')
 const newPinA = ref('')
@@ -54,10 +63,12 @@ onMounted(async () => {
   // tokengrab → Login.vue hands a refreshed token to us via sessionStorage
   // (URL would put it in browser history; query strings are visible). Pick
   // it up, drop it into the textarea, flash + scroll the section into view.
+  await refreshWechatQr()
   if (route.query.prefill === 'token') {
     const tok = sessionStorage.getItem('wangui:prefill_token')
     if (tok) {
       newToken.value = tok
+      showLegacyToken.value = true
       sessionStorage.removeItem('wangui:prefill_token')
       tokenPrefilledFlash.value = true
       // Drop the query so refresh doesn't re-trigger the flash.
@@ -101,18 +112,45 @@ async function savePin() {
 
 async function saveToken() {
   const tok = newToken.value.trim()
-  if (!tok) return
+  const cb = callbackUrl.value.trim()
+  if (!tok && !cb) return
   savingToken.value = true
   try {
-    await api.updateToken(tok)
+    await api.updateToken({
+      token: tok || undefined,
+      callbackUrl: cb || undefined,
+    })
     showToast('ok', 'Token 已更新')
     newToken.value = ''
+    callbackUrl.value = ''
     await auth.refresh()
   } catch (e: any) {
     showToast('err', e.message || 'Token 更新失败')
   } finally {
     savingToken.value = false
   }
+}
+
+async function refreshWechatQr() {
+  buildingWechatQr.value = true
+  try {
+    wechatState.value = createWechatOauthState()
+    wechatQrDataUrl.value = await QRCode.toDataURL(buildWechatOauthAuthorizeUrl(wechatState.value), {
+      width: 240,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+    })
+  } catch (e: any) {
+    wechatQrDataUrl.value = ''
+    showToast('err', e?.message || '二维码生成失败')
+  } finally {
+    buildingWechatQr.value = false
+  }
+}
+
+async function copyWechatUrl() {
+  const ok = await copyText(buildWechatOauthAuthorizeUrl(wechatState.value))
+  showToast(ok ? 'ok' : 'err', ok ? '授权链接已复制' : '复制失败，请手动长按二维码')
 }
 
 async function copyInvite() {
@@ -209,25 +247,91 @@ async function logout() {
 
       <div class="mt-5 pt-5 border-t border-black/[0.06] dark:border-white/[0.05]">
         <div class="flex items-center justify-between mb-2">
-          <p class="text-xs text-zinc-500 dark:text-zinc-400">粘贴新 Token 更新</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400">扫码更新学校 Token</p>
           <Transition name="fade">
             <span
               v-if="tokenPrefilledFlash"
               class="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium"
             >
               <CheckCircle2 class="w-3 h-3" />
-              已由 Token Grab 自动填入
+              已自动填入待更新的 JWT
             </span>
           </Transition>
         </div>
+        <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+          <div class="flex flex-col sm:flex-row gap-4">
+            <div class="shrink-0 self-center sm:self-start">
+              <div class="w-36 h-36 rounded-xl bg-white ring-1 ring-black/[0.06] p-2 flex items-center justify-center overflow-hidden">
+                <img
+                  v-if="wechatQrDataUrl"
+                  :src="wechatQrDataUrl"
+                  alt="微信扫码授权二维码"
+                  class="w-full h-full object-contain"
+                />
+                <div v-else class="text-[11px] text-zinc-400 text-center px-2">
+                  {{ buildingWechatQr ? '生成中…' : '二维码生成失败' }}
+                </div>
+              </div>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                扫码后在手机微信里完成学校晚归授权，然后把跳转后的
+                <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">https://xhbcs.henau.edu.cn/?code=...</code>
+                整段回调链接，或里面的 <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">code</code> 粘贴到下面。
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  @click="copyWechatUrl"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                >
+                  <Copy class="w-3 h-3" />
+                  复制授权链接
+                </button>
+                <button
+                  type="button"
+                  @click="refreshWechatQr"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                >
+                  <RefreshCw class="w-3 h-3" />
+                  刷新二维码
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5 mt-3">
+          <QrCode class="w-3.5 h-3.5" />
+          回调链接或 code
+        </label>
         <textarea
-          v-model="newToken"
-          placeholder="eyJ..."
-          class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 font-mono-token h-24 resize-none focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+          v-model="callbackUrl"
+          placeholder="https://xhbcs.henau.edu.cn/?code=...&state=STATE#/checkin"
+          class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 h-24 resize-none focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
         />
         <button
+          @click="showLegacyToken = !showLegacyToken"
+          type="button"
+          class="mt-2 text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+        >
+          {{ showLegacyToken ? '收起手动 JWT 兜底' : '高级选项：手动粘贴 JWT' }}
+        </button>
+        <Transition name="expand">
+          <div
+            v-if="showLegacyToken"
+            class="mt-2 overflow-hidden rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
+          >
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2">仅在扫码流程异常时使用，直接粘贴学校 JWT。</p>
+            <textarea
+              v-model="newToken"
+              placeholder="eyJ..."
+              class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 font-mono-token h-24 resize-none focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+            />
+          </div>
+        </Transition>
+        <button
           @click="saveToken"
-          :disabled="savingToken || !newToken.trim()"
+          :disabled="savingToken || (!newToken.trim() && !callbackUrl.trim())"
           class="mt-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed"
         >
           {{ savingToken ? '保存中…' : '更新 Token' }}

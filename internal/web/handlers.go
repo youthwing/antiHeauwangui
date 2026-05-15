@@ -13,7 +13,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"wangui/internal/api"
 	"wangui/internal/scheduler"
 	"wangui/internal/store"
 )
@@ -108,8 +107,8 @@ func clientIP(r *http.Request) string {
 // First-time registration: invite code + school JWT + disclaimer. Rate-limited by IP.
 
 type activateReq struct {
+	schoolAuthInput
 	InviteCode         string `json:"inviteCode"`
-	Token              string `json:"token"`
 	Pin                string `json:"pin"`
 	DisclaimerAccepted bool   `json:"disclaimerAccepted"`
 }
@@ -133,11 +132,6 @@ func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "邀请码不能为空")
 		return
 	}
-	tok := normalizeToken(req.Token)
-	if tok == "" {
-		writeErr(w, http.StatusBadRequest, "Token 不能为空")
-		return
-	}
 	pin := strings.TrimSpace(req.Pin)
 	if !validPin(pin) {
 		writeErr(w, http.StatusBadRequest, "PIN 必须是 4–6 位数字")
@@ -148,29 +142,17 @@ func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "PIN 哈希失败")
 		return
 	}
-	claims, err := parseJWT(tok)
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if time.Until(claims.ExpiresAt()) < 5*time.Minute {
-		writeErr(w, http.StatusBadRequest, "Token 已过期或即将过期，请重新抓取")
-		return
-	}
-
-	// Verify token actually works against the school API.
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	c := api.New(tok)
-	su, err := c.GetUser(ctx)
+	auth, status, err := h.resolveSchoolAuth(ctx, req.schoolAuthInput)
 	if err != nil {
-		writeErr(w, http.StatusUnauthorized, "Token 校验失败: "+err.Error())
+		writeErr(w, status, err.Error())
 		return
 	}
 
 	// Guard: if this user already has a different invite code bound, refuse.
 	// They must delete their account first to free the old code, then activate with the new one.
-	if existing, err := h.store.GetUser(ctx, claims.Iss); err == nil {
+	if existing, err := h.store.GetUser(ctx, auth.Claims.Iss); err == nil {
 		if existing.InviteCode != "" && existing.InviteCode != code {
 			writeErr(w, http.StatusForbidden,
 				"该学号已绑定邀请码 "+existing.InviteCode+"，不能再激活新邀请码。如需更换请先在「账号」页注销。")
@@ -179,7 +161,7 @@ func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Atomically bind the invite code to this user_id.
-	if _, err := h.store.BindCode(ctx, code, claims.Iss); err != nil {
+	if _, err := h.store.BindCode(ctx, code, auth.Claims.Iss); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeErr(w, http.StatusBadRequest, "邀请码不存在")
 			return
@@ -194,14 +176,14 @@ func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u := &store.User{
-		UserID:        claims.Iss,
-		UserName:      su.UserName,
-		UserNumber:    su.UserNumber,
-		UserSection:   su.UserSection,
-		UserClass:     su.UserClass,
-		UserAvatarURL: su.UserAvatarURL,
-		Token:         tok,
-		TokenExp:      claims.ExpiresAt(),
+		UserID:        auth.Claims.Iss,
+		UserName:      auth.User.UserName,
+		UserNumber:    auth.User.UserNumber,
+		UserSection:   auth.User.UserSection,
+		UserClass:     auth.User.UserClass,
+		UserAvatarURL: auth.User.UserAvatarURL,
+		Token:         auth.Token,
+		TokenExp:      auth.Claims.ExpiresAt(),
 		AutoSign:      true,
 		InviteCode:    code,
 		DeviceModel:   "iPhone",
@@ -214,15 +196,15 @@ func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Ensure invite_code is set on a re-activation as well.
-	_ = h.store.SetInviteCode(ctx, claims.Iss, code)
+	_ = h.store.SetInviteCode(ctx, auth.Claims.Iss, code)
 
-	sess, err := h.store.CreateSession(ctx, claims.Iss, false, 30*24*time.Hour)
+	sess, err := h.store.CreateSession(ctx, auth.Claims.Iss, false, 30*24*time.Hour)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "会话创建失败")
 		return
 	}
 	setSessionCookie(w, sessionCookie, sess.SessionID, sess.ExpiresAt)
-	h.log.Info("activate ok", "user", claims.Iss, "code", code, "name", su.UserName)
+	h.log.Info("activate ok", "user", auth.Claims.Iss, "code", code, "name", auth.User.UserName)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -328,44 +310,28 @@ func (h *handlers) listDorms(w http.ResponseWriter, r *http.Request) {
 
 func (h *handlers) updateToken(w http.ResponseWriter, r *http.Request) {
 	uid := userIDOf(r)
-	var req struct {
-		Token string `json:"token"`
-	}
+	var req schoolAuthInput
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "请求格式错误")
 		return
 	}
-	tok := normalizeToken(req.Token)
-	if tok == "" {
-		writeErr(w, http.StatusBadRequest, "Token 不能为空")
-		return
-	}
-	claims, err := parseJWT(tok)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	auth, status, err := h.resolveSchoolAuth(ctx, req)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
+		writeErr(w, status, err.Error())
 		return
 	}
-	if claims.Iss != uid {
+	if auth.Claims.Iss != uid {
 		writeErr(w, http.StatusBadRequest, "Token 属于另一个账号，无法覆盖")
 		return
 	}
-	if time.Until(claims.ExpiresAt()) < 5*time.Minute {
-		writeErr(w, http.StatusBadRequest, "Token 已过期或即将过期")
-		return
-	}
-	c := api.New(tok)
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	if _, err := c.GetUser(ctx); err != nil {
-		writeErr(w, http.StatusUnauthorized, "Token 校验失败: "+err.Error())
-		return
-	}
-	if err := h.store.UpdateToken(ctx, uid, tok, claims.ExpiresAt()); err != nil {
+	if err := h.store.UpdateToken(ctx, uid, auth.Token, auth.Claims.ExpiresAt()); err != nil {
 		writeErr(w, http.StatusInternalServerError, "保存失败")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "expiresAt": claims.Exp,
+		"ok": true, "expiresAt": auth.Claims.Exp,
 	})
 }
 
@@ -381,17 +347,17 @@ func (h *handlers) getSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateSettingsReq struct {
-	AutoSign       *bool            `json:"autoSign"`
-	DormID         *int64           `json:"dormId"`
-	DeviceModel    *string          `json:"deviceModel"`
-	DeviceSystem   *string          `json:"deviceSystem"`
-	TriggerMinute  *int             `json:"triggerMinute"`
-	JitterSec      *int             `json:"jitterSec"`
-	RetryCount     *int             `json:"retryCount"`
-	RetryGapMin    *int             `json:"retryGapMin"`
-	NotifyEmail    *string          `json:"notifyEmail"`
-	NotifyEnabled  *bool            `json:"notifyEnabled"`
-	SignDays       *int             `json:"signDays"`
+	AutoSign      *bool   `json:"autoSign"`
+	DormID        *int64  `json:"dormId"`
+	DeviceModel   *string `json:"deviceModel"`
+	DeviceSystem  *string `json:"deviceSystem"`
+	TriggerMinute *int    `json:"triggerMinute"`
+	JitterSec     *int    `json:"jitterSec"`
+	RetryCount    *int    `json:"retryCount"`
+	RetryGapMin   *int    `json:"retryGapMin"`
+	NotifyEmail   *string `json:"notifyEmail"`
+	NotifyEnabled *bool   `json:"notifyEnabled"`
+	SignDays      *int    `json:"signDays"`
 	// Legacy raw-coord fields, accepted for backwards compat / admin override.
 	Latitude       *float64         `json:"latitude"`
 	Longitude      *float64         `json:"longitude"`
