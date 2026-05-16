@@ -27,7 +27,17 @@ let timer: number | null = null
 onMounted(async () => {
   await auth.init()
   await loadRecords()
-  timer = window.setInterval(() => (now.value = new Date()), 30_000)
+  // Tick every 30s. During the 22:00–22:35 window, also re-pull records
+  // so the "今日签到" status auto-transitions from "正在尝试" → "已完成"
+  // without the user having to refresh.
+  timer = window.setInterval(async () => {
+    now.value = new Date()
+    const h = now.value.getHours()
+    const m = now.value.getMinutes()
+    if (h === 22 && m <= 35) {
+      await loadRecords()
+    }
+  }, 30_000)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
@@ -65,17 +75,20 @@ const tokenColor = computed(() => {
   return 'text-emerald-400'
 })
 
-// Today already signed?
-const signedToday = computed(() => {
-  const today = new Date()
-  const y = today.getFullYear()
-  const m = today.getMonth()
-  const d = today.getDate()
-  return records.value.some(r => {
-    if (r.status !== 'success' && r.status !== 'already') return false
-    const t = new Date(r.occurredAt * 1000)
-    return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d
-  })
+// Today's most recent record (any status). Used by the Today-status card
+// below to decide which terminal state to render.
+const todayRecord = computed(() => {
+  const t = new Date()
+  const y = t.getFullYear()
+  const m = t.getMonth()
+  const d = t.getDate()
+  for (const r of records.value) {
+    const ts = new Date(r.occurredAt * 1000)
+    if (ts.getFullYear() === y && ts.getMonth() === m && ts.getDate() === d) {
+      return r
+    }
+  }
+  return null
 })
 
 // Is today a sign-in day per the user's sign_days bitmask?
@@ -89,14 +102,15 @@ const isSignDayToday = computed(() => {
 })
 
 // Personal sign moment: 22:00 + my triggerMinute. Each user has their own
-// trigger so they don't all fire at the same second. Display this to the user
-// so they know when to expect the email rather than refreshing the page from
-// 21:50 onward.
+// trigger so they don't all fire at the same second. Displayed to the user
+// so they know when to expect the email rather than refreshing from 21:50.
 const mySignMinute = computed(() => me.value?.settings.triggerMinute ?? 2)
 
 const mySignTimeStr = computed(() => `22:${String(mySignMinute.value).padStart(2, '0')}`)
 
-// Time until *my* sign moment (not the 22:00 window opening).
+// Countdown to the NEXT firing of my sign moment. Always points to a future
+// time — if today's moment has passed, this counts to tomorrow's. Used by
+// the "我的签到时刻" card to render a stable schedule view.
 const untilMySign = computed(() => {
   const n = now.value
   const target = new Date(n)
@@ -107,23 +121,34 @@ const untilMySign = computed(() => {
   return { h: Math.floor(totalMin / 60), m: totalMin % 60, totalMin }
 })
 
-// Where in the cycle am I?
-//   pending   — today, before my sign moment, not yet signed
-//   signing   — 22:00–22:30 today, my sign moment already passed but no record yet
-//   waiting   — outside today's window (tomorrow or earlier today)
-const cycleState = computed<'pending' | 'signing' | 'waiting'>(() => {
-  const n = now.value
-  if (n.getHours() !== 22 || n.getMinutes() >= 30) return 'waiting'
-  // Within 22:00–22:30
-  if (n.getMinutes() < mySignMinute.value) return 'pending'
-  return 'signing'
-})
-
-const inWindow = computed(() => {
+// State machine for the "今日签到" status card. Each branch is exclusive.
+// Order matters: a record observed today always wins over time-based guesses.
+//   resting   — today is not in signDays (no firing today)
+//   done      — todayRecord exists with success/already
+//   exempt    — todayRecord exists with status=exempt (请假 / 节假日 / 走读)
+//   failed    — todayRecord exists with status=failed (retryable via 立即签到)
+//   missed    — past 22:30 today, no successful record
+//   trying    — within 22:00–22:30, no record yet, my sign moment reached
+//   imminent  — within 22:00–22:30, no record yet, my sign moment not yet
+//   waiting   — anything else (most of the day before 22:00 / next-day)
+type TodayState = 'resting' | 'done' | 'exempt' | 'failed' | 'missed' | 'trying' | 'imminent' | 'waiting'
+const todayState = computed<TodayState>(() => {
+  if (!isSignDayToday.value) return 'resting'
+  const rec = todayRecord.value
+  if (rec) {
+    if (rec.status === 'success' || rec.status === 'already') return 'done'
+    if (rec.status === 'exempt') return 'exempt'
+    if (rec.status === 'failed') return 'failed'
+    // 'skipped' falls through to time-based logic
+  }
   const n = now.value
   const h = n.getHours()
   const m = n.getMinutes()
-  return h === 22 && m < 30
+  if (h === 22 && m < 30) {
+    return m >= mySignMinute.value ? 'trying' : 'imminent'
+  }
+  if (h > 22 || (h === 22 && m >= 30)) return 'missed'
+  return 'waiting'
 })
 
 async function signNow() {
@@ -217,79 +242,110 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
 
     <!-- KPI row -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <!-- Today status -->
+      <!--
+        Today status card — single source of truth for "今天签了吗".
+        Drives off todayState, which observes the actual record. After the
+        system fires at 22:0X, the record arrives, records auto-poll picks
+        it up within 30s, and this card flips to "已完成" on its own.
+      -->
       <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
         <div class="flex items-center gap-1.5 mb-2">
           <CheckCircle2 class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[11px] text-zinc-500 tracking-wide uppercase">今日签到</span>
         </div>
-        <template v-if="!isSignDayToday">
+        <template v-if="todayState === 'resting'">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-zinc-500" />
             <span class="text-zinc-500 dark:text-zinc-400 font-semibold text-base">今日休息</span>
           </div>
           <p class="text-xs text-zinc-500 mt-1.5">不在你设置的签到日期内</p>
         </template>
-        <template v-else-if="signedToday">
+        <template v-else-if="todayState === 'done'">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgb(16_185_129_/_0.8)]" />
             <span class="text-emerald-400 font-semibold text-base">已完成</span>
           </div>
-          <p class="text-xs text-zinc-500 mt-1.5">今天的窗口已完成 ✓</p>
+          <p class="text-xs text-zinc-500 mt-1.5">
+            {{ todayRecord?.status === 'already' ? '今日已签到 ✓' : '签到成功 ✓' }}
+            <span v-if="todayRecord" class="ml-1 text-zinc-500 dark:text-zinc-600">
+              {{ formatDateTime(todayRecord.occurredAt).slice(11, 16) }}
+            </span>
+          </p>
+        </template>
+        <template v-else-if="todayState === 'exempt'">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-blue-500" />
+            <span class="text-blue-400 font-semibold text-base">今日免签</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1.5 truncate">
+            {{ todayRecord?.message || '学校系统标记免签（请假 / 节假日 / 走读）' }}
+          </p>
+        </template>
+        <template v-else-if="todayState === 'failed'">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgb(239_68_68_/_0.8)]" />
+            <span class="text-red-400 font-semibold text-base">签到失败</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1.5 truncate">
+            {{ todayRecord?.message || '执行失败，请点「立即签到」重试' }}
+          </p>
+        </template>
+        <template v-else-if="todayState === 'missed'">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-red-500" />
+            <span class="text-red-400 font-semibold text-base">已错过窗口</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1.5">22:30 已过且无签到记录，请检查 Token / 配置</p>
+        </template>
+        <template v-else-if="todayState === 'trying'">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgb(245_158_11_/_0.8)] animate-pulse" />
+            <span class="text-amber-400 font-semibold text-base">正在尝试…</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1.5">后台正在执行，30 秒内自动刷新</p>
+        </template>
+        <template v-else-if="todayState === 'imminent'">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500" />
+            <span class="text-amber-400 font-semibold text-base">即将开始</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1.5">
+            还差 {{ Math.max(0, mySignMinute - now.getMinutes()) }} 分钟到你的预定时刻
+          </p>
         </template>
         <template v-else>
           <div class="flex items-center gap-2">
-            <span
-              :class="cycleState === 'signing' ? 'bg-amber-500 shadow-[0_0_8px_rgb(245_158_11_/_0.8)]' : 'bg-zinc-600'"
-              class="w-2 h-2 rounded-full"
-            />
-            <span class="text-zinc-500 dark:text-zinc-400 font-semibold text-base">
-              {{ cycleState === 'signing' ? '正在尝试…' : '待签到' }}
-            </span>
+            <span class="w-2 h-2 rounded-full bg-zinc-500" />
+            <span class="text-zinc-500 dark:text-zinc-400 font-semibold text-base">待签到</span>
           </div>
-          <p class="text-xs text-zinc-500 mt-1.5">
-            <template v-if="cycleState === 'signing'">
-              你的预定时刻 {{ mySignTimeStr }} 已到，签到中
-            </template>
-            <template v-else>
-              今天 <span class="text-emerald-400 font-mono-token">{{ mySignTimeStr }}</span> 自动签
-            </template>
-          </p>
+          <p class="text-xs text-zinc-500 mt-1.5">今晚 22:00–22:30 自动触发</p>
         </template>
       </div>
 
-      <!-- My sign moment -->
+      <!--
+        Sign-time card — pure schedule info. NEVER reflects today's state.
+        Always shows the configured 22:0X and a countdown to the next
+        occurrence. Keeps semantics distinct from the Today card so the
+        two never tell the same story.
+      -->
       <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
         <div class="flex items-center gap-1.5 mb-2">
           <Clock class="w-3.5 h-3.5 text-zinc-500" />
-          <span class="text-[11px] text-zinc-500 tracking-wide uppercase">
-            {{ cycleState === 'signing' ? '正在签到' : '我的签到时刻' }}
-          </span>
+          <span class="text-[11px] text-zinc-500 tracking-wide uppercase">我的签到时刻</span>
         </div>
         <div class="flex items-baseline gap-1.5">
-          <span v-if="cycleState === 'signing'" class="text-amber-400 font-bold text-lg tabular-nums">
-            执行中
+          <span class="text-3xl font-bold tabular-nums leading-none text-emerald-400">
+            {{ mySignTimeStr }}
           </span>
-          <template v-else-if="cycleState === 'pending'">
-            <span class="text-2xl font-bold tabular-nums leading-none text-emerald-400">{{ mySignTimeStr }}</span>
-            <span class="text-xs text-zinc-500 ml-1">±60秒</span>
-          </template>
-          <template v-else>
-            <span class="text-2xl font-bold tabular-nums leading-none">{{ untilMySign.h }}</span>
-            <span class="text-xs text-zinc-500">小时</span>
-            <span class="text-2xl font-bold tabular-nums leading-none">{{ untilMySign.m }}</span>
-            <span class="text-xs text-zinc-500">分</span>
-          </template>
+          <span class="text-[10px] text-zinc-500">±60秒</span>
         </div>
         <p class="text-xs text-zinc-500 mt-1.5">
-          <template v-if="cycleState === 'signing'">
-            预定 {{ mySignTimeStr }}（含 ±60 秒抖动），后台正在尝试
-          </template>
-          <template v-else-if="cycleState === 'pending'">
-            还差 {{ 22 * 60 + mySignMinute - now.getHours() * 60 - now.getMinutes() }} 分钟
+          每天此刻自动签 ·
+          <template v-if="untilMySign.totalMin < 60">
+            {{ untilMySign.totalMin <= 0 ? '刚刚' : '还有 ' + untilMySign.m + ' 分钟' }}
           </template>
           <template v-else>
-            到 {{ mySignTimeStr }} 自动签
+            距下次 {{ untilMySign.h }} 小时{{ untilMySign.m > 0 ? ' ' + untilMySign.m + ' 分钟' : '' }}
           </template>
         </p>
       </div>
