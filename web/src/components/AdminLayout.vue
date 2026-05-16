@@ -6,6 +6,7 @@ import {
   Ticket,
   Building2,
   Users,
+  UserPlus,
   ScrollText,
   Cog,
   LogOut,
@@ -26,6 +27,7 @@ const items: NavItem[] = [
   { to: '/rosekhlifa/codes', label: '邀请码', icon: Ticket },
   { to: '/rosekhlifa/dorms', label: '宿舍楼', icon: Building2 },
   { to: '/rosekhlifa/users', label: '用户', icon: Users },
+  { to: '/rosekhlifa/guests', label: '临时朋友', icon: UserPlus },
   { to: '/rosekhlifa/logs', label: '日志', icon: ScrollText },
   { to: '/rosekhlifa/settings', label: '设置', icon: Cog },
 ]

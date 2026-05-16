@@ -88,17 +88,35 @@ const isSignDayToday = computed(() => {
   return (sd & (1 << bit)) !== 0
 })
 
-// Time to next sign window (22:00).
-const nextWindow = computed(() => {
+// Personal sign moment: 22:00 + my triggerMinute. Each user has their own
+// trigger so they don't all fire at the same second. Display this to the user
+// so they know when to expect the email rather than refreshing the page from
+// 21:50 onward.
+const mySignMinute = computed(() => me.value?.settings.triggerMinute ?? 2)
+
+const mySignTimeStr = computed(() => `22:${String(mySignMinute.value).padStart(2, '0')}`)
+
+// Time until *my* sign moment (not the 22:00 window opening).
+const untilMySign = computed(() => {
   const n = now.value
   const target = new Date(n)
-  target.setHours(22, 0, 0, 0)
+  target.setHours(22, mySignMinute.value, 0, 0)
   if (target <= n) target.setDate(target.getDate() + 1)
   const ms = target.getTime() - n.getTime()
   const totalMin = Math.floor(ms / 60000)
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return { h, m, totalMin }
+  return { h: Math.floor(totalMin / 60), m: totalMin % 60, totalMin }
+})
+
+// Where in the cycle am I?
+//   pending   — today, before my sign moment, not yet signed
+//   signing   — 22:00–22:30 today, my sign moment already passed but no record yet
+//   waiting   — outside today's window (tomorrow or earlier today)
+const cycleState = computed<'pending' | 'signing' | 'waiting'>(() => {
+  const n = now.value
+  if (n.getHours() !== 22 || n.getMinutes() >= 30) return 'waiting'
+  // Within 22:00–22:30
+  if (n.getMinutes() < mySignMinute.value) return 'pending'
+  return 'signing'
 })
 
 const inWindow = computed(() => {
@@ -221,31 +239,59 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         </template>
         <template v-else>
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-zinc-600" />
-            <span class="text-zinc-500 dark:text-zinc-400 font-semibold text-base">未签到</span>
+            <span
+              :class="cycleState === 'signing' ? 'bg-amber-500 shadow-[0_0_8px_rgb(245_158_11_/_0.8)]' : 'bg-zinc-600'"
+              class="w-2 h-2 rounded-full"
+            />
+            <span class="text-zinc-500 dark:text-zinc-400 font-semibold text-base">
+              {{ cycleState === 'signing' ? '正在尝试…' : '待签到' }}
+            </span>
           </div>
-          <p class="text-xs text-zinc-500 mt-1.5">今天 22:00 开放窗口</p>
+          <p class="text-xs text-zinc-500 mt-1.5">
+            <template v-if="cycleState === 'signing'">
+              你的预定时刻 {{ mySignTimeStr }} 已到，签到中
+            </template>
+            <template v-else>
+              今天 <span class="text-emerald-400 font-mono-token">{{ mySignTimeStr }}</span> 自动签
+            </template>
+          </p>
         </template>
       </div>
 
-      <!-- Next window -->
+      <!-- My sign moment -->
       <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
         <div class="flex items-center gap-1.5 mb-2">
           <Clock class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[11px] text-zinc-500 tracking-wide uppercase">
-            {{ inWindow ? '签到窗口' : '下次窗口' }}
+            {{ cycleState === 'signing' ? '正在签到' : '我的签到时刻' }}
           </span>
         </div>
         <div class="flex items-baseline gap-1.5">
-          <span v-if="inWindow" class="text-emerald-400 font-bold text-lg">进行中</span>
+          <span v-if="cycleState === 'signing'" class="text-amber-400 font-bold text-lg tabular-nums">
+            执行中
+          </span>
+          <template v-else-if="cycleState === 'pending'">
+            <span class="text-2xl font-bold tabular-nums leading-none text-emerald-400">{{ mySignTimeStr }}</span>
+            <span class="text-xs text-zinc-500 ml-1">±60秒</span>
+          </template>
           <template v-else>
-            <span class="text-2xl font-bold tabular-nums leading-none">{{ nextWindow.h }}</span>
+            <span class="text-2xl font-bold tabular-nums leading-none">{{ untilMySign.h }}</span>
             <span class="text-xs text-zinc-500">小时</span>
-            <span class="text-2xl font-bold tabular-nums leading-none">{{ nextWindow.m }}</span>
+            <span class="text-2xl font-bold tabular-nums leading-none">{{ untilMySign.m }}</span>
             <span class="text-xs text-zinc-500">分</span>
           </template>
         </div>
-        <p class="text-xs text-zinc-500 mt-1.5">每天 22:00–22:30</p>
+        <p class="text-xs text-zinc-500 mt-1.5">
+          <template v-if="cycleState === 'signing'">
+            预定 {{ mySignTimeStr }}（含 ±60 秒抖动），后台正在尝试
+          </template>
+          <template v-else-if="cycleState === 'pending'">
+            还差 {{ 22 * 60 + mySignMinute - now.getHours() * 60 - now.getMinutes() }} 分钟
+          </template>
+          <template v-else>
+            到 {{ mySignTimeStr }} 自动签
+          </template>
+        </p>
       </div>
 
       <!-- Token -->

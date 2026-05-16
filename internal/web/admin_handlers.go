@@ -1,11 +1,14 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	mathrand "math/rand/v2"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -62,14 +65,19 @@ func (h *handlers) adminMe(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/admin/stats
 func (h *handlers) adminStats(w http.ResponseWriter, r *http.Request) {
 	totalUsers, _ := h.store.CountUsers(r.Context())
+	totalGuests, _ := h.store.CountGuests(r.Context())
 	totalCodes, usedCodes, _ := h.store.CountCodes(r.Context())
 	today, _ := h.store.CountTodayRecords(r.Context())
 
-	// Token expiry warnings: count users whose token expires within 24h.
+	// Token expiry warnings: count regular users whose token expires within
+	// 24h. Guests are excluded — they get auto-cleaned, no need to alert.
 	users, _ := h.store.ListUsers(r.Context(), store.UserListFilter{Limit: 500})
 	expiring := 0
 	disabled := 0
 	for _, u := range users {
+		if u.IsGuest {
+			continue
+		}
 		if time.Until(u.TokenExp) < 24*time.Hour && !u.IsDisabled {
 			expiring++
 		}
@@ -80,7 +88,8 @@ func (h *handlers) adminStats(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"users": map[string]any{
-			"total":    totalUsers,
+			"total":    totalUsers - totalGuests,
+			"guests":   totalGuests,
 			"disabled": disabled,
 			"expiring": expiring,
 		},
@@ -706,4 +715,248 @@ func atoiDefault(s string, def int) int {
 		return def
 	}
 	return n
+}
+
+// ============================================================================
+// Guest endpoints: admin-managed temporary users that sign on specific
+// calendar dates, no PIN, auto-cleanup after the last date.
+// ============================================================================
+
+type guestCreateReq struct {
+	schoolAuthInput
+	Label     string   `json:"label"`
+	SignDates []string `json:"signDates"` // ["2026-05-20", ...]
+	DormID    int64    `json:"dormId"`    // optional, 0 = no dorm bound
+}
+
+type guestUpdateReq struct {
+	Label     *string  `json:"label"`
+	SignDates []string `json:"signDates"`
+}
+
+// GET /api/v1/rosekhlifa/guests
+func (h *handlers) adminListGuests(w http.ResponseWriter, r *http.Request) {
+	guests, err := h.store.ListGuests(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	out := make([]map[string]any, 0, len(guests))
+	for _, g := range guests {
+		out = append(out, h.guestDTO(r.Context(), g))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// POST /api/v1/rosekhlifa/guests
+//
+// Body: {label, signDates: [...], dormId?, callbackUrl|oauthCode|token}
+//
+// Resolves the school OAuth code → JWT → user identity, writes a guest user
+// record. ExpiresAt is auto-set to (max(signDates) + 1 day) so the cleanup
+// ticker picks it up after the last sign date passes.
+func (h *handlers) adminCreateGuest(w http.ResponseWriter, r *http.Request) {
+	var req guestCreateReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	label := strings.TrimSpace(req.Label)
+	if label == "" {
+		writeErr(w, http.StatusBadRequest, "备注名不能为空")
+		return
+	}
+	dates := normalizeSignDates(req.SignDates)
+	if len(dates) == 0 {
+		writeErr(w, http.StatusBadRequest, "至少要选一个有效签到日期 (YYYY-MM-DD)")
+		return
+	}
+	maxDate, err := time.ParseInLocation("2006-01-02", dates[len(dates)-1], time.Local)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "日期解析失败")
+		return
+	}
+	// Cleanup runs at 02:00 each day; setting expires_at to next-day 00:00
+	// means a guest signing on May 20 is gone by May 21 02:00.
+	expiresAt := time.Date(maxDate.Year(), maxDate.Month(), maxDate.Day(), 0, 0, 0, 0, maxDate.Location()).AddDate(0, 0, 1)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	auth, status, err := h.resolveSchoolAuth(ctx, req.schoolAuthInput)
+	if err != nil {
+		writeErr(w, status, err.Error())
+		return
+	}
+
+	// Refuse to overwrite an existing non-guest account with the same user_id.
+	if existing, err := h.store.GetUser(ctx, auth.Claims.Iss); err == nil {
+		if !existing.IsGuest {
+			writeErr(w, http.StatusConflict,
+				"该学号 ("+auth.User.UserNumber+") 已存在正式账号，不能创建为临时朋友")
+			return
+		}
+		// Existing guest: we'll overwrite (admin is re-issuing dates).
+	}
+
+	datesJSON, _ := json.Marshal(dates)
+
+	u := &store.User{
+		UserID:        auth.Claims.Iss,
+		UserName:      auth.User.UserName,
+		UserNumber:    auth.User.UserNumber,
+		UserSection:   auth.User.UserSection,
+		UserClass:     auth.User.UserClass,
+		UserAvatarURL: auth.User.UserAvatarURL,
+		Token:         auth.Token,
+		TokenExp:      auth.Claims.ExpiresAt(),
+		AutoSign:      true,
+		DeviceModel:   "iPhone",
+		DeviceSystem:  "iOS",
+		TriggerMinute: mathrand.IntN(10),
+		JitterSec:     60,
+		IsGuest:       true,
+		GuestLabel:    label,
+		SignDates:     string(datesJSON),
+		ExpiresAt:     &expiresAt,
+	}
+	if err := h.store.UpsertUser(ctx, u); err != nil {
+		h.log.Error("upsert guest", "err", err.Error())
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	// UpsertUser's ON CONFLICT branch only touches identity + token. Guest
+	// fields on an existing record need a follow-up UPDATE.
+	if err := h.store.UpdateGuestSchedule(ctx, u.UserID, label, string(datesJSON), &expiresAt); err != nil {
+		h.log.Error("update guest schedule", "err", err.Error())
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+
+	if req.DormID > 0 {
+		if dorm, err := h.store.GetDorm(ctx, req.DormID); err == nil {
+			_ = h.store.SetUserDorm(ctx, u.UserID, dorm)
+		}
+	}
+
+	reloaded, err := h.store.GetUser(ctx, u.UserID)
+	if err != nil {
+		reloaded = u
+	}
+	h.log.Info("guest created", "user", u.UserID, "label", label, "dates", len(dates))
+	writeJSON(w, http.StatusOK, h.guestDTO(ctx, reloaded))
+}
+
+// PUT /api/v1/rosekhlifa/guests/{id}
+//
+// Update label and/or sign_dates. When dates change, expires_at is recomputed.
+func (h *handlers) adminUpdateGuest(w http.ResponseWriter, r *http.Request) {
+	uid := chi.URLParam(r, "id")
+	var req guestUpdateReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	cur, err := h.store.GetUser(r.Context(), uid)
+	if err != nil || !cur.IsGuest {
+		writeErr(w, http.StatusNotFound, "临时朋友不存在")
+		return
+	}
+	label := cur.GuestLabel
+	if req.Label != nil {
+		label = strings.TrimSpace(*req.Label)
+	}
+	signDates := cur.SignDates
+	expiresAt := cur.ExpiresAt
+	if req.SignDates != nil {
+		dates := normalizeSignDates(req.SignDates)
+		if len(dates) == 0 {
+			writeErr(w, http.StatusBadRequest, "至少要选一个有效签到日期")
+			return
+		}
+		maxDate, _ := time.ParseInLocation("2006-01-02", dates[len(dates)-1], time.Local)
+		e := time.Date(maxDate.Year(), maxDate.Month(), maxDate.Day(), 0, 0, 0, 0, maxDate.Location()).AddDate(0, 0, 1)
+		expiresAt = &e
+		datesJSON, _ := json.Marshal(dates)
+		signDates = string(datesJSON)
+	}
+	if err := h.store.UpdateGuestSchedule(r.Context(), uid, label, signDates, expiresAt); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	if updated, err := h.store.GetUser(r.Context(), uid); err == nil {
+		writeJSON(w, http.StatusOK, h.guestDTO(r.Context(), updated))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// DELETE /api/v1/rosekhlifa/guests/{id}
+func (h *handlers) adminDeleteGuest(w http.ResponseWriter, r *http.Request) {
+	uid := chi.URLParam(r, "id")
+	cur, err := h.store.GetUser(r.Context(), uid)
+	if err != nil || !cur.IsGuest {
+		writeErr(w, http.StatusNotFound, "临时朋友不存在")
+		return
+	}
+	if err := h.store.DeleteUser(r.Context(), uid); err != nil {
+		writeErr(w, http.StatusInternalServerError, "删除失败")
+		return
+	}
+	h.log.Info("guest deleted", "user", uid, "label", cur.GuestLabel)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (h *handlers) guestDTO(ctx context.Context, u *store.User) map[string]any {
+	var dates []string
+	_ = json.Unmarshal([]byte(u.SignDates), &dates)
+	out := map[string]any{
+		"userId":      u.UserID,
+		"userName":    u.UserName,
+		"userNumber":  u.UserNumber,
+		"userSection": u.UserSection,
+		"userClass":   u.UserClass,
+		"label":       u.GuestLabel,
+		"signDates":   dates,
+		"tokenExp":    u.TokenExp.Unix(),
+		"tokenValid":  time.Now().Before(u.TokenExp),
+		"createdAt":   u.CreatedAt.Unix(),
+		"dormId":      u.DormID,
+	}
+	if u.ExpiresAt != nil {
+		out["expiresAt"] = u.ExpiresAt.Unix()
+	} else {
+		out["expiresAt"] = nil
+	}
+	if u.DormID != nil {
+		if d, err := h.store.GetDorm(ctx, *u.DormID); err == nil {
+			out["dormName"] = d.Name
+		}
+	}
+	return out
+}
+
+// normalizeSignDates parses, validates, dedupes, and sorts a list of
+// "YYYY-MM-DD" strings ascending. Invalid entries silently dropped; empty
+// result means no valid dates remained.
+func normalizeSignDates(in []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, raw := range in {
+		s := strings.TrimSpace(raw)
+		if s == "" {
+			continue
+		}
+		t, err := time.ParseInLocation("2006-01-02", s, time.Local)
+		if err != nil {
+			continue
+		}
+		norm := t.Format("2006-01-02")
+		if seen[norm] {
+			continue
+		}
+		seen[norm] = true
+		out = append(out, norm)
+	}
+	sort.Strings(out)
+	return out
 }

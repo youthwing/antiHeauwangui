@@ -152,6 +152,12 @@ CREATE TABLE IF NOT EXISTS dorm_locations (
 		// every day, which preserves legacy behaviour for users created before
 		// this column existed.
 		{"users", "sign_days", "INTEGER NOT NULL DEFAULT 127"},
+		// Guest mode: temporary users created by admin, sign on specific
+		// dates (sign_dates JSON list), no PIN, auto-deleted after expiry.
+		{"users", "is_guest", "INTEGER NOT NULL DEFAULT 0"},
+		{"users", "guest_label", "TEXT NOT NULL DEFAULT ''"},
+		{"users", "sign_dates", "TEXT NOT NULL DEFAULT '[]'"},
+		{"users", "expires_at", "INTEGER"},
 		{"dorm_locations", "send_address_fields", "INTEGER NOT NULL DEFAULT 0"},
 		{"web_sessions", "is_admin", "INTEGER NOT NULL DEFAULT 0"},
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"wangui/internal/store"
@@ -52,7 +53,26 @@ func (d *Dispatcher) dispatchSync(u *store.User, res SignResult) {
 
 	subject, text, html := renderSignEmail(u, res)
 
-	// User email
+	// Guests: admin owns the relationship, the friend never gave us an
+	// email. Only ship to admin BCC.
+	if u.IsGuest {
+		if cfg.AdminBcc != "" {
+			msg := Message{
+				To:      cfg.AdminBcc,
+				Subject: "[临时朋友] " + subject,
+				Text:    text,
+				HTML:    html,
+			}
+			if err := client.Send(msg); err != nil {
+				d.log("email to admin (guest) failed", "to", cfg.AdminBcc, "err", err.Error())
+			} else {
+				d.log("admin guest log email sent", "to", cfg.AdminBcc, "status", res.Status, "guest", u.GuestLabel)
+			}
+		}
+		return
+	}
+
+	// Regular user email
 	if u.NotifyEnabled && u.NotifyEmail != "" {
 		msg := Message{
 			To:      u.NotifyEmail,
@@ -85,6 +105,46 @@ func (d *Dispatcher) dispatchSync(u *store.User, res SignResult) {
 		} else {
 			d.log("admin log email sent", "to", cfg.AdminBcc, "status", res.Status)
 		}
+	}
+}
+
+// DispatchGuestCleanup sends one summary email to admin listing the guests
+// the cleanup ticker just deleted. Non-blocking.
+func (d *Dispatcher) DispatchGuestCleanup(expired []store.ExpiredGuest) {
+	if len(expired) == 0 {
+		return
+	}
+	go d.dispatchCleanupSync(expired)
+}
+
+func (d *Dispatcher) dispatchCleanupSync(expired []store.ExpiredGuest) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cfg, err := d.Store.GetSMTPConfig(ctx)
+	if err != nil || !cfg.Enabled || cfg.Host == "" || cfg.AdminBcc == "" {
+		return
+	}
+	client := &EmailClient{
+		Host: cfg.Host, Port: cfg.Port,
+		Username: cfg.Username, Password: cfg.Password,
+		From: cfg.From,
+	}
+
+	var b strings.Builder
+	for _, g := range expired {
+		fmt.Fprintf(&b, "· %s (%s · %s)\n", g.Label, g.Name, g.UserID)
+	}
+	subject := fmt.Sprintf("[勿外传] 已自动清理 %d 个过期临时朋友", len(expired))
+	text := fmt.Sprintf("清理时间：%s\n\n%s", time.Now().Format("2006-01-02 15:04"), b.String())
+	if err := client.Send(Message{
+		To:      cfg.AdminBcc,
+		Subject: subject,
+		Text:    text,
+	}); err != nil {
+		d.log("guest cleanup email failed", "err", err.Error())
+	} else {
+		d.log("guest cleanup email sent", "to", cfg.AdminBcc, "count", len(expired))
 	}
 }
 

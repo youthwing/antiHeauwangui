@@ -4,6 +4,7 @@ import type {
   SignRecord,
   InviteCode,
   AdminUser,
+  AdminGuest,
   AdminStats,
   AdminLog,
   Dorm,
@@ -11,6 +12,8 @@ import type {
   DormUserBrief,
   SmtpConfig,
   SmtpUpdate,
+  GuestCreateReq,
+  GuestUpdateReq,
 } from './types'
 
 export interface SchoolAuthPayload {
@@ -41,6 +44,14 @@ export const api = {
     request<{ ok: boolean }>('/login', {
       method: 'POST',
       body: JSON.stringify({ userNumber, pin }),
+    }),
+  // Two-step activation: precheck the invite code (and PIN/disclaimer) before
+  // showing the wechat-OAuth UI. Random visitors with no invite never see the
+  // QR / "copy callback URL" flow at all.
+  activatePrecheck: (inviteCode: string) =>
+    request<{ ok: boolean; note?: string }>('/activate/precheck', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode }),
     }),
   activate: (
     inviteCode: string,
@@ -159,6 +170,20 @@ export const adminApi = {
     request<{ ok: boolean }>('/rosekhlifa/dorms/' + id, { method: 'DELETE' }),
   dormUsers: (id: number) =>
     request<DormUserBrief[]>('/rosekhlifa/dorms/' + id + '/users'),
+
+  listGuests: () => request<AdminGuest[]>('/rosekhlifa/guests'),
+  createGuest: (req: GuestCreateReq) =>
+    request<AdminGuest>('/rosekhlifa/guests', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  updateGuest: (userId: string, req: GuestUpdateReq) =>
+    request<AdminGuest>('/rosekhlifa/guests/' + userId, {
+      method: 'PUT',
+      body: JSON.stringify(req),
+    }),
+  deleteGuest: (userId: string) =>
+    request<{ ok: boolean }>('/rosekhlifa/guests/' + userId, { method: 'DELETE' }),
 
   getSmtp: () => request<SmtpConfig>('/rosekhlifa/smtp'),
   updateSmtp: (cfg: SmtpUpdate) =>

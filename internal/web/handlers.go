@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"regexp"
@@ -103,6 +104,58 @@ func clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
+// ---------- POST /api/v1/activate/precheck ----------
+//
+// Lightweight invite-code probe used by the two-step activation flow. Lets
+// us gate the wechat-OAuth UI behind a valid code so a random visitor with
+// no invite never sees the QR / "copy callback URL" instructions. NOT a
+// full activate — just answers "is this code redeemable?".
+//
+// Rate-limited by IP (shares the login bucket) so an attacker can't brute
+// the invite-code space.
+
+type activatePrecheckReq struct {
+	InviteCode string `json:"inviteCode"`
+}
+
+func (h *handlers) activatePrecheck(w http.ResponseWriter, r *http.Request) {
+	if !h.loginLimiter.allow(clientIP(r)) {
+		writeErr(w, http.StatusTooManyRequests, "尝试过于频繁，请稍后再试")
+		return
+	}
+	var req activatePrecheckReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	code := strings.TrimSpace(strings.ToUpper(req.InviteCode))
+	if code == "" {
+		writeErr(w, http.StatusBadRequest, "邀请码不能为空")
+		return
+	}
+	c, err := h.store.GetCode(r.Context(), code)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "邀请码不存在")
+		return
+	}
+	if c.Disabled {
+		writeErr(w, http.StatusBadRequest, "该邀请码已被禁用")
+		return
+	}
+	// We can't tell here whether the caller is the original binder (no token
+	// yet, so we don't know their user_id). If the code is bound, we let
+	// them through with a heads-up. The real check happens in /activate,
+	// which compares the school-returned user_id to the existing binding.
+	if c.BoundUserID != nil && *c.BoundUserID != "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":   true,
+			"note": "该邀请码已被使用过。如你是原激活人想重新激活，可以继续；否则将被拒绝。",
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // ---------- POST /api/v1/activate ----------
 // First-time registration: invite code + school JWT + disclaimer. Rate-limited by IP.
 
@@ -175,6 +228,17 @@ func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Per-user "personal sign minute" so users don't all fire at 22:02.
+	// Range is intentionally narrow: 0..9 → every user signs within
+	// 22:00–22:10. That leaves the user 20 minutes (until 22:30) to bail
+	// out to a manual sign-in from a teaching building if our auto-sign
+	// silently fails. Trade-off: 10 users squeezed into 10 minutes will
+	// occasionally pick the same minute, but the 60-second jitter spreads
+	// them across seconds so they don't fire simultaneously.
+	//
+	// We only set these on first activation; re-activation (existing user)
+	// keeps whatever they had configured. UpsertUser only updates identity
+	// + token fields on conflict, so the schedule columns stay untouched.
 	u := &store.User{
 		UserID:        auth.Claims.Iss,
 		UserName:      auth.User.UserName,
@@ -188,6 +252,8 @@ func (h *handlers) activate(w http.ResponseWriter, r *http.Request) {
 		InviteCode:    code,
 		DeviceModel:   "iPhone",
 		DeviceSystem:  "iOS",
+		TriggerMinute: rand.IntN(10),
+		JitterSec:     60,
 		PinHash:       pinHash,
 	}
 	if err := h.store.UpsertUser(ctx, u); err != nil {
@@ -329,6 +395,17 @@ func (h *handlers) updateToken(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.UpdateToken(ctx, uid, auth.Token, auth.Claims.ExpiresAt()); err != nil {
 		writeErr(w, http.StatusInternalServerError, "保存失败")
 		return
+	}
+	// Also refresh display fields from /auth/user. If the user's avatar
+	// fetch failed during activation (school CDN flake, transient 403),
+	// re-grabbing the token now also re-grabs the avatar — letting users
+	// self-heal a broken avatar without admin intervention.
+	if err := h.store.UpdateUserProfile(ctx, uid,
+		auth.User.UserName, auth.User.UserNumber,
+		auth.User.UserSection, auth.User.UserClass,
+		auth.User.UserAvatarURL,
+	); err != nil {
+		h.log.Warn("refresh profile failed (token still updated)", "user", uid, "err", err.Error())
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "expiresAt": auth.Claims.Exp,

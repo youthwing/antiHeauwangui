@@ -58,6 +58,16 @@ type User struct {
 	// 0 effectively disables auto-sign even when AutoSign==true.
 	SignDays int
 
+	// Guest fields: when IsGuest==true, this is an admin-managed temporary
+	// account. Schedule is driven by SignDates (JSON array of "YYYY-MM-DD")
+	// instead of SignDays. The account is auto-deleted after ExpiresAt.
+	// Guests have no PIN and never receive sign-result emails — only admin
+	// BCC sees their outcomes.
+	IsGuest    bool       // is_guest
+	GuestLabel string     // guest_label — admin-visible nickname
+	SignDates  string     // sign_dates — raw JSON "[YYYY-MM-DD, ...]"
+	ExpiresAt  *time.Time // expires_at — nil = no auto-cleanup
+
 	PinHash []byte // bcrypt hash of the 4–6 digit login PIN; nil = no PIN set
 
 	CreatedAt time.Time
@@ -71,6 +81,7 @@ const userColumns = `user_id, user_name, user_number, user_section, user_class,
   trigger_minute, jitter_sec, retry_count, retry_gap_min, saved_locations,
   pin_hash, dorm_id, send_address_fields, user_avatar_url,
   notify_email, notify_enabled, sign_days,
+  is_guest, guest_label, sign_dates, expires_at,
   created_at, updated_at`
 
 // UpsertUser inserts a new user or updates identity + token of an existing one.
@@ -104,6 +115,13 @@ func (s *Store) UpsertUser(ctx context.Context, u *User) error {
 		// activation doesn't accidentally disable auto-sign.
 		u.SignDays = 127
 	}
+	if u.SignDates == "" {
+		u.SignDates = "[]"
+	}
+	var expiresAt any
+	if u.ExpiresAt != nil {
+		expiresAt = u.ExpiresAt.Unix()
+	}
 	_, err = s.db.ExecContext(ctx, `
 INSERT INTO users (
   user_id, user_name, user_number, user_section, user_class,
@@ -112,8 +130,9 @@ INSERT INTO users (
   trigger_minute, jitter_sec, retry_count, retry_gap_min, saved_locations,
   pin_hash, dorm_id, send_address_fields, user_avatar_url,
   notify_email, notify_enabled, sign_days,
+  is_guest, guest_label, sign_dates, expires_at,
   created_at, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(user_id) DO UPDATE SET
   user_name        = excluded.user_name,
   user_number      = excluded.user_number,
@@ -133,6 +152,7 @@ ON CONFLICT(user_id) DO UPDATE SET
 		u.TriggerMinute, u.JitterSec, u.RetryCount, u.RetryGapMin, u.SavedLocations,
 		u.PinHash, u.DormID, boolInt(u.SendAddressFields), u.UserAvatarURL,
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
+		boolInt(u.IsGuest), u.GuestLabel, u.SignDates, expiresAt,
 		u.CreatedAt.Unix(), u.UpdatedAt.Unix())
 	return err
 }
@@ -156,7 +176,8 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 	var inviteCode sql.NullString
 	var pinHash []byte
 	var dormID sql.NullInt64
-	var sendFields, notifyEnabled int
+	var sendFields, notifyEnabled, isGuest int
+	var expiresAt sql.NullInt64
 	err := r.Scan(
 		&u.UserID, &u.UserName, &u.UserNumber, &u.UserSection, &u.UserClass,
 		&enc, &tokenExp, &autoSign, &isDisabled, &inviteCode,
@@ -165,6 +186,7 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 		&u.TriggerMinute, &u.JitterSec, &u.RetryCount, &u.RetryGapMin, &u.SavedLocations,
 		&pinHash, &dormID, &sendFields, &u.UserAvatarURL,
 		&u.NotifyEmail, &notifyEnabled, &u.SignDays,
+		&isGuest, &u.GuestLabel, &u.SignDates, &expiresAt,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -191,6 +213,11 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 	}
 	u.SendAddressFields = sendFields != 0
 	u.NotifyEnabled = notifyEnabled != 0
+	u.IsGuest = isGuest != 0
+	if expiresAt.Valid {
+		t := time.Unix(expiresAt.Int64, 0)
+		u.ExpiresAt = &t
+	}
 	u.CreatedAt = time.Unix(createdAt, 0)
 	u.UpdatedAt = time.Unix(updatedAt, 0)
 	return &u, nil
@@ -282,6 +309,24 @@ func (s *Store) UpdateToken(ctx context.Context, userID, token string, exp time.
 	_, err = s.db.ExecContext(ctx, `
 UPDATE users SET token_enc = ?, token_exp = ?, updated_at = ? WHERE user_id = ?
 `, enc, exp.Unix(), time.Now().Unix(), userID)
+	return err
+}
+
+// UpdateUserProfile refreshes the snapshot fields we copy from the school
+// system (name, class, avatar). Called after a token refresh so a user whose
+// avatar fetch failed during activation can get a working avatar simply by
+// re-grabbing their token.
+func (s *Store) UpdateUserProfile(ctx context.Context, userID, name, number, section, class, avatarURL string) error {
+	_, err := s.db.ExecContext(ctx, `
+UPDATE users SET
+  user_name       = ?,
+  user_number     = ?,
+  user_section    = ?,
+  user_class      = ?,
+  user_avatar_url = ?,
+  updated_at      = ?
+WHERE user_id = ?
+`, name, number, section, class, avatarURL, time.Now().Unix(), userID)
 	return err
 }
 
@@ -381,6 +426,91 @@ func (s *Store) CountUsers(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
 	return n, err
+}
+
+// CountGuests returns the number of admin-managed temporary (guest) users.
+func (s *Store) CountGuests(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE is_guest = 1`).Scan(&n)
+	return n, err
+}
+
+// ListGuests returns all guest users, newest first.
+func (s *Store) ListGuests(ctx context.Context) ([]*User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT "+userColumns+" FROM users WHERE is_guest = 1 ORDER BY created_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]*User, 0)
+	for rows.Next() {
+		u, err := s.scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+// ExpiredGuest is the minimal info we keep about a guest we're about to
+// delete — enough for an admin notification email.
+type ExpiredGuest struct {
+	UserID string
+	Label  string
+	Name   string // school's user_name, for the admin email body
+}
+
+// DeleteExpiredGuests removes guests whose expires_at < now. Returns the
+// list of (user_id, label, name) we deleted so the caller can email admin.
+func (s *Store) DeleteExpiredGuests(ctx context.Context, now time.Time) ([]ExpiredGuest, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT user_id, guest_label, user_name FROM users
+		 WHERE is_guest = 1 AND expires_at IS NOT NULL AND expires_at < ?`,
+		now.Unix())
+	if err != nil {
+		return nil, err
+	}
+	var expired []ExpiredGuest
+	for rows.Next() {
+		var g ExpiredGuest
+		if err := rows.Scan(&g.UserID, &g.Label, &g.Name); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		expired = append(expired, g)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if len(expired) == 0 {
+		return nil, nil
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`DELETE FROM users WHERE is_guest = 1 AND expires_at IS NOT NULL AND expires_at < ?`,
+		now.Unix()); err != nil {
+		return nil, err
+	}
+	return expired, nil
+}
+
+// UpdateGuestSchedule patches a guest's label / sign_dates / expires_at /
+// dorm binding. Only touches guest records (is_guest=1).
+func (s *Store) UpdateGuestSchedule(ctx context.Context, userID, label, signDates string, expiresAt *time.Time) error {
+	var exp any
+	if expiresAt != nil {
+		exp = expiresAt.Unix()
+	}
+	_, err := s.db.ExecContext(ctx, `
+UPDATE users SET
+  guest_label = ?,
+  sign_dates  = ?,
+  expires_at  = ?,
+  updated_at  = ?
+WHERE user_id = ? AND is_guest = 1
+`, label, signDates, exp, time.Now().Unix(), userID)
+	return err
 }
 
 // DeleteUser removes a user; their records cascade via FK.

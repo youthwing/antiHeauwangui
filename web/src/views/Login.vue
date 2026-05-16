@@ -16,19 +16,16 @@ import {
   Hash,
   ShieldCheck,
   QrCode,
-  Copy,
   RefreshCw,
 } from 'lucide-vue-next'
 import Logo from '../components/Logo.vue'
 import { api } from '../api'
 import { useAuth } from '../stores/auth'
 import { showToast } from '../lib/toast'
-import { copyText } from '../lib/clipboard'
 import {
   buildWechatOauthAuthorizeUrl,
   createWechatOauthState,
   detectSchoolOauthInput,
-  HENAU_WECHAT_CALLBACK_EXAMPLE,
 } from '../lib/schoolOauth'
 
 const router = useRouter()
@@ -37,6 +34,13 @@ const auth = useAuth()
 
 type Mode = 'login' | 'activate'
 const mode = ref<Mode>('login')
+
+// Activation is two-step: 'credentials' (invite + PIN + disclaimer) → server
+// precheck → 'token' (wechat QR + paste callback). Reason: random visitors
+// without an invite never see the OAuth UI, so they can't crib the flow.
+type ActivateStep = 'credentials' | 'token'
+const activateStep = ref<ActivateStep>('credentials')
+const precheckLoading = ref(false)
 
 // Login fields
 const loginNumber = ref('')
@@ -112,17 +116,21 @@ const callbackLooksValid = computed(
 const callbackCodePreview = computed(() => shortCode(callbackDetection.value.code))
 
 const canSubmit = computed(() => {
-  if (submitting.value) return false
+  if (submitting.value || precheckLoading.value) return false
   if (mode.value === 'login') {
     return loginNumber.value.trim().length > 0 && isPinValid(loginPin.value)
   }
-  return (
-    inviteCode.value.trim().length > 0 &&
-    (callbackLooksValid.value || token.value.trim().length > 0) &&
-    isPinValid(pinA.value) &&
-    pinA.value === pinB.value &&
-    agreed.value
-  )
+  // mode === 'activate'
+  if (activateStep.value === 'credentials') {
+    return (
+      inviteCode.value.trim().length > 0 &&
+      isPinValid(pinA.value) &&
+      pinA.value === pinB.value &&
+      agreed.value
+    )
+  }
+  // step === 'token'
+  return callbackLooksValid.value || token.value.trim().length > 0
 })
 
 const pinMatchHint = computed(() => {
@@ -135,6 +143,23 @@ const pinMatchHint = computed(() => {
 async function submit() {
   error.value = null
   if (!canSubmit.value) return
+
+  // Activate flow, step 1: precheck the invite code BEFORE revealing the
+  // wechat-OAuth UI. Random visitors never see step 2 at all.
+  if (mode.value === 'activate' && activateStep.value === 'credentials') {
+    precheckLoading.value = true
+    try {
+      await api.activatePrecheck(inviteCode.value.trim().toUpperCase())
+      activateStep.value = 'token'
+      await refreshWechatQr()
+    } catch (e: any) {
+      error.value = e.message || '邀请码校验失败'
+    } finally {
+      precheckLoading.value = false
+    }
+    return
+  }
+
   submitting.value = true
   try {
     if (mode.value === 'login') {
@@ -164,10 +189,18 @@ async function submit() {
   }
 }
 
+function backToCredentials() {
+  activateStep.value = 'credentials'
+  error.value = null
+  // Keep form state (invite / pin / disclaimer); also keep callbackUrl
+  // so user doesn't lose paste content if they're toggling.
+}
+
 function switchTo(m: Mode) {
   if (mode.value === m) return
   mode.value = m
   error.value = null
+  if (m === 'activate') activateStep.value = 'credentials'
 }
 
 // Restrict PIN inputs to digits only as user types.
@@ -197,16 +230,6 @@ async function refreshWechatQr() {
   } finally {
     buildingWechatQr.value = false
   }
-}
-
-async function copyWechatUrl() {
-  const ok = await copyText(buildWechatOauthAuthorizeUrl(wechatState.value))
-  showToast(ok ? 'ok' : 'err', ok ? '授权链接已复制' : '复制失败，请手动长按二维码')
-}
-
-async function copyCallbackExample() {
-  const ok = await copyText(HENAU_WECHAT_CALLBACK_EXAMPLE)
-  showToast(ok ? 'ok' : 'err', ok ? '回调链接示例已复制' : '复制失败')
 }
 
 onMounted(async () => {
@@ -354,26 +377,170 @@ onMounted(async () => {
           <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-5">首次使用，用邀请码 + 微信扫码登录晚归页面完成激活，并设置登录 PIN</p>
 
           <div class="space-y-4">
-            <div>
-              <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
-                <Ticket class="w-3.5 h-3.5" />
-                邀请码
-              </label>
-              <input
-                v-model="inviteCode"
-                placeholder="ABC-DEF-XYZ9"
-                autocomplete="off"
-                autocapitalize="characters"
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring tracking-wider text-center text-base"
-              />
+            <!-- Step indicator: shown only in activate flow. Random visitors
+                 see step 1 only — the wechat-OAuth UI is hidden until the
+                 server confirms the invite code is real. -->
+            <div class="flex items-center justify-center gap-2 text-[11px]">
+              <span
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors"
+                :class="activateStep === 'credentials'
+                  ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                  : 'text-zinc-500 dark:text-zinc-600'"
+              >
+                <span
+                  class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
+                  :class="activateStep === 'credentials'
+                    ? 'bg-emerald-500 text-zinc-950'
+                    : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
+                >1</span>
+                <span>凭证</span>
+              </span>
+              <span class="text-zinc-400 dark:text-zinc-700">→</span>
+              <span
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors"
+                :class="activateStep === 'token'
+                  ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                  : 'text-zinc-500 dark:text-zinc-600'"
+              >
+                <span
+                  class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
+                  :class="activateStep === 'token'
+                    ? 'bg-emerald-500 text-zinc-950'
+                    : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
+                >2</span>
+                <span>学校 Token</span>
+              </span>
             </div>
 
-            <div>
-              <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
-                <QrCode class="w-3.5 h-3.5" />
-                微信扫码获取学校 Token
-              </label>
-              <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+            <!-- ============ Step 1: credentials ============ -->
+            <div v-show="activateStep === 'credentials'" class="space-y-4">
+              <div>
+                <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
+                  <Ticket class="w-3.5 h-3.5" />
+                  邀请码
+                </label>
+                <input
+                  v-model="inviteCode"
+                  placeholder="ABC-DEF-XYZ9"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring tracking-wider text-center text-base"
+                />
+              </div>
+
+              <!-- PIN warning -->
+              <div class="rounded-lg bg-amber-500/[0.07] ring-1 ring-amber-500/25 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                <p>
+                  <strong class="text-amber-300">⚠️ PIN 就是你以后登录 wangui 的密码</strong>，
+                  4–6 位数字，自己定，<strong>记牢别忘</strong>。
+                </p>
+                <p class="text-zinc-500 dark:text-zinc-400 mt-1">
+                  以后登录用「学号 + 这个 PIN」就行，不需要再扫码。<br />
+                  忘了的话只能让管理员给你重置。
+                </p>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
+                    <ShieldCheck class="w-3.5 h-3.5" />
+                    设置登录 PIN
+                  </label>
+                  <input
+                    :value="pinA"
+                    @input="(e: any) => (pinA = pinDigits(e.target.value))"
+                    placeholder="4–6 位数字"
+                    type="password"
+                    inputmode="numeric"
+                    autocomplete="new-password"
+                    maxlength="6"
+                    class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
+                  />
+                </div>
+                <div>
+                  <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
+                    <ShieldCheck class="w-3.5 h-3.5" />
+                    再输一次
+                  </label>
+                  <input
+                    :value="pinB"
+                    @input="(e: any) => (pinB = pinDigits(e.target.value))"
+                    placeholder="重复"
+                    type="password"
+                    inputmode="numeric"
+                    maxlength="6"
+                    class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
+                  />
+                </div>
+              </div>
+              <p
+                v-if="pinMatchHint"
+                class="-mt-2 text-[11px] text-amber-400 inline-flex items-center gap-1"
+              >
+                <AlertCircle class="w-3 h-3" />
+                {{ pinMatchHint }}
+              </p>
+
+              <!-- Disclaimer inline -->
+              <div class="rounded-lg bg-white/50 dark:bg-zinc-950/50 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+                <button
+                  type="button"
+                  @click="toggleDisclaimer"
+                  class="w-full flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+                >
+                  <span class="inline-flex items-center gap-1.5">
+                    <AlertCircle class="w-3.5 h-3.5 text-amber-400" />
+                    使用须知
+                  </span>
+                  <span class="text-[10px] text-zinc-500 dark:text-zinc-600">{{ showDisclaimerDetail ? '收起 ↑' : '展开 ↓' }}</span>
+                </button>
+
+                <Transition name="expand">
+                  <ul v-if="showDisclaimerDetail" class="mt-3 space-y-2.5 overflow-hidden">
+                    <li v-for="(it, i) in disclaimerItems" :key="i" class="flex gap-2.5">
+                      <component :is="it.icon" class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="it.color" />
+                      <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">{{ it.text }}</p>
+                    </li>
+                  </ul>
+                </Transition>
+
+                <label
+                  class="mt-3 flex items-center gap-2 select-none"
+                  :class="canCheckAgreement ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
+                >
+                  <input
+                    type="checkbox"
+                    v-model="agreed"
+                    :disabled="!canCheckAgreement"
+                    class="sr-only peer"
+                  />
+                  <div class="w-4 h-4 rounded border-2 border-zinc-600 peer-checked:border-emerald-500 peer-checked:bg-emerald-500 transition-colors flex items-center justify-center shrink-0">
+                    <Check v-if="agreed" class="w-2.5 h-2.5 text-zinc-950" :stroke-width="3" />
+                  </div>
+                  <span class="text-xs text-zinc-700 dark:text-zinc-300">
+                    <template v-if="canCheckAgreement">我已阅读并同意</template>
+                    <template v-else-if="showDisclaimerDetail">阅读中… ({{ readCountdown }}s)</template>
+                    <template v-else>请先展开「使用须知」并阅读完</template>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- ============ Step 2: school token ============ -->
+            <div v-show="activateStep === 'token'" class="space-y-4">
+              <button
+                type="button"
+                @click="backToCredentials"
+                class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+              >
+                ← 上一步：改邀请码 / PIN
+              </button>
+
+              <div>
+                <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
+                  <QrCode class="w-3.5 h-3.5" />
+                  微信扫码获取学校 Token
+                </label>
+                <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
                 <div class="flex flex-col sm:flex-row gap-4">
                   <div class="shrink-0 self-center sm:self-start">
                     <div class="w-36 h-36 rounded-xl bg-white ring-1 ring-black/[0.06] p-2 flex items-center justify-center overflow-hidden">
@@ -389,21 +556,13 @@ onMounted(async () => {
                     </div>
                   </div>
                   <div class="min-w-0 flex-1">
-                    <ol class="text-[11px] text-zinc-500 dark:text-zinc-400 space-y-1.5 list-decimal list-inside leading-relaxed">
-                      <li>用手机微信扫描左侧二维码，进入学校晚归页面并完成授权。</li>
-                      <li>授权成功后，页面会跳到 <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">https://xhbcs.henau.edu.cn/?code=...</code>。</li>
-                      <li>把这个回调链接或里面的 <code class="bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-700 dark:text-zinc-300">code</code> 粘贴到下面输入框。</li>
-                      <li>提交后服务器会直接向学校接口换取 JWT，不需要再抓包。</li>
+                    <ol class="text-[12px] text-zinc-700 dark:text-zinc-300 space-y-2 list-decimal list-inside leading-relaxed">
+                      <li>用手机<strong>微信</strong>扫左边二维码</li>
+                      <li>会自动跳到学校晚归页面，<strong>正常登录</strong>就行</li>
+                      <li>登录成功后，点页面<strong>右上角「⋯」</strong>→ 选<strong>「复制链接」</strong></li>
+                      <li>回到这里，把链接<strong>粘到下方输入框</strong>，提交完成</li>
                     </ol>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        @click="copyWechatUrl"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
-                      >
-                        <Copy class="w-3 h-3" />
-                        复制授权链接
-                      </button>
+                    <div class="mt-3">
                       <button
                         type="button"
                         @click="refreshWechatQr"
@@ -411,14 +570,6 @@ onMounted(async () => {
                       >
                         <RefreshCw class="w-3 h-3" />
                         刷新二维码
-                      </button>
-                      <button
-                        type="button"
-                        @click="copyCallbackExample"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
-                      >
-                        <Copy class="w-3 h-3" />
-                        复制回调链接示例
                       </button>
                     </div>
                   </div>
@@ -491,91 +642,8 @@ onMounted(async () => {
               </Transition>
             </div>
 
-            <!-- PIN setup -->
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
-                  <ShieldCheck class="w-3.5 h-3.5" />
-                  设置 PIN
-                </label>
-                <input
-                  :value="pinA"
-                  @input="(e: any) => (pinA = pinDigits(e.target.value))"
-                  placeholder="4–6 位"
-                  type="password"
-                  inputmode="numeric"
-                  autocomplete="new-password"
-                  maxlength="6"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
-                />
-              </div>
-              <div>
-                <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
-                  <ShieldCheck class="w-3.5 h-3.5" />
-                  再输一次
-                </label>
-                <input
-                  :value="pinB"
-                  @input="(e: any) => (pinB = pinDigits(e.target.value))"
-                  placeholder="重复"
-                  type="password"
-                  inputmode="numeric"
-                  maxlength="6"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
-                />
-              </div>
             </div>
-            <p
-              v-if="pinMatchHint"
-              class="-mt-2 text-[11px] text-amber-400 inline-flex items-center gap-1"
-            >
-              <AlertCircle class="w-3 h-3" />
-              {{ pinMatchHint }}
-            </p>
-
-            <!-- Disclaimer inline -->
-            <div class="rounded-lg bg-white/50 dark:bg-zinc-950/50 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
-              <button
-                type="button"
-                @click="toggleDisclaimer"
-                class="w-full flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
-              >
-                <span class="inline-flex items-center gap-1.5">
-                  <AlertCircle class="w-3.5 h-3.5 text-amber-400" />
-                  使用须知
-                </span>
-                <span class="text-[10px] text-zinc-500 dark:text-zinc-600">{{ showDisclaimerDetail ? '收起 ↑' : '展开 ↓' }}</span>
-              </button>
-
-              <Transition name="expand">
-                <ul v-if="showDisclaimerDetail" class="mt-3 space-y-2.5 overflow-hidden">
-                  <li v-for="(it, i) in disclaimerItems" :key="i" class="flex gap-2.5">
-                    <component :is="it.icon" class="w-3.5 h-3.5 shrink-0 mt-0.5" :class="it.color" />
-                    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">{{ it.text }}</p>
-                  </li>
-                </ul>
-              </Transition>
-
-              <label
-                class="mt-3 flex items-center gap-2 select-none"
-                :class="canCheckAgreement ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
-              >
-                <input
-                  type="checkbox"
-                  v-model="agreed"
-                  :disabled="!canCheckAgreement"
-                  class="sr-only peer"
-                />
-                <div class="w-4 h-4 rounded border-2 border-zinc-600 peer-checked:border-emerald-500 peer-checked:bg-emerald-500 transition-colors flex items-center justify-center shrink-0">
-                  <Check v-if="agreed" class="w-2.5 h-2.5 text-zinc-950" :stroke-width="3" />
-                </div>
-                <span class="text-xs text-zinc-700 dark:text-zinc-300">
-                  <template v-if="canCheckAgreement">我已阅读并同意</template>
-                  <template v-else-if="showDisclaimerDetail">阅读中… ({{ readCountdown }}s)</template>
-                  <template v-else>请先展开「使用须知」并阅读完</template>
-                </span>
-              </label>
-            </div>
+            <!-- /step 2 -->
           </div>
 
           <button
@@ -583,8 +651,11 @@ onMounted(async () => {
             :disabled="!canSubmit"
             class="mt-5 w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
           >
-            <span>{{ submitting ? '激活中…' : '激活账号' }}</span>
-            <ArrowRight v-if="!submitting" class="w-4 h-4" />
+            <span v-if="submitting">激活中…</span>
+            <span v-else-if="activateStep === 'credentials' && !precheckLoading">下一步：获取学校 Token</span>
+            <span v-else-if="precheckLoading">校验邀请码…</span>
+            <span v-else>激活账号</span>
+            <ArrowRight v-if="!submitting && !precheckLoading" class="w-4 h-4" />
           </button>
 
           <div

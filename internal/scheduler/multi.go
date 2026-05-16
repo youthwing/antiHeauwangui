@@ -2,8 +2,10 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"math/rand/v2"
+	"slices"
 	"sync"
 	"time"
 
@@ -36,7 +38,49 @@ func NewMulti(s *store.Store, l *slog.Logger) *Multi {
 	}
 }
 
-func (m *Multi) Start(ctx context.Context) { go m.loop(ctx) }
+func (m *Multi) Start(ctx context.Context) {
+	go m.loop(ctx)
+	go m.guestCleanupLoop(ctx)
+}
+
+// guestCleanupLoop runs every day at 02:00 (well outside the sign window) and
+// deletes guests whose expires_at is in the past. Emails admin a summary.
+func (m *Multi) guestCleanupLoop(ctx context.Context) {
+	for {
+		next := nextCleanupTime(time.Now())
+		m.log.Info("guest cleanup armed", "next", next.Format(time.RFC3339))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Until(next)):
+		}
+		m.runGuestCleanup(ctx)
+	}
+}
+
+func nextCleanupTime(now time.Time) time.Time {
+	today := time.Date(now.Year(), now.Month(), now.Day(), 2, 0, 0, 0, now.Location())
+	if today.After(now) {
+		return today
+	}
+	return today.Add(24 * time.Hour)
+}
+
+func (m *Multi) runGuestCleanup(ctx context.Context) {
+	expired, err := m.store.DeleteExpiredGuests(ctx, time.Now())
+	if err != nil {
+		m.log.Error("cleanup expired guests", "err", err.Error())
+		return
+	}
+	if len(expired) == 0 {
+		m.log.Info("cleanup: no expired guests")
+		return
+	}
+	for _, g := range expired {
+		m.log.Info("cleanup deleted guest", "user", g.UserID, "label", g.Label, "name", g.Name)
+	}
+	m.notifier.DispatchGuestCleanup(expired)
+}
 
 func (m *Multi) loop(ctx context.Context) {
 	for {
@@ -98,12 +142,19 @@ func (m *Multi) runForUser(ctx context.Context, userID string, deadline time.Tim
 	if !u.AutoSign || u.IsDisabled {
 		return
 	}
-	if !isSignDay(u.SignDays, time.Now()) {
-		// Today isn't in the user's sign_days bitmask — silently skip.
-		// We deliberately don't write a sign_records row or send an email:
-		// "today is a rest day" is the expected steady state, not an event.
-		m.log.Info("skip non-sign-day", "user", userID, "sign_days", u.SignDays)
-		return
+	// Guest users sign on specific calendar dates (sign_dates list) instead
+	// of recurring weekdays (sign_days bitmask). Different schedule shape,
+	// same "skip silently if not today" semantics.
+	if u.IsGuest {
+		if !isSignDate(u.SignDates, time.Now()) {
+			m.log.Info("skip non-sign-date guest", "user", userID, "label", u.GuestLabel)
+			return
+		}
+	} else {
+		if !isSignDay(u.SignDays, time.Now()) {
+			m.log.Info("skip non-sign-day", "user", userID, "sign_days", u.SignDays)
+			return
+		}
 	}
 
 	// Wait for trigger_minute then add jitter.
@@ -253,4 +304,15 @@ func isSignDay(signDays int, t time.Time) bool {
 	}
 	bit := (int(t.Weekday()) + 6) % 7 // Sun→6, Mon→0, …, Sat→5
 	return signDays&(1<<bit) != 0
+}
+
+// isSignDate reports whether today (in local time) is one of the JSON-encoded
+// "YYYY-MM-DD" dates in the guest user's sign_dates field. Empty list or
+// invalid JSON → returns false (skip).
+func isSignDate(signDatesJSON string, t time.Time) bool {
+	var dates []string
+	if err := json.Unmarshal([]byte(signDatesJSON), &dates); err != nil {
+		return false
+	}
+	return slices.Contains(dates, t.Format("2006-01-02"))
 }

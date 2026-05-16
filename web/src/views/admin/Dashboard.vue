@@ -63,7 +63,12 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
             <Users class="w-4 h-4 text-zinc-500" />
             <span class="text-[10px] text-zinc-500 tracking-wide uppercase">用户</span>
           </div>
-          <p class="text-3xl font-bold tabular-nums">{{ stats?.users.total ?? '—' }}</p>
+          <p class="text-3xl font-bold tabular-nums">
+            {{ stats?.users.total ?? '—' }}
+            <span v-if="stats?.users.guests" class="text-base font-medium text-zinc-500 dark:text-zinc-400 ml-1">
+              + <span class="text-emerald-400">{{ stats.users.guests }}</span> 临时
+            </span>
+          </p>
           <p class="text-xs text-zinc-500 mt-2 tabular-nums">
             <span class="text-red-400">{{ stats?.users.disabled ?? 0 }}</span> 禁用 ·
             <span class="text-amber-400">{{ stats?.users.expiring ?? 0 }}</span> 24h 内过期

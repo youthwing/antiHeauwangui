@@ -55,6 +55,7 @@ function toggleDay(bit: number) {
 function applyPreset(mask: number) {
   form.signDays = mask
 }
+const showScheduleFaq = ref(false)
 const activePreset = computed<'every' | 'weekday' | 'weekend' | 'custom'>(() => {
   const m = form.signDays & 0x7f
   if (m === PRESETS.every) return 'every'
@@ -269,6 +270,56 @@ const previewSchedule = computed(() => {
         </p>
       </div>
 
+      <!-- Schedule FAQ — explains what these 4 inputs actually do.
+           Collapsed by default; users almost never touch these so they
+           don't need to read it. -->
+      <div class="mb-3">
+        <button
+          type="button"
+          @click="showScheduleFaq = !showScheduleFaq"
+          class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+        >
+          <span>ⓘ 这 4 个数字啥意思？</span>
+          <span class="text-zinc-600">{{ showScheduleFaq ? '收起' : '展开看说明' }}</span>
+        </button>
+        <Transition name="expand">
+          <div v-if="showScheduleFaq" class="mt-2 rounded-lg bg-blue-500/[0.05] ring-1 ring-blue-500/20 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-2.5 overflow-hidden">
+            <p>
+              系统每天 22:00 整点醒来，但不会让所有用户都在 22:00:00 这一秒同时签到 —— 那样 5 个学号同 IP 集中发请求会很显眼，且每天看你都"卡在 22:00 没结果"也会焦虑。下面 4 个参数控制具体的延迟。
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+              <div>
+                <p class="text-emerald-300 font-medium">首次触发分钟</p>
+                <p class="text-zinc-500 mt-0.5">
+                  从 22:00 起再等几分钟。<strong>激活账号时系统已为你随机分配过一次（0–27 分钟）</strong>，每个用户不同。你的当前值意味着每天大约 22:{{ String(form.triggerMinute).padStart(2, '0') }} 左右签。
+                </p>
+              </div>
+              <div>
+                <p class="text-emerald-300 font-medium">抖动秒数</p>
+                <p class="text-zinc-500 mt-0.5">
+                  在上面那个分钟基础上，再随机往后推 0–{{ form.jitterSec }} 秒。每天具体的"秒数"都不同，避免每天精确到秒的规律。
+                </p>
+              </div>
+              <div>
+                <p class="text-emerald-300 font-medium">重试次数</p>
+                <p class="text-zinc-500 mt-0.5">
+                  第一次签失败（网络问题 / 学校 API 抽风）后，再试几次。默认 3 次，4 次机会总共。
+                </p>
+              </div>
+              <div>
+                <p class="text-emerald-300 font-medium">重试间隔</p>
+                <p class="text-zinc-500 mt-0.5">
+                  两次重试之间等几分钟。默认 5 分钟，配合"重试 3 次" = 最多覆盖 20 分钟（接近 22:30 截止）。
+                </p>
+              </div>
+            </div>
+            <p class="text-zinc-500 mt-2">
+              <strong class="text-zinc-400">大白话总结</strong>：你的预定签到时刻 ≈ <span class="font-mono-token text-emerald-300">22:{{ String(form.triggerMinute).padStart(2, '0') }}</span>，实际可能再往后 0–{{ form.jitterSec }} 秒。如果你没动过这些参数，<strong>什么都不用改，默认很合理</strong>。
+            </p>
+          </div>
+        </Transition>
+      </div>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">
@@ -280,7 +331,7 @@ const previewSchedule = computed(() => {
             min="0" max="29"
             class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
           />
-          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">0–29 分钟，默认 2</p>
+          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">22:00 后多少分钟开始 · 0–29</p>
         </div>
         <div>
           <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">
@@ -292,7 +343,7 @@ const previewSchedule = computed(() => {
             min="0" max="600"
             class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
           />
-          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">+ 0~抖动秒 随机延迟</p>
+          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">在上面时刻再加 0~N 秒随机</p>
         </div>
         <div>
           <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">
@@ -304,7 +355,7 @@ const previewSchedule = computed(() => {
             min="0" max="5"
             class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
           />
-          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">失败后重试次数</p>
+          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">失败后再试几次 · 默认 3</p>
         </div>
         <div>
           <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">
@@ -316,7 +367,7 @@ const previewSchedule = computed(() => {
             min="1" max="15"
             class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
           />
-          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">两次重试之间</p>
+          <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">两次重试之间等几分钟</p>
         </div>
       </div>
 
@@ -491,3 +542,8 @@ const previewSchedule = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.expand-enter-active, .expand-leave-active { transition: all 0.25s ease; max-height: 600px; }
+.expand-enter-from, .expand-leave-to { max-height: 0; opacity: 0; overflow: hidden; }
+</style>

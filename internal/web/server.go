@@ -49,6 +49,7 @@ func (s *Server) Run(ctx context.Context) error {
 		// Public (no auth)
 		r.Post("/login", h.login)
 		r.Post("/activate", h.activate)
+		r.Post("/activate/precheck", h.activatePrecheck)
 		r.Post("/rosekhlifa/login", h.adminLogin)
 
 		// User endpoints
@@ -89,6 +90,11 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Put("/dorms/{id}", h.adminUpdateDorm)
 			r.Delete("/dorms/{id}", h.adminDeleteDorm)
 			r.Get("/dorms/{id}/users", h.adminDormUsers)
+
+			r.Get("/guests", h.adminListGuests)
+			r.Post("/guests", h.adminCreateGuest)
+			r.Put("/guests/{id}", h.adminUpdateGuest)
+			r.Delete("/guests/{id}", h.adminDeleteGuest)
 
 			r.Get("/logs", h.adminLogs)
 

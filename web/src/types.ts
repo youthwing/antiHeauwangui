@@ -152,9 +152,39 @@ export interface DormUserBrief {
 }
 
 export interface AdminStats {
-  users: { total: number; disabled: number; expiring: number }
+  users: { total: number; guests: number; disabled: number; expiring: number }
   codes: { total: number; used: number; unused: number }
   today: Record<string, number>
+}
+
+export interface AdminGuest {
+  userId: string
+  userName: string
+  userNumber: string
+  userSection: string
+  userClass: string
+  label: string
+  signDates: string[]
+  tokenExp: number
+  tokenValid: boolean
+  createdAt: number
+  dormId?: number | null
+  dormName?: string
+  expiresAt: number | null
+}
+
+export interface GuestCreateReq {
+  label: string
+  signDates: string[]
+  dormId?: number
+  callbackUrl?: string
+  oauthCode?: string
+  token?: string
+}
+
+export interface GuestUpdateReq {
+  label?: string
+  signDates?: string[]
 }
 
 export interface AdminLog {

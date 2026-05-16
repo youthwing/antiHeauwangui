@@ -39,6 +39,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'codes', name: 'admin-codes', component: () => import('./views/admin/Codes.vue') },
       { path: 'dorms', name: 'admin-dorms', component: () => import('./views/admin/Dorms.vue') },
       { path: 'users', name: 'admin-users', component: () => import('./views/admin/Users.vue') },
+      { path: 'guests', name: 'admin-guests', component: () => import('./views/admin/Guests.vue') },
       { path: 'logs', name: 'admin-logs', component: () => import('./views/admin/Logs.vue') },
       { path: 'settings', name: 'admin-settings', component: () => import('./views/admin/Settings.vue') },
     ],
