@@ -10,6 +10,8 @@ import {
   ArrowRight,
   KeyRound,
   MapPin,
+  Bell,
+  BellOff,
 } from 'lucide-vue-next'
 import type { SignRecord } from '../types'
 import { useAuth } from '../stores/auth'
@@ -121,6 +123,24 @@ const untilMySign = computed(() => {
   return { h: Math.floor(totalMin / 60), m: totalMin % 60, totalMin }
 })
 
+// Notification-channel summary, surfaced as a chip in the hero so the user
+// remembers what they will/won't get pinged on. Reads only the boolean flags
+// + the keySet marker — the actual SendKey never reaches the browser.
+type NotifyTone = 'emerald' | 'amber' | 'zinc'
+const notifyState = computed<{ tone: NotifyTone; label: string; sub: string }>(() => {
+  const s = me.value?.settings
+  if (!s) return { tone: 'zinc', label: '通知未配置', sub: '前往配置 →' }
+  const emailOn = !!s.notifyEnabled && !!s.notifyEmail
+  const wechatOn = !!s.serverChanEnabled && !!s.serverChanKeySet
+  const emailConfigured = !!s.notifyEmail
+  const wechatConfigured = !!s.serverChanKeySet
+  if (emailOn && wechatOn) return { tone: 'emerald', label: '通知已开启', sub: '微信 + 邮件' }
+  if (wechatOn) return { tone: 'emerald', label: '通知已开启', sub: '仅微信' }
+  if (emailOn) return { tone: 'emerald', label: '通知已开启', sub: '仅邮件' }
+  if (emailConfigured || wechatConfigured) return { tone: 'amber', label: '通知已关闭', sub: '已配置但未启用' }
+  return { tone: 'zinc', label: '通知未配置', sub: '前往配置 →' }
+})
+
 // State machine for the "今日签到" status card. Each branch is exclusive.
 // Order matters: a record observed today always wins over time-based guesses.
 //   resting   — today is not in signDays (no firing today)
@@ -206,38 +226,82 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
             <span class="font-mono-token text-zinc-500">{{ me.userNumber }}</span>
           </p>
         </div>
-        <!-- Dorm binding status -->
+        <!-- Right-side status chips: dorm + notification channels.
+             Stacked vertically on desktop, hidden here on mobile and
+             re-shown below as a row for tighter vertical use of space. -->
+        <div class="hidden sm:flex flex-col gap-1.5 shrink-0">
+          <RouterLink
+            to="/settings"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 transition-colors text-xs"
+            :class="me.settings.dormName
+              ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300 hover:bg-emerald-500/15'
+              : 'bg-amber-500/10 ring-amber-500/25 text-amber-300 hover:bg-amber-500/15'"
+          >
+            <MapPin class="w-3.5 h-3.5" />
+            <div class="leading-tight">
+              <div class="text-[10px] opacity-70 tracking-wide uppercase">
+                {{ me.settings.dormName ? '已绑定位置' : '未绑定位置' }}
+              </div>
+              <div class="font-medium truncate max-w-[160px]">
+                {{ me.settings.dormName || '前往配置 →' }}
+              </div>
+            </div>
+          </RouterLink>
+          <RouterLink
+            to="/settings"
+            class="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 transition-colors text-xs"
+            :class="notifyState.tone === 'emerald'
+              ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300 hover:bg-emerald-500/15'
+              : notifyState.tone === 'amber'
+                ? 'bg-amber-500/10 ring-amber-500/25 text-amber-300 hover:bg-amber-500/15'
+                : 'bg-zinc-500/10 ring-zinc-500/25 text-zinc-500 hover:bg-zinc-500/15'"
+            :title="notifyState.tone === 'emerald'
+              ? '签到结果 + Token 即将过期都会推到这些通道'
+              : notifyState.tone === 'amber'
+                ? '已配置但开关都关着，不会收到提醒'
+                : '没有任何通知通道；签到出错你不会知道'"
+          >
+            <Bell v-if="notifyState.tone === 'emerald'" class="w-3.5 h-3.5" />
+            <BellOff v-else class="w-3.5 h-3.5" />
+            <div class="leading-tight">
+              <div class="text-[10px] opacity-70 tracking-wide uppercase">
+                {{ notifyState.label }}
+              </div>
+              <div class="font-medium truncate max-w-[160px]">
+                {{ notifyState.sub }}
+              </div>
+            </div>
+          </RouterLink>
+        </div>
+      </div>
+      <!-- Mobile-only status row -->
+      <div class="sm:hidden mt-3 grid grid-cols-2 gap-2">
         <RouterLink
           to="/settings"
-          class="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg ring-1 transition-colors shrink-0 text-xs"
+          class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg ring-1 text-[11px] min-w-0"
           :class="me.settings.dormName
-            ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300 hover:bg-emerald-500/15'
-            : 'bg-amber-500/10 ring-amber-500/25 text-amber-300 hover:bg-amber-500/15'"
+            ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300'
+            : 'bg-amber-500/10 ring-amber-500/25 text-amber-300'"
         >
-          <MapPin class="w-3.5 h-3.5" />
-          <div class="leading-tight">
-            <div class="text-[10px] opacity-70 tracking-wide uppercase">
-              {{ me.settings.dormName ? '已绑定位置' : '未绑定位置' }}
-            </div>
-            <div class="font-medium truncate max-w-[160px]">
-              {{ me.settings.dormName || '前往配置 →' }}
-            </div>
-          </div>
+          <MapPin class="w-3.5 h-3.5 shrink-0" />
+          <span class="font-medium truncate">
+            {{ me.settings.dormName || '未绑定位置' }}
+          </span>
+        </RouterLink>
+        <RouterLink
+          to="/settings"
+          class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg ring-1 text-[11px] min-w-0"
+          :class="notifyState.tone === 'emerald'
+            ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300'
+            : notifyState.tone === 'amber'
+              ? 'bg-amber-500/10 ring-amber-500/25 text-amber-300'
+              : 'bg-zinc-500/10 ring-zinc-500/25 text-zinc-500'"
+        >
+          <Bell v-if="notifyState.tone === 'emerald'" class="w-3.5 h-3.5 shrink-0" />
+          <BellOff v-else class="w-3.5 h-3.5 shrink-0" />
+          <span class="font-medium truncate">{{ notifyState.sub }}</span>
         </RouterLink>
       </div>
-      <!-- Mobile-only dorm status (shown below on small screens) -->
-      <RouterLink
-        to="/settings"
-        class="sm:hidden mt-3 flex items-center gap-2 px-3 py-2 rounded-lg ring-1 text-xs"
-        :class="me.settings.dormName
-          ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300'
-          : 'bg-amber-500/10 ring-amber-500/25 text-amber-300'"
-      >
-        <MapPin class="w-3.5 h-3.5 shrink-0" />
-        <span class="font-medium truncate">
-          {{ me.settings.dormName ? `已绑定: ${me.settings.dormName}` : '未绑定位置 — 点此配置' }}
-        </span>
-      </RouterLink>
     </section>
 
     <!-- KPI row -->
