@@ -287,8 +287,9 @@ func (h *handlers) adminGetUser(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var req struct {
-		IsDisabled *bool `json:"isDisabled"`
-		AutoSign   *bool `json:"autoSign"`
+		IsDisabled *bool  `json:"isDisabled"`
+		AutoSign   *bool  `json:"autoSign"`
+		DormID     *int64 `json:"dormId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "请求格式错误")
@@ -316,7 +317,101 @@ func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if req.DormID != nil {
+		if *req.DormID == 0 {
+			if err := h.store.SetUserDorm(r.Context(), id, nil); err != nil {
+				writeErr(w, http.StatusInternalServerError, "保存失败")
+				return
+			}
+			u.DormID = nil
+		} else {
+			dorm, err := h.store.GetDorm(r.Context(), *req.DormID)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "宿舍楼不存在")
+				return
+			}
+			if err := h.store.SetUserDorm(r.Context(), id, dorm); err != nil {
+				writeErr(w, http.StatusInternalServerError, "保存失败")
+				return
+			}
+			u.DormID = &dorm.ID
+		}
+	}
 	writeJSON(w, http.StatusOK, adminUserDTO(u))
+}
+
+// POST /api/v1/rosekhlifa/users/{id}/token — admin refreshes a user's school
+// token via wechat OAuth callback. Critical for guests, who have no PIN and
+// can't log in to refresh their own token after the ~7-day school JWT expires.
+// The new token's user_id (iss) MUST match {id} so admin can't accidentally
+// overwrite the wrong account when a guest scans the wrong QR or pastes a
+// callback meant for a different user.
+func (h *handlers) adminRefreshUserToken(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	cur, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	var req schoolAuthInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	auth, status, err := h.resolveSchoolAuth(ctx, req)
+	if err != nil {
+		writeErr(w, status, err.Error())
+		return
+	}
+	if auth.Claims.Iss != id {
+		writeErr(w, http.StatusBadRequest,
+			"Token 属于另一个账号 ("+auth.User.UserNumber+")，不能覆盖 "+cur.UserNumber)
+		return
+	}
+	if err := h.store.UpdateToken(ctx, id, auth.Token, auth.Claims.ExpiresAt()); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	// Refresh display fields (name/avatar may have changed school-side) but
+	// don't fail the request if this part errors.
+	if err := h.store.UpdateUserProfile(ctx, id,
+		auth.User.UserName, auth.User.UserNumber,
+		auth.User.UserSection, auth.User.UserClass,
+		auth.User.UserAvatarURL); err != nil {
+		h.log.Warn("refresh profile failed (token still updated)", "user", id, "err", err.Error())
+	}
+	h.log.Info("admin refresh token", "target_user", id, "new_exp", auth.Claims.ExpiresAt())
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":        true,
+		"expiresAt": auth.Claims.Exp,
+	})
+}
+
+// POST /api/v1/rosekhlifa/users/{id}/sign-now — admin signs on behalf of any
+// user (regular or guest). Same logic as the user-side /sign-now: invoke the
+// scheduler once, persist a record. No email dispatch — admin already knows
+// they hit the button.
+func (h *handlers) adminSignNowForUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	u, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+	res := h.sched.SignOnce(ctx, u)
+	_ = h.store.AddRecord(ctx, &store.Record{
+		UserID: id, RuleID: -1, // -1 marks "admin-triggered manual sign"
+		Status: res.Status, Message: res.Message,
+	})
+	h.log.Info("admin sign-now", "target_user", id, "status", res.Status)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  res.Status,
+		"message": res.Message,
+	})
 }
 
 // DELETE /api/v1/admin/users/{id}
@@ -910,17 +1005,22 @@ func (h *handlers) guestDTO(ctx context.Context, u *store.User) map[string]any {
 	var dates []string
 	_ = json.Unmarshal([]byte(u.SignDates), &dates)
 	out := map[string]any{
-		"userId":      u.UserID,
-		"userName":    u.UserName,
-		"userNumber":  u.UserNumber,
-		"userSection": u.UserSection,
-		"userClass":   u.UserClass,
-		"label":       u.GuestLabel,
-		"signDates":   dates,
-		"tokenExp":    u.TokenExp.Unix(),
-		"tokenValid":  time.Now().Before(u.TokenExp),
-		"createdAt":   u.CreatedAt.Unix(),
-		"dormId":      u.DormID,
+		"userId":        u.UserID,
+		"userName":      u.UserName,
+		"userNumber":    u.UserNumber,
+		"userSection":   u.UserSection,
+		"userClass":     u.UserClass,
+		"userAvatarUrl": u.UserAvatarURL,
+		"label":         u.GuestLabel,
+		"signDates":     dates,
+		"tokenExp":      u.TokenExp.Unix(),
+		"tokenValid":    time.Now().Before(u.TokenExp),
+		"createdAt":     u.CreatedAt.Unix(),
+		"dormId":        u.DormID,
+		"autoSign":      u.AutoSign,
+		"isDisabled":    u.IsDisabled,
+		"triggerMinute": u.TriggerMinute,
+		"jitterSec":     u.JitterSec,
 	}
 	if u.ExpiresAt != nil {
 		out["expiresAt"] = u.ExpiresAt.Unix()
@@ -931,6 +1031,20 @@ func (h *handlers) guestDTO(ctx context.Context, u *store.User) map[string]any {
 		if d, err := h.store.GetDorm(ctx, *u.DormID); err == nil {
 			out["dormName"] = d.Name
 		}
+	}
+	// Recent records so the admin can see the guest's last few outcomes
+	// without leaving the card view.
+	if recs, err := h.store.ListRecords(ctx, u.UserID, 5); err == nil {
+		rec := make([]map[string]any, 0, len(recs))
+		for _, r := range recs {
+			rec = append(rec, map[string]any{
+				"id":         r.ID,
+				"status":     r.Status,
+				"message":    r.Message,
+				"occurredAt": r.OccurredAt.Unix(),
+			})
+		}
+		out["recentRecords"] = rec
 	}
 	return out
 }

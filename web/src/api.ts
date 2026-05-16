@@ -135,7 +135,10 @@ export const adminApi = {
     return request<AdminUser[]>('/rosekhlifa/users?' + q.toString())
   },
   getUser: (id: string) => request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id)),
-  updateUser: (id: string, patch: { isDisabled?: boolean; autoSign?: boolean }) =>
+  updateUser: (
+    id: string,
+    patch: { isDisabled?: boolean; autoSign?: boolean; dormId?: number },
+  ) =>
     request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id), {
       method: 'PUT',
       body: JSON.stringify(patch),
@@ -150,6 +153,19 @@ export const adminApi = {
       {
         method: 'POST',
         body: JSON.stringify({ newPin: newPin || '' }),
+      },
+    ),
+  signNowFor: (id: string) =>
+    request<{ status: string; message: string }>(
+      '/rosekhlifa/users/' + encodeURIComponent(id) + '/sign-now',
+      { method: 'POST' },
+    ),
+  refreshUserToken: (id: string, auth: SchoolAuthPayload) =>
+    request<{ ok: boolean; expiresAt: number }>(
+      '/rosekhlifa/users/' + encodeURIComponent(id) + '/token',
+      {
+        method: 'POST',
+        body: JSON.stringify(auth),
       },
     ),
 

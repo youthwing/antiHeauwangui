@@ -163,6 +163,7 @@ export interface AdminGuest {
   userNumber: string
   userSection: string
   userClass: string
+  userAvatarUrl: string
   label: string
   signDates: string[]
   tokenExp: number
@@ -171,6 +172,16 @@ export interface AdminGuest {
   dormId?: number | null
   dormName?: string
   expiresAt: number | null
+  autoSign: boolean
+  isDisabled: boolean
+  triggerMinute: number
+  jitterSec: number
+  recentRecords?: Array<{
+    id: number
+    status: SignStatus
+    message: string
+    occurredAt: number
+  }>
 }
 
 export interface GuestCreateReq {
