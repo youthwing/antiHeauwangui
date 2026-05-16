@@ -37,6 +37,7 @@ const (
 	TypeStatsUpdated   = "stats.update"     // admin stats may have changed
 	TypeWindowOpen     = "window.open"      // 22:00 sign window armed
 	TypeWindowClose    = "window.close"     // 22:30 sign window finished
+	TypeAnnouncementChanged = "announcement.changed" // admin added/edited/removed a notice
 )
 
 // Bus is the singleton-per-process pub/sub broker.

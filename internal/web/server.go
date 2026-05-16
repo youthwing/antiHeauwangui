@@ -54,6 +54,10 @@ func (s *Server) Run(ctx context.Context) error {
 		r.Post("/activate", h.activate)
 		r.Post("/activate/precheck", h.activatePrecheck)
 		r.Post("/rosekhlifa/login", h.adminLogin)
+		// User-facing announcements are public-ish: any logged-in user reads
+		// them through /me-scoped sessions, but we don't need auth on the
+		// list itself — the data is non-sensitive (admin-authored notices).
+		r.Get("/announcements", h.listAnnouncements)
 
 		// User endpoints
 		r.Group(func(r chi.Router) {
@@ -108,6 +112,11 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/records.csv", h.adminExportRecordsCSV)
 			r.Get("/school-rules", h.adminSchoolRules)
 			r.Get("/events", h.adminEvents)
+
+			r.Get("/announcements", h.adminListAnnouncements)
+			r.Post("/announcements", h.adminCreateAnnouncement)
+			r.Put("/announcements/{id}", h.adminUpdateAnnouncement)
+			r.Delete("/announcements/{id}", h.adminDeleteAnnouncement)
 
 			r.Get("/smtp", h.adminGetSMTP)
 			r.Put("/smtp", h.adminUpdateSMTP)

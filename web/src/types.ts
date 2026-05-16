@@ -259,3 +259,25 @@ export interface AdminLog {
   message: string
   occurredAt: number
 }
+
+export type AnnouncementLevel = 'info' | 'success' | 'warning' | 'critical'
+
+// Admin-authored notice displayed on the user Dashboard. The plain-text
+// content is rendered with a tiny inline markdown subset (newlines,
+// **bold**, *italic*, [link](url)) — no raw HTML.
+export interface Announcement {
+  id: number
+  title: string
+  content: string
+  level: AnnouncementLevel
+  expiresAt: number | null
+  createdAt: number
+  updatedAt: number
+}
+
+export interface AnnouncementUpsertReq {
+  title: string
+  content: string
+  level: AnnouncementLevel
+  expiresAt?: number | null
+}

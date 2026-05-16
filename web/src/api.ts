@@ -16,12 +16,20 @@ import type {
   GuestUpdateReq,
   SchoolCheckinStatus,
   UserStats,
+  Announcement,
+  AnnouncementUpsertReq,
 } from './types'
 
 export interface SchoolAuthPayload {
   token?: string
   callbackUrl?: string
   oauthCode?: string
+}
+
+// Public-ish endpoint — admin authors notices and any user reads them.
+// Lives outside the `api` (user-scoped) object because there's no PIN gate.
+export function listAnnouncements(): Promise<Announcement[]> {
+  return request('/announcements')
 }
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -234,4 +242,22 @@ export const adminApi = {
 
   schoolRules: () =>
     request<{ rules: unknown; updatedAt: number }>('/rosekhlifa/school-rules'),
+
+  // --- Announcements ---
+  listAnnouncements: () =>
+    request<Announcement[]>('/rosekhlifa/announcements'),
+  createAnnouncement: (req: AnnouncementUpsertReq) =>
+    request<Announcement>('/rosekhlifa/announcements', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  updateAnnouncement: (id: number, req: Partial<AnnouncementUpsertReq>) =>
+    request<Announcement>('/rosekhlifa/announcements/' + id, {
+      method: 'PUT',
+      body: JSON.stringify(req),
+    }),
+  deleteAnnouncement: (id: number) =>
+    request<{ ok: boolean }>('/rosekhlifa/announcements/' + id, {
+      method: 'DELETE',
+    }),
 }

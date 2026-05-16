@@ -175,5 +175,21 @@ CREATE TABLE IF NOT EXISTS dorm_locations (
 			return fmt.Errorf("migrate add %s.%s: %w", u.table, u.name, err)
 		}
 	}
+
+	// Announcements: admin-authored notices shown on the user Dashboard.
+	// Own table (not key-value config) so we can keep many rows, each with
+	// its own expiry / level / created_at.
+	if _, err := s.db.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS announcements (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  title       TEXT NOT NULL,
+  content     TEXT NOT NULL,
+  level       TEXT NOT NULL DEFAULT 'info',
+  expires_at  INTEGER,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+)`); err != nil {
+		return fmt.Errorf("create announcements: %w", err)
+	}
 	return nil
 }

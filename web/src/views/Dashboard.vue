@@ -17,9 +17,10 @@ import {
   TrendingUp,
   Trophy,
 } from 'lucide-vue-next'
-import type { SignRecord, UserStats } from '../types'
+import type { SignRecord, UserStats, Announcement } from '../types'
 import { useAuth } from '../stores/auth'
-import { api } from '../api'
+import { api, listAnnouncements } from '../api'
+import AnnouncementCard from '../components/AnnouncementCard.vue'
 import { formatDateTime, formatRemaining } from '../lib/format'
 import { showToast } from '../lib/toast'
 import Avatar from '../components/Avatar.vue'
@@ -27,13 +28,15 @@ import Avatar from '../components/Avatar.vue'
 const auth = useAuth()
 const records = ref<SignRecord[]>([])
 const stats = ref<UserStats | null>(null)
+const announcements = ref<Announcement[]>([])
 const now = ref(new Date())
 const signing = ref(false)
 
 let timer: number | null = null
+let announcementsTimer: number | null = null
 onMounted(async () => {
   await auth.init()
-  await Promise.all([loadRecords(), loadStats()])
+  await Promise.all([loadRecords(), loadStats(), loadAnnouncements()])
   // Tick every 30s. During the 22:00–22:35 window, also re-pull records
   // so the "今日签到" status auto-transitions from "正在尝试" → "已完成"
   // without the user having to refresh.
@@ -45,9 +48,14 @@ onMounted(async () => {
       await Promise.all([loadRecords(), loadStats()])
     }
   }, 30_000)
+  // Lightweight announcement poll. Users get a new admin notice within
+  // 60s without having to refresh the page. Endpoint is small (just a
+  // few rows) so this is essentially free.
+  announcementsTimer = window.setInterval(loadAnnouncements, 60_000)
 })
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (announcementsTimer) clearInterval(announcementsTimer)
 })
 
 async function loadRecords() {
@@ -63,6 +71,14 @@ async function loadStats() {
     stats.value = await api.stats()
   } catch {
     stats.value = null
+  }
+}
+
+async function loadAnnouncements() {
+  try {
+    announcements.value = await listAnnouncements()
+  } catch {
+    announcements.value = []
   }
 }
 
@@ -237,6 +253,17 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
 
 <template>
   <div v-if="me" class="space-y-3">
+    <!-- Announcements (admin-authored). Most important info first; only
+         renders when there's something to show, so users with a quiet
+         system see the normal hero immediately. -->
+    <section v-if="announcements.length > 0" class="space-y-2">
+      <AnnouncementCard
+        v-for="a in announcements"
+        :key="a.id"
+        :a="a"
+      />
+    </section>
+
     <!-- Hero -->
     <section
       class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-zinc-100/40 dark:from-zinc-900 dark:to-zinc-900/40 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5 ambient-glow"

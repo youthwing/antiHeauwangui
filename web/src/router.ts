@@ -37,6 +37,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', name: 'admin-dashboard', component: () => import('./views/admin/Dashboard.vue') },
       { path: 'monitor', name: 'admin-monitor', component: () => import('./views/admin/Monitor.vue') },
+      { path: 'announcements', name: 'admin-announcements', component: () => import('./views/admin/Announcements.vue') },
       // Backward compat: /tonight kept as a redirect so any bookmarks still work.
       { path: 'tonight', redirect: '/rosekhlifa/monitor' },
       { path: 'codes', name: 'admin-codes', component: () => import('./views/admin/Codes.vue') },

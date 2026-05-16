@@ -12,6 +12,7 @@ import {
   LogOut,
   ShieldCheck,
   Activity,
+  Megaphone,
 } from 'lucide-vue-next'
 import Logo from './Logo.vue'
 import ThemeToggle from './ThemeToggle.vue'
@@ -26,6 +27,7 @@ const admin = useAdminAuth()
 const items: NavItem[] = [
   { to: '/rosekhlifa', label: '概览', icon: LayoutDashboard },
   { to: '/rosekhlifa/monitor', label: '监控看板', icon: Activity },
+  { to: '/rosekhlifa/announcements', label: '公告', icon: Megaphone },
   { to: '/rosekhlifa/codes', label: '邀请码', icon: Ticket },
   { to: '/rosekhlifa/dorms', label: '宿舍楼', icon: Building2 },
   { to: '/rosekhlifa/users', label: '用户', icon: Users },
