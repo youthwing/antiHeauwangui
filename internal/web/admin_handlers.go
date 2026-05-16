@@ -16,7 +16,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	apiclient "wangui/internal/api"
 	"wangui/internal/notify"
+	"wangui/internal/scheduler"
 	"wangui/internal/store"
 )
 
@@ -210,12 +212,30 @@ func (h *handlers) adminListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(users))
 	for _, u := range users {
+		if u.IsGuest {
+			// Guests have their own admin page; don't double-list them here.
+			continue
+		}
 		dto := adminUserDTO(u)
 		if u.DormID != nil {
 			dto["dormId"] = *u.DormID
 			if name, ok := dormNames[*u.DormID]; ok {
 				dto["dormName"] = name
 			}
+		}
+		// Include last 3 records so the cards on the users page can show a
+		// quick history without an N+1 round trip from the frontend.
+		if recs, err := h.store.ListRecords(r.Context(), u.UserID, 3); err == nil {
+			rec := make([]map[string]any, 0, len(recs))
+			for _, x := range recs {
+				rec = append(rec, map[string]any{
+					"id":         x.ID,
+					"status":     x.Status,
+					"message":    x.Message,
+					"occurredAt": x.OccurredAt.Unix(),
+				})
+			}
+			dto["recentRecords"] = rec
 		}
 		out = append(out, dto)
 	}
@@ -290,6 +310,7 @@ func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		IsDisabled *bool  `json:"isDisabled"`
 		AutoSign   *bool  `json:"autoSign"`
 		DormID     *int64 `json:"dormId"`
+		SignDays   *int   `json:"signDays"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "请求格式错误")
@@ -312,6 +333,17 @@ func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AutoSign != nil {
 		u.AutoSign = *req.AutoSign
+		if err := h.store.UpdateSettings(r.Context(), u); err != nil {
+			writeErr(w, http.StatusInternalServerError, "保存失败")
+			return
+		}
+	}
+	if req.SignDays != nil {
+		if *req.SignDays < 0 || *req.SignDays > 127 {
+			writeErr(w, http.StatusBadRequest, "signDays 必须在 0–127 之间")
+			return
+		}
+		u.SignDays = *req.SignDays
 		if err := h.store.UpdateSettings(r.Context(), u); err != nil {
 			writeErr(w, http.StatusInternalServerError, "保存失败")
 			return
@@ -387,6 +419,80 @@ func (h *handlers) adminRefreshUserToken(w http.ResponseWriter, r *http.Request)
 		"ok":        true,
 		"expiresAt": auth.Claims.Exp,
 	})
+}
+
+// GET /api/v1/rosekhlifa/users/{id}/checkin-status — fetch the school's
+// view of "what should this user do tonight" without performing a sign.
+// This is how admin sees that a user has filed leave (请假) or that today
+// is a 节假日离校 day — info the school surfaces but our records don't.
+//
+// Cached client-side via the regular HTTP cache headers; this endpoint
+// hits the school live each call. Rate-limited by school's own backend.
+func (h *handlers) adminCheckinStatusForUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	u, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	if time.Now().After(u.TokenExp) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"state":   "tokenExpired",
+			"message": "Token 已过期，无法查询",
+		})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	c := apiclient.New(u.Token)
+	st, err := c.CheckinStatus(ctx, scheduler.DefaultRuleID)
+	if err != nil {
+		if apiclient.IsAuthExpired(err) {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"state":   "tokenExpired",
+				"message": "Token 已失效，请刷新",
+			})
+			return
+		}
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"state":   "error",
+			"message": "学校接口异常: " + err.Error(),
+		})
+		return
+	}
+	// Derive a single coarse state for UI rendering. Order matters — exempt
+	// dominates "has checked in" since the school's own response sometimes
+	// returns both.
+	state := "pending"
+	switch {
+	case st.IsBoarding:
+		state = "boarding"
+	case st.IsExempt != nil && *st.IsExempt:
+		state = "exempt"
+	case st.HasCheckedIn != nil && *st.HasCheckedIn:
+		state = "signed"
+	case st.CanCheckin:
+		state = "canSign"
+	}
+	out := map[string]any{
+		"state":        state,
+		"message":      st.Message,
+		"canCheckin":   st.CanCheckin,
+		"hasCheckedIn": st.HasCheckedIn,
+		"isExempt":     st.IsExempt,
+		"isBoarding":   st.IsBoarding,
+		"exemptReason": st.ExemptReason,
+	}
+	if st.CurrentRule != nil {
+		out["currentRule"] = map[string]any{
+			"ruleId":      st.CurrentRule.RuleID,
+			"ruleName":    st.CurrentRule.RuleName,
+			"startTime":   st.CurrentRule.StartTime,
+			"endTime":     st.CurrentRule.EndTime,
+			"description": st.CurrentRule.Description,
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // POST /api/v1/rosekhlifa/users/{id}/sign-now — admin signs on behalf of any
@@ -784,20 +890,24 @@ func generateNumericPin(n int) string {
 
 func adminUserDTO(u *store.User) map[string]any {
 	return map[string]any{
-		"userId":      u.UserID,
-		"userName":    u.UserName,
-		"userNumber":  u.UserNumber,
-		"userSection": u.UserSection,
-		"userClass":   u.UserClass,
-		"inviteCode":  u.InviteCode,
-		"isDisabled":  u.IsDisabled,
-		"autoSign":    u.AutoSign,
-		"latitude":    u.Lat,
-		"longitude":   u.Lng,
-		"tokenExp":    u.TokenExp.Unix(),
-		"tokenValid":  time.Now().Before(u.TokenExp),
-		"createdAt":   u.CreatedAt.Unix(),
-		"updatedAt":   u.UpdatedAt.Unix(),
+		"userId":        u.UserID,
+		"userName":      u.UserName,
+		"userNumber":    u.UserNumber,
+		"userSection":   u.UserSection,
+		"userClass":     u.UserClass,
+		"userAvatarUrl": u.UserAvatarURL,
+		"inviteCode":    u.InviteCode,
+		"isDisabled":    u.IsDisabled,
+		"autoSign":      u.AutoSign,
+		"latitude":      u.Lat,
+		"longitude":     u.Lng,
+		"tokenExp":      u.TokenExp.Unix(),
+		"tokenValid":    time.Now().Before(u.TokenExp),
+		"createdAt":     u.CreatedAt.Unix(),
+		"updatedAt":     u.UpdatedAt.Unix(),
+		"signDays":      u.SignDays,
+		"triggerMinute": u.TriggerMinute,
+		"jitterSec":     u.JitterSec,
 	}
 }
 

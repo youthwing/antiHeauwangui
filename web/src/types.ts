@@ -122,6 +122,7 @@ export interface AdminUser {
   userNumber: string
   userSection: string
   userClass: string
+  userAvatarUrl: string
   inviteCode: string
   isDisabled: boolean
   autoSign: boolean
@@ -133,12 +134,34 @@ export interface AdminUser {
   tokenValid: boolean
   createdAt: number
   updatedAt: number
+  signDays: number
+  triggerMinute: number
+  jitterSec: number
   recentRecords?: Array<{
     id: number
     status: SignStatus
     message: string
     occurredAt: number
   }>
+}
+
+// Snapshot of the school's "what should this user do tonight" answer.
+// `state` is a coarse bucket derived server-side from the school's response.
+export interface SchoolCheckinStatus {
+  state: 'pending' | 'canSign' | 'signed' | 'exempt' | 'boarding' | 'tokenExpired' | 'error'
+  message: string
+  canCheckin?: boolean
+  hasCheckedIn?: boolean | null
+  isExempt?: boolean | null
+  isBoarding?: boolean
+  exemptReason?: string | null
+  currentRule?: {
+    ruleId: number
+    ruleName: string
+    startTime: string
+    endTime: string
+    description: string
+  }
 }
 
 export interface DormUserBrief {

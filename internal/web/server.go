@@ -85,6 +85,7 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Post("/users/{id}/pin", h.adminResetUserPin)
 			r.Post("/users/{id}/token", h.adminRefreshUserToken)
 			r.Post("/users/{id}/sign-now", h.adminSignNowForUser)
+			r.Get("/users/{id}/checkin-status", h.adminCheckinStatusForUser)
 			r.Delete("/users/{id}", h.adminDeleteUser)
 
 			r.Get("/dorms", h.adminListDorms)

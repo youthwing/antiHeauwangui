@@ -36,6 +36,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAdmin: true },
     children: [
       { path: '', name: 'admin-dashboard', component: () => import('./views/admin/Dashboard.vue') },
+      { path: 'tonight', name: 'admin-tonight', component: () => import('./views/admin/Tonight.vue') },
       { path: 'codes', name: 'admin-codes', component: () => import('./views/admin/Codes.vue') },
       { path: 'dorms', name: 'admin-dorms', component: () => import('./views/admin/Dorms.vue') },
       { path: 'users', name: 'admin-users', component: () => import('./views/admin/Users.vue') },

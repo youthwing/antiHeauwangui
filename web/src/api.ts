@@ -14,6 +14,7 @@ import type {
   SmtpUpdate,
   GuestCreateReq,
   GuestUpdateReq,
+  SchoolCheckinStatus,
 } from './types'
 
 export interface SchoolAuthPayload {
@@ -137,7 +138,12 @@ export const adminApi = {
   getUser: (id: string) => request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id)),
   updateUser: (
     id: string,
-    patch: { isDisabled?: boolean; autoSign?: boolean; dormId?: number },
+    patch: {
+      isDisabled?: boolean
+      autoSign?: boolean
+      dormId?: number
+      signDays?: number
+    },
   ) =>
     request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id), {
       method: 'PUT',
@@ -159,6 +165,10 @@ export const adminApi = {
     request<{ status: string; message: string }>(
       '/rosekhlifa/users/' + encodeURIComponent(id) + '/sign-now',
       { method: 'POST' },
+    ),
+  checkinStatusFor: (id: string) =>
+    request<SchoolCheckinStatus>(
+      '/rosekhlifa/users/' + encodeURIComponent(id) + '/checkin-status',
     ),
   refreshUserToken: (id: string, auth: SchoolAuthPayload) =>
     request<{ ok: boolean; expiresAt: number }>(
