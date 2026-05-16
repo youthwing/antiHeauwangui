@@ -68,6 +68,15 @@ type User struct {
 	SignDates  string     // sign_dates — raw JSON "[YYYY-MM-DD, ...]"
 	ExpiresAt  *time.Time // expires_at — nil = no auto-cleanup
 
+	// Server酱 push channel — independent from email. Empty key disables.
+	ServerChanKey     string
+	ServerChanEnabled bool
+
+	// TokenWarnedAt is the unix timestamp of the last token-expiry warning
+	// we sent for the *current* token. Reset to 0 on UpdateToken so a fresh
+	// token starts the warning cycle over.
+	TokenWarnedAt int64
+
 	PinHash []byte // bcrypt hash of the 4–6 digit login PIN; nil = no PIN set
 
 	CreatedAt time.Time
@@ -82,6 +91,7 @@ const userColumns = `user_id, user_name, user_number, user_section, user_class,
   pin_hash, dorm_id, send_address_fields, user_avatar_url,
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
+  server_chan_key, server_chan_enabled, token_warned_at,
   created_at, updated_at`
 
 // UpsertUser inserts a new user or updates identity + token of an existing one.
@@ -131,8 +141,9 @@ INSERT INTO users (
   pin_hash, dorm_id, send_address_fields, user_avatar_url,
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
+  server_chan_key, server_chan_enabled, token_warned_at,
   created_at, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(user_id) DO UPDATE SET
   user_name        = excluded.user_name,
   user_number      = excluded.user_number,
@@ -153,6 +164,7 @@ ON CONFLICT(user_id) DO UPDATE SET
 		u.PinHash, u.DormID, boolInt(u.SendAddressFields), u.UserAvatarURL,
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
 		boolInt(u.IsGuest), u.GuestLabel, u.SignDates, expiresAt,
+		u.ServerChanKey, boolInt(u.ServerChanEnabled), u.TokenWarnedAt,
 		u.CreatedAt.Unix(), u.UpdatedAt.Unix())
 	return err
 }
@@ -176,7 +188,7 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 	var inviteCode sql.NullString
 	var pinHash []byte
 	var dormID sql.NullInt64
-	var sendFields, notifyEnabled, isGuest int
+	var sendFields, notifyEnabled, isGuest, serverChanEnabled int
 	var expiresAt sql.NullInt64
 	err := r.Scan(
 		&u.UserID, &u.UserName, &u.UserNumber, &u.UserSection, &u.UserClass,
@@ -187,6 +199,7 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 		&pinHash, &dormID, &sendFields, &u.UserAvatarURL,
 		&u.NotifyEmail, &notifyEnabled, &u.SignDays,
 		&isGuest, &u.GuestLabel, &u.SignDates, &expiresAt,
+		&u.ServerChanKey, &serverChanEnabled, &u.TokenWarnedAt,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -214,6 +227,7 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 	u.SendAddressFields = sendFields != 0
 	u.NotifyEnabled = notifyEnabled != 0
 	u.IsGuest = isGuest != 0
+	u.ServerChanEnabled = serverChanEnabled != 0
 	if expiresAt.Valid {
 		t := time.Unix(expiresAt.Int64, 0)
 		u.ExpiresAt = &t
@@ -272,43 +286,63 @@ func (s *Store) SetPinHash(ctx context.Context, userID string, hash []byte) erro
 func (s *Store) UpdateSettings(ctx context.Context, u *User) error {
 	_, err := s.db.ExecContext(ctx, `
 UPDATE users SET
-  auto_sign       = ?,
-  lat             = ?,
-  lng             = ?,
-  address         = ?,
-  city            = ?,
-  road            = ?,
-  poi             = ?,
-  device_model    = ?,
-  device_system   = ?,
-  trigger_minute  = ?,
-  jitter_sec      = ?,
-  retry_count     = ?,
-  retry_gap_min   = ?,
-  saved_locations = ?,
-  notify_email    = ?,
-  notify_enabled  = ?,
-  sign_days       = ?,
-  updated_at      = ?
+  auto_sign           = ?,
+  lat                 = ?,
+  lng                 = ?,
+  address             = ?,
+  city                = ?,
+  road                = ?,
+  poi                 = ?,
+  device_model        = ?,
+  device_system       = ?,
+  trigger_minute      = ?,
+  jitter_sec          = ?,
+  retry_count         = ?,
+  retry_gap_min       = ?,
+  saved_locations     = ?,
+  notify_email        = ?,
+  notify_enabled      = ?,
+  sign_days           = ?,
+  server_chan_key     = ?,
+  server_chan_enabled = ?,
+  updated_at          = ?
 WHERE user_id = ?
 `,
 		boolInt(u.AutoSign), u.Lat, u.Lng, u.Address, u.City, u.Road, u.Poi,
 		u.DeviceModel, u.DeviceSystem,
 		u.TriggerMinute, u.JitterSec, u.RetryCount, u.RetryGapMin, u.SavedLocations,
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
+		u.ServerChanKey, boolInt(u.ServerChanEnabled),
 		time.Now().Unix(), u.UserID)
 	return err
 }
 
-// UpdateToken rotates the stored token for a user.
+// UpdateToken rotates the stored token for a user. Resets token_warned_at to
+// 0 so the new token cycle starts fresh — a user who refreshes proactively
+// won't get re-warned about the *old* token's imminent expiry.
 func (s *Store) UpdateToken(ctx context.Context, userID, token string, exp time.Time) error {
 	enc, err := s.c.Encrypt([]byte(token))
 	if err != nil {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `
-UPDATE users SET token_enc = ?, token_exp = ?, updated_at = ? WHERE user_id = ?
+UPDATE users SET
+  token_enc       = ?,
+  token_exp       = ?,
+  token_warned_at = 0,
+  updated_at      = ?
+WHERE user_id = ?
 `, enc, exp.Unix(), time.Now().Unix(), userID)
+	return err
+}
+
+// MarkTokenWarned records that a token-expiry warning was just dispatched
+// for this user's current token. Reset by UpdateToken next time the token
+// rotates, so each token cycle warns at most once.
+func (s *Store) MarkTokenWarned(ctx context.Context, userID string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET token_warned_at = ?, updated_at = ? WHERE user_id = ?`,
+		at.Unix(), time.Now().Unix(), userID)
 	return err
 }
 

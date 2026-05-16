@@ -41,6 +41,69 @@ func NewMulti(s *store.Store, l *slog.Logger) *Multi {
 func (m *Multi) Start(ctx context.Context) {
 	go m.loop(ctx)
 	go m.guestCleanupLoop(ctx)
+	go m.tokenWarnLoop(ctx)
+}
+
+// TokenWarnThreshold is the "send warning" cutoff. Anything inside this
+// window (and not yet warned for the current token) triggers a notification.
+// 48h gives the user a comfortable buffer to refresh.
+const TokenWarnThreshold = 48 * time.Hour
+
+// tokenWarnLoop fires once a day at 10:00 local time, scans all users,
+// and dispatches a warning email + Server酱 push for any user whose JWT
+// expires within TokenWarnThreshold AND has not been warned for the
+// current token cycle (token_warned_at is reset to 0 on UpdateToken).
+func (m *Multi) tokenWarnLoop(ctx context.Context) {
+	for {
+		next := nextTokenWarnTime(time.Now())
+		m.log.Info("token-warn armed", "next", next.Format(time.RFC3339))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Until(next)):
+		}
+		m.runTokenWarnSweep(ctx)
+	}
+}
+
+func nextTokenWarnTime(now time.Time) time.Time {
+	today := time.Date(now.Year(), now.Month(), now.Day(), 10, 0, 0, 0, now.Location())
+	if today.After(now) {
+		return today
+	}
+	return today.Add(24 * time.Hour)
+}
+
+func (m *Multi) runTokenWarnSweep(ctx context.Context) {
+	users, err := m.store.ListUsers(ctx, store.UserListFilter{Limit: 500})
+	if err != nil {
+		m.log.Error("token-warn list users", "err", err.Error())
+		return
+	}
+	now := time.Now()
+	warned := 0
+	for _, u := range users {
+		if u.IsDisabled {
+			continue
+		}
+		remaining := time.Until(u.TokenExp)
+		if remaining <= 0 || remaining > TokenWarnThreshold {
+			continue
+		}
+		// Per-token-cycle dedup: TokenWarnedAt is reset to 0 when the token
+		// is rotated, so a non-zero value means we already pinged about this
+		// exact token. Don't spam.
+		if u.TokenWarnedAt != 0 {
+			continue
+		}
+		hoursLeft := max(int(remaining/time.Hour), 1)
+		m.notifier.DispatchTokenWarning(u, hoursLeft)
+		if err := m.store.MarkTokenWarned(ctx, u.UserID, now); err != nil {
+			m.log.Warn("mark token-warned", "user", u.UserID, "err", err.Error())
+		}
+		warned++
+	}
+	m.log.Info("token-warn sweep done", "scanned", len(users), "warned", warned)
 }
 
 // guestCleanupLoop runs every day at 02:00 (well outside the sign window) and

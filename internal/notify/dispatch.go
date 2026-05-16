@@ -25,11 +25,14 @@ type SignResult struct {
 	Message string
 }
 
-// DispatchSignResult queues an email for the user (if they enabled notify) and
-// always copies the admin Bcc (if configured). Non-blocking from the caller's
-// perspective — fires a goroutine.
+// DispatchSignResult fans out to every channel configured for this user
+// (email + Server酱) plus the admin global BCC equivalents. Non-blocking
+// from the caller's perspective — fires a goroutine.
 func (d *Dispatcher) DispatchSignResult(u *store.User, res SignResult) {
-	go d.dispatchSync(u, res)
+	go func() {
+		d.dispatchSync(u, res)
+		d.dispatchServerChan(u, res)
+	}()
 }
 
 func (d *Dispatcher) dispatchSync(u *store.User, res SignResult) {
@@ -104,6 +107,124 @@ func (d *Dispatcher) dispatchSync(u *store.User, res SignResult) {
 			d.log("email to admin failed", "to", cfg.AdminBcc, "err", err.Error())
 		} else {
 			d.log("admin log email sent", "to", cfg.AdminBcc, "status", res.Status)
+		}
+	}
+}
+
+// dispatchServerChan pushes the sign result through Server酱 for the user
+// (if they configured + enabled their own key) and the admin (if admin
+// configured + enabled the global admin key). Each channel is independent
+// of the email pipeline — both can fire for the same event.
+func (d *Dispatcher) dispatchServerChan(u *store.User, res SignResult) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cfg, err := d.Store.GetSMTPConfig(ctx)
+	if err != nil {
+		d.log("notify config load failed (serverchan)", "err", err.Error())
+		return
+	}
+
+	title, body := renderSignServerChan(u, res)
+
+	// Per-user push — guests never get one (no SendKey collected).
+	if !u.IsGuest && u.ServerChanEnabled && u.ServerChanKey != "" {
+		client := NewServerChan(u.ServerChanKey)
+		if err := client.Send(ctx, title, body); err != nil {
+			d.log("serverchan to user failed", "user", u.UserID, "err", err.Error())
+		} else {
+			d.log("serverchan sent to user", "user", u.UserID, "status", res.Status)
+		}
+	}
+
+	// Admin push — fires for everyone (regular + guest), giving admin a single
+	// stream of all sign outcomes alongside email BCC.
+	if cfg.AdminServerChanEnabled && cfg.AdminServerChanKey != "" {
+		adminTitle := title
+		if u.IsGuest {
+			adminTitle = "[临时朋友] " + title
+		}
+		adminBody := body
+		client := NewServerChan(cfg.AdminServerChanKey)
+		if err := client.Send(ctx, adminTitle, adminBody); err != nil {
+			d.log("serverchan to admin failed", "err", err.Error())
+		} else {
+			d.log("serverchan sent to admin", "status", res.Status, "user", u.UserID)
+		}
+	}
+}
+
+// DispatchTokenWarning sends a "Token 即将过期" alert through every channel
+// the user (and admin) has enabled. Caller should already have checked the
+// expiry threshold AND token_warned_at deduping. Non-blocking.
+func (d *Dispatcher) DispatchTokenWarning(u *store.User, hoursLeft int) {
+	go d.dispatchTokenWarning(u, hoursLeft)
+}
+
+func (d *Dispatcher) dispatchTokenWarning(u *store.User, hoursLeft int) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cfg, err := d.Store.GetSMTPConfig(ctx)
+	if err != nil {
+		d.log("token-warn smtp load failed", "err", err.Error())
+		return
+	}
+
+	subject, text, html := renderTokenWarnEmail(u, hoursLeft)
+	title, body := renderTokenWarnServerChan(u, hoursLeft)
+
+	// --- Email path (user + admin BCC) ---
+	if cfg.Enabled && cfg.Host != "" && cfg.Username != "" {
+		client := &EmailClient{
+			Host: cfg.Host, Port: cfg.Port,
+			Username: cfg.Username, Password: cfg.Password, From: cfg.From,
+		}
+		// Guests have no user email — only admin gets notified, and even then
+		// only if the guest's token actually matters (it usually doesn't, since
+		// they're auto-cleaned soon). Still surface it for transparency.
+		if u.IsGuest {
+			if cfg.AdminBcc != "" {
+				_ = client.Send(Message{
+					To: cfg.AdminBcc, Subject: "[临时朋友] " + subject,
+					Text: text, HTML: html,
+				})
+			}
+		} else {
+			sent := false
+			if u.NotifyEnabled && u.NotifyEmail != "" {
+				msg := Message{To: u.NotifyEmail, Subject: subject, Text: text, HTML: html}
+				if cfg.AdminBcc != "" && cfg.AdminBcc != u.NotifyEmail {
+					msg.Bcc = []string{cfg.AdminBcc}
+				}
+				if err := client.Send(msg); err != nil {
+					d.log("token-warn email to user failed", "user", u.UserID, "err", err.Error())
+				} else {
+					sent = true
+					d.log("token-warn email sent", "user", u.UserID, "hours_left", hoursLeft)
+				}
+			}
+			if !sent && cfg.AdminBcc != "" {
+				_ = client.Send(Message{
+					To: cfg.AdminBcc, Subject: "[管理员日志] " + subject,
+					Text: text, HTML: html,
+				})
+			}
+		}
+	}
+
+	// --- Server酱 path ---
+	if !u.IsGuest && u.ServerChanEnabled && u.ServerChanKey != "" {
+		if err := NewServerChan(u.ServerChanKey).Send(ctx, title, body); err != nil {
+			d.log("token-warn serverchan to user failed", "user", u.UserID, "err", err.Error())
+		}
+	}
+	if cfg.AdminServerChanEnabled && cfg.AdminServerChanKey != "" {
+		adminTitle := title
+		if u.IsGuest {
+			adminTitle = "[临时朋友] " + title
+		}
+		if err := NewServerChan(cfg.AdminServerChanKey).Send(ctx, adminTitle, body); err != nil {
+			d.log("token-warn serverchan to admin failed", "err", err.Error())
 		}
 	}
 }
@@ -195,6 +316,97 @@ func renderSignEmail(u *store.User, res SignResult) (subject, text, html string)
 </body></html>`,
 		color, label, u.UserName, u.UserNumber, when, res.Message)
 	return
+}
+
+// renderSignServerChan produces a compact Server酱 push for one sign result.
+// title is what shows in the wechat notification banner; body is the
+// in-detail markdown.
+func renderSignServerChan(u *store.User, res SignResult) (title, body string) {
+	statusLabels := map[string]string{
+		"success": "✅ 签到成功",
+		"already": "🔵 今日已签",
+		"exempt":  "💤 免签",
+		"failed":  "❌ 签到失败",
+		"skipped": "⏭ 跳过",
+	}
+	label, ok := statusLabels[res.Status]
+	if !ok {
+		label = res.Status
+	}
+	when := time.Now().Format("2006-01-02 15:04:05")
+	if u.IsGuest {
+		title = fmt.Sprintf("%s · %s", label, u.GuestLabel)
+	} else {
+		title = fmt.Sprintf("%s · %s", label, u.UserName)
+	}
+	body = fmt.Sprintf(
+		"**结果**：%s\n\n**姓名**：%s\n\n**学号**：`%s`\n\n**说明**：%s\n\n**时间**：%s",
+		label, u.UserName, u.UserNumber, nonBlank(res.Message, "—"), when,
+	)
+	return
+}
+
+// renderTokenWarnEmail returns subject + text + html for a token-expiry alert.
+func renderTokenWarnEmail(u *store.User, hoursLeft int) (subject, text, html string) {
+	human := humanHours(hoursLeft)
+	subject = fmt.Sprintf("[勿外传] Token 即将过期 · %s · 剩 %s", u.UserName, human)
+	text = fmt.Sprintf(
+		"姓名：%s\n学号：%s\n剩余：%s\n到期时间：%s\n\n请尽快打开 wangui 的「账号」页重新扫码刷新 Token。\n",
+		u.UserName, u.UserNumber, human, u.TokenExp.Format("2006-01-02 15:04"),
+	)
+	html = fmt.Sprintf(`<!doctype html><html><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#fafafa;padding:24px;color:#18181b;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+  <div style="padding:18px 22px;background:#f59e0b;color:#fff;">
+    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">勿外传 · Token 提醒</div>
+    <div style="font-size:22px;font-weight:700;margin-top:4px;">Token 即将过期</div>
+  </div>
+  <div style="padding:18px 22px;font-size:14px;line-height:1.7;">
+    <div><strong style="color:#71717a;">姓名</strong>　%s</div>
+    <div><strong style="color:#71717a;">学号</strong>　%s</div>
+    <div><strong style="color:#71717a;">剩余</strong>　<span style="color:#d97706;font-weight:600;">%s</span></div>
+    <div><strong style="color:#71717a;">到期</strong>　%s</div>
+    <div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;color:#92400e;">
+      请尽快打开 wangui 站点，进入「账号」页重新扫码刷新 Token，否则到期后将无法自动签到。
+    </div>
+  </div>
+  <div style="padding:12px 22px;font-size:11px;color:#a1a1aa;background:#fafafa;border-top:1px solid #e5e7eb;">
+    勿外传 · 仅内部使用 · 自动发送，请勿回复
+  </div>
+</div></body></html>`,
+		u.UserName, u.UserNumber, human, u.TokenExp.Format("2006-01-02 15:04"))
+	return
+}
+
+func renderTokenWarnServerChan(u *store.User, hoursLeft int) (title, body string) {
+	human := humanHours(hoursLeft)
+	title = fmt.Sprintf("⚠️ Token 即将过期 · %s · 剩 %s", u.UserName, human)
+	body = fmt.Sprintf(
+		"**姓名**：%s\n\n**学号**：`%s`\n\n**剩余**：%s\n\n**到期**：%s\n\n请尽快打开 wangui 「账号」页重新扫码刷新，否则将无法自动签到。",
+		u.UserName, u.UserNumber, human, u.TokenExp.Format("2006-01-02 15:04"),
+	)
+	return
+}
+
+func humanHours(h int) string {
+	if h <= 0 {
+		return "已过期"
+	}
+	if h < 24 {
+		return fmt.Sprintf("%d 小时", h)
+	}
+	d := h / 24
+	rem := h % 24
+	if rem == 0 {
+		return fmt.Sprintf("%d 天", d)
+	}
+	return fmt.Sprintf("%d 天 %d 小时", d, rem)
+}
+
+func nonBlank(s, fallback string) string {
+	if strings.TrimSpace(s) == "" {
+		return fallback
+	}
+	return s
 }
 
 func (d *Dispatcher) log(msg string, kv ...any) {

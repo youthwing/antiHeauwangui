@@ -158,6 +158,14 @@ CREATE TABLE IF NOT EXISTS dorm_locations (
 		{"users", "guest_label", "TEXT NOT NULL DEFAULT ''"},
 		{"users", "sign_dates", "TEXT NOT NULL DEFAULT '[]'"},
 		{"users", "expires_at", "INTEGER"},
+		// Server酱 per-user push channel — independent from email, can be
+		// enabled together or alone. Empty key means disabled regardless
+		// of the flag.
+		{"users", "server_chan_key", "TEXT NOT NULL DEFAULT ''"},
+		{"users", "server_chan_enabled", "INTEGER NOT NULL DEFAULT 0"},
+		// Last time a token-expiry warning was sent for the current token.
+		// Reset to 0 on UpdateToken so each token cycle warns at most once.
+		{"users", "token_warned_at", "INTEGER NOT NULL DEFAULT 0"},
 		{"dorm_locations", "send_address_fields", "INTEGER NOT NULL DEFAULT 0"},
 		{"web_sessions", "is_admin", "INTEGER NOT NULL DEFAULT 0"},
 	}

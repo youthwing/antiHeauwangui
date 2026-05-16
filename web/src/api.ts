@@ -87,6 +87,10 @@ export const api = {
   dorms: () => request<Dorm[]>('/dorms'),
   signNow: () =>
     request<{ status: string; message: string }>('/sign-now', { method: 'POST' }),
+  // Push a test message via the user's currently SAVED Server酱 SendKey.
+  // Returns 502 with upstream error if the SendKey is invalid.
+  testServerChan: () =>
+    request<{ ok: boolean }>('/notify/test-serverchan', { method: 'POST' }),
   logout: () => request<{ ok: boolean }>('/logout', { method: 'POST' }),
   deleteMe: () => request<{ ok: boolean }>('/me', { method: 'DELETE' }),
 }
@@ -219,6 +223,10 @@ export const adminApi = {
     }),
   testSmtp: () =>
     request<{ ok: boolean; sentTo: string }>('/rosekhlifa/smtp/test', {
+      method: 'POST',
+    }),
+  testServerChan: () =>
+    request<{ ok: boolean }>('/rosekhlifa/serverchan/test', {
       method: 'POST',
     }),
 }

@@ -10,6 +10,11 @@ import {
   RotateCcw,
   MapPin,
   Mail,
+  Bell,
+  Send,
+  Eye,
+  EyeOff,
+  HelpCircle,
 } from 'lucide-vue-next'
 import type { Settings, Dorm } from '../types'
 import { useAuth } from '../stores/auth'
@@ -38,6 +43,16 @@ const form = reactive<Settings>({
   notifyEnabled: false,
   signDays: 127,
 })
+
+// Server酱 lives outside `form` because the input is write-only: the server
+// never echoes the SendKey back, so we keep a transient ref and only
+// submit it when the user has typed something fresh.
+const serverChanKey = ref('')
+const serverChanEnabled = ref(false)
+const serverChanKeySet = ref(false)
+const showServerChanKey = ref(false)
+const testingServerChan = ref(false)
+const showServerChanFaq = ref(false)
 
 // signDays bitmask helpers. bit 0 = Mon … bit 6 = Sun.
 const PRESETS = {
@@ -85,6 +100,9 @@ function hydrate(s: Settings) {
   form.savedLocations = Array.isArray(s.savedLocations) ? [...s.savedLocations] : []
   form.notifyEmail = s.notifyEmail || ''
   form.notifyEnabled = !!s.notifyEnabled
+  serverChanEnabled.value = !!s.serverChanEnabled
+  serverChanKeySet.value = !!s.serverChanKeySet
+  serverChanKey.value = '' // reset on hydrate so saved key isn't re-sent
   // Server returns 0 for "never sign" but UI keeps the form's default-127
   // so an empty value doesn't accidentally wipe the schedule. We trust the
   // server's value here, treating 0 as a real "no days selected" state.
@@ -132,15 +150,37 @@ async function saveAll() {
       retryGapMin: form.retryGapMin,
       notifyEmail: form.notifyEmail.trim(),
       notifyEnabled: form.notifyEnabled,
+      serverChanEnabled: serverChanEnabled.value,
       signDays: form.signDays & 0x7f,
     }
+    // Only send the SendKey if the user typed something fresh — empty means
+    // "keep what's already saved" (same as the SMTP password convention).
+    const sck = serverChanKey.value.trim()
+    if (sck) payload.serverChanKey = sck
     await api.updateSettings(payload)
     showToast('ok', '配置已保存')
+    if (sck) {
+      serverChanKey.value = ''
+      serverChanKeySet.value = true
+    }
     await auth.refresh()
   } catch (e: any) {
     showToast('err', e.message || '保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+async function testServerChanPush() {
+  if (testingServerChan.value) return
+  testingServerChan.value = true
+  try {
+    await api.testServerChan()
+    showToast('ok', '测试推送已发送，请查看微信')
+  } catch (e: any) {
+    showToast('err', e.message || '推送失败')
+  } finally {
+    testingServerChan.value = false
   }
 }
 
@@ -491,6 +531,107 @@ const previewSchedule = computed(() => {
       <p class="text-[11px] text-zinc-500 mt-2">
         只在自动签到的「最终结果」时发一封；手动「立即签到」不发邮件。
       </p>
+    </section>
+
+    <!-- Section 3.5: Server酱 微信推送 -->
+    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+      <div class="flex items-center justify-between mb-3 gap-3">
+        <div class="flex items-center gap-2">
+          <Bell class="w-4 h-4 text-zinc-500" />
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">Server 酱 (微信推送)</h2>
+        </div>
+        <button
+          @click="serverChanEnabled = !serverChanEnabled"
+          :class="serverChanEnabled ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+          class="relative w-11 h-6 rounded-full transition-colors shrink-0"
+        >
+          <span
+            :class="serverChanEnabled ? 'translate-x-5' : 'translate-x-0.5'"
+            class="absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-md transition-transform"
+          />
+        </button>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed mb-3">
+        把签到结果和 <strong>Token 即将过期（剩 2 天时）</strong>直接推到你的微信。需要你自己在 Server 酱注册并拿到 SendKey。
+      </p>
+
+      <!-- FAQ collapsible -->
+      <button
+        type="button"
+        @click="showServerChanFaq = !showServerChanFaq"
+        class="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors mb-2"
+      >
+        <HelpCircle class="w-3.5 h-3.5" />
+        {{ showServerChanFaq ? '收起说明' : '什么是 Server 酱 / SendKey 在哪拿？' }}
+      </button>
+      <Transition name="expand">
+        <div
+          v-if="showServerChanFaq"
+          class="rounded-lg bg-zinc-100 dark:bg-zinc-950/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-3 mb-3 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-2"
+        >
+          <p>
+            <strong class="text-zinc-900 dark:text-zinc-200">Server 酱（方糖）</strong> 是一个免费的「程序→微信」推送服务。配置后，wangui 在
+            发生事件时（签到成功 / 失败 / Token 快过期）会调它的接口，你的微信就能立即收到通知。
+          </p>
+          <ol class="list-decimal pl-5 space-y-1">
+            <li>访问 <code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">sct.ftqq.com</code>，用微信扫码登录</li>
+            <li>登录后在「SendKey」页面看到形如 <code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">SCT123...AbCdEf</code> 的字符串</li>
+            <li>把这串 SendKey 粘到下面输入框 → 打开开关 → 保存配置 → 点「发测试推送」</li>
+            <li>微信收到「Server 酱测试推送」即成功</li>
+          </ol>
+          <p>
+            <strong>免费版每天 5 条</strong>，正常使用足够（签到 1 条 + 可能的提醒 1 条）。SCT 前缀的 key 用免费的 sctapi.ftqq.com；
+            sctp 前缀的 key 自动走 Server 酱³ 的 push.ft07.com。
+          </p>
+          <p>
+            <strong class="text-zinc-900 dark:text-zinc-200">隐私</strong>：SendKey 等同于「允许任何人给你的微信发消息」，
+            不要分享给别人。wangui 把它<strong>加密存储</strong>，从不在网页上回显，只在发送时取出使用。
+          </p>
+        </div>
+      </Transition>
+
+      <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1 flex items-center justify-between">
+        <span>SendKey</span>
+        <span
+          v-if="serverChanKeySet && !serverChanKey"
+          class="text-emerald-600 dark:text-emerald-400 normal-case tracking-normal"
+        >
+          ✓ 已设置，留空保持不变
+        </span>
+      </label>
+      <div class="relative">
+        <input
+          v-model="serverChanKey"
+          :type="showServerChanKey ? 'text' : 'password'"
+          :placeholder="serverChanKeySet ? '保持不变（输入新值才覆盖）' : 'SCT... 或 sctp...'"
+          :disabled="!serverChanEnabled && !serverChanKeySet"
+          autocomplete="off"
+          class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 pr-10 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token disabled:opacity-50"
+        />
+        <button
+          @click="showServerChanKey = !showServerChanKey"
+          type="button"
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+        >
+          <component :is="showServerChanKey ? EyeOff : Eye" class="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <p class="text-[11px] text-zinc-500 mt-2">
+        会推送的事件：自动签到的<strong>最终结果</strong>、<strong>Token 剩 2 天</strong>的提醒。手动「立即签到」不推送，避免刷屏。
+      </p>
+
+      <div class="mt-3 flex justify-end">
+        <button
+          type="button"
+          @click="testServerChanPush"
+          :disabled="testingServerChan || !serverChanKeySet"
+          :title="serverChanKeySet ? '使用已保存的 SendKey 发一条' : '请先保存 SendKey'"
+          class="inline-flex items-center gap-1.5 bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-blue-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <Send class="w-3 h-3" :class="testingServerChan ? 'wangui-spin' : ''" />
+          {{ testingServerChan ? '推送中…' : '发测试推送' }}
+        </button>
+      </div>
     </section>
 
     <!-- Section 4: 设备信息 -->

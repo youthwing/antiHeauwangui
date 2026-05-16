@@ -63,6 +63,7 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/records", h.records)
 			r.Get("/dorms", h.listDorms)
 			r.Post("/sign-now", h.signNow)
+			r.Post("/notify/test-serverchan", h.testServerChan)
 			r.Post("/logout", h.logout)
 			r.Delete("/me", h.deleteMe)
 		})
@@ -104,6 +105,7 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/smtp", h.adminGetSMTP)
 			r.Put("/smtp", h.adminUpdateSMTP)
 			r.Post("/smtp/test", h.adminTestSMTP)
+			r.Post("/serverchan/test", h.adminTestServerChan)
 		})
 	})
 

@@ -684,26 +684,31 @@ func (h *handlers) adminGetSMTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"enabled":     cfg.Enabled,
-		"host":        cfg.Host,
-		"port":        cfg.Port,
-		"username":    cfg.Username,
-		"from":        cfg.From,
-		"adminBcc":    cfg.AdminBcc,
-		"passwordSet": cfg.Password != "",
+		"enabled":                cfg.Enabled,
+		"host":                   cfg.Host,
+		"port":                   cfg.Port,
+		"username":               cfg.Username,
+		"from":                   cfg.From,
+		"adminBcc":               cfg.AdminBcc,
+		"passwordSet":            cfg.Password != "",
+		"adminServerChanEnabled": cfg.AdminServerChanEnabled,
+		"adminServerChanKeySet":  cfg.AdminServerChanKey != "",
 	})
 }
 
-// PUT /api/v1/rosekhlifa/smtp — update; empty password keeps the existing one.
+// PUT /api/v1/rosekhlifa/smtp — update notify config. Empty password keeps
+// the existing one; same for adminServerChanKey ("" means keep current).
 func (h *handlers) adminUpdateSMTP(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Enabled  bool   `json:"enabled"`
-		Host     string `json:"host"`
-		Port     int    `json:"port"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-		From     string `json:"from"`
-		AdminBcc string `json:"adminBcc"`
+		Enabled                bool   `json:"enabled"`
+		Host                   string `json:"host"`
+		Port                   int    `json:"port"`
+		Username               string `json:"username"`
+		Password               string `json:"password"`
+		From                   string `json:"from"`
+		AdminBcc               string `json:"adminBcc"`
+		AdminServerChanKey     string `json:"adminServerChanKey"`
+		AdminServerChanEnabled bool   `json:"adminServerChanEnabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "请求格式错误")
@@ -723,26 +728,54 @@ func (h *handlers) adminUpdateSMTP(w http.ResponseWriter, r *http.Request) {
 		// Gmail app passwords are shown grouped as "glht egbx rokr ktiu"
 		// (4×4 with spaces) but the real value has no whitespace at all.
 		// strings.Fields splits on any whitespace, then re-joins with "".
-		Password: strings.Join(strings.Fields(req.Password), ""),
-		From:     strings.TrimSpace(req.From),
-		AdminBcc: strings.TrimSpace(req.AdminBcc),
+		Password:               strings.Join(strings.Fields(req.Password), ""),
+		From:                   strings.TrimSpace(req.From),
+		AdminBcc:               strings.TrimSpace(req.AdminBcc),
+		AdminServerChanKey:     strings.TrimSpace(req.AdminServerChanKey),
+		AdminServerChanEnabled: req.AdminServerChanEnabled,
 	}
 	if err := h.store.SetSMTPConfig(r.Context(), cfg); err != nil {
 		writeErr(w, http.StatusInternalServerError, "保存失败")
 		return
 	}
-	// Re-read to send back current state.
 	saved, _ := h.store.GetSMTPConfig(r.Context())
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":          true,
-		"enabled":     saved.Enabled,
-		"host":        saved.Host,
-		"port":        saved.Port,
-		"username":    saved.Username,
-		"from":        saved.From,
-		"adminBcc":    saved.AdminBcc,
-		"passwordSet": saved.Password != "",
+		"ok":                     true,
+		"enabled":                saved.Enabled,
+		"host":                   saved.Host,
+		"port":                   saved.Port,
+		"username":               saved.Username,
+		"from":                   saved.From,
+		"adminBcc":               saved.AdminBcc,
+		"passwordSet":            saved.Password != "",
+		"adminServerChanEnabled": saved.AdminServerChanEnabled,
+		"adminServerChanKeySet":  saved.AdminServerChanKey != "",
 	})
+}
+
+// POST /api/v1/rosekhlifa/serverchan/test — push a test notification to the
+// admin's saved Server酱 SendKey.
+func (h *handlers) adminTestServerChan(w http.ResponseWriter, r *http.Request) {
+	cfg, err := h.store.GetSMTPConfig(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	if cfg.AdminServerChanKey == "" {
+		writeErr(w, http.StatusBadRequest, "Admin Server酱 SendKey 未配置")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	client := notify.NewServerChan(cfg.AdminServerChanKey)
+	if err := client.Send(ctx,
+		"[勿外传] Server酱 测试推送",
+		"如果你的微信收到了这条消息，说明 admin Server酱 配置已生效。\n\n时间："+time.Now().Format("2006-01-02 15:04:05"),
+	); err != nil {
+		writeErr(w, http.StatusBadGateway, "推送失败: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // POST /api/v1/rosekhlifa/smtp/test — send a real test email to adminBcc

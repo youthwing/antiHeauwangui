@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"net"
@@ -14,6 +15,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"wangui/internal/notify"
 	"wangui/internal/scheduler"
 	"wangui/internal/store"
 )
@@ -325,24 +327,26 @@ func meDTO(u *store.User) map[string]any {
 
 func settingsDTO(u *store.User) map[string]any {
 	return map[string]any{
-		"autoSign":       u.AutoSign,
-		"dormId":         u.DormID,
-		"latitude":       u.Lat,
-		"longitude":      u.Lng,
-		"address":        u.Address,
-		"city":           u.City,
-		"road":           u.Road,
-		"poi":            u.Poi,
-		"deviceModel":    u.DeviceModel,
-		"deviceSystem":   u.DeviceSystem,
-		"triggerMinute":  u.TriggerMinute,
-		"jitterSec":      u.JitterSec,
-		"retryCount":     u.RetryCount,
-		"retryGapMin":    u.RetryGapMin,
-		"savedLocations": json.RawMessage(u.SavedLocations),
-		"notifyEmail":    u.NotifyEmail,
-		"notifyEnabled":  u.NotifyEnabled,
-		"signDays":       u.SignDays,
+		"autoSign":          u.AutoSign,
+		"dormId":            u.DormID,
+		"latitude":          u.Lat,
+		"longitude":         u.Lng,
+		"address":           u.Address,
+		"city":              u.City,
+		"road":              u.Road,
+		"poi":               u.Poi,
+		"deviceModel":       u.DeviceModel,
+		"deviceSystem":      u.DeviceSystem,
+		"triggerMinute":     u.TriggerMinute,
+		"jitterSec":         u.JitterSec,
+		"retryCount":        u.RetryCount,
+		"retryGapMin":       u.RetryGapMin,
+		"savedLocations":    json.RawMessage(u.SavedLocations),
+		"notifyEmail":       u.NotifyEmail,
+		"notifyEnabled":     u.NotifyEnabled,
+		"signDays":          u.SignDays,
+		"serverChanKeySet":  u.ServerChanKey != "",
+		"serverChanEnabled": u.ServerChanEnabled,
 	}
 }
 
@@ -424,17 +428,19 @@ func (h *handlers) getSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateSettingsReq struct {
-	AutoSign      *bool   `json:"autoSign"`
-	DormID        *int64  `json:"dormId"`
-	DeviceModel   *string `json:"deviceModel"`
-	DeviceSystem  *string `json:"deviceSystem"`
-	TriggerMinute *int    `json:"triggerMinute"`
-	JitterSec     *int    `json:"jitterSec"`
-	RetryCount    *int    `json:"retryCount"`
-	RetryGapMin   *int    `json:"retryGapMin"`
-	NotifyEmail   *string `json:"notifyEmail"`
-	NotifyEnabled *bool   `json:"notifyEnabled"`
-	SignDays      *int    `json:"signDays"`
+	AutoSign          *bool   `json:"autoSign"`
+	DormID            *int64  `json:"dormId"`
+	DeviceModel       *string `json:"deviceModel"`
+	DeviceSystem      *string `json:"deviceSystem"`
+	TriggerMinute     *int    `json:"triggerMinute"`
+	JitterSec         *int    `json:"jitterSec"`
+	RetryCount        *int    `json:"retryCount"`
+	RetryGapMin       *int    `json:"retryGapMin"`
+	NotifyEmail       *string `json:"notifyEmail"`
+	NotifyEnabled     *bool   `json:"notifyEnabled"`
+	ServerChanKey     *string `json:"serverChanKey"`
+	ServerChanEnabled *bool   `json:"serverChanEnabled"`
+	SignDays          *int    `json:"signDays"`
 	// Legacy raw-coord fields, accepted for backwards compat / admin override.
 	Latitude       *float64         `json:"latitude"`
 	Longitude      *float64         `json:"longitude"`
@@ -514,6 +520,12 @@ func (h *handlers) updateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.NotifyEnabled != nil {
 		u.NotifyEnabled = *req.NotifyEnabled
+	}
+	if req.ServerChanKey != nil {
+		u.ServerChanKey = strings.TrimSpace(*req.ServerChanKey)
+	}
+	if req.ServerChanEnabled != nil {
+		u.ServerChanEnabled = *req.ServerChanEnabled
 	}
 	if req.SignDays != nil {
 		if *req.SignDays < 0 || *req.SignDays > 127 {
@@ -658,6 +670,33 @@ func (h *handlers) logout(w http.ResponseWriter, r *http.Request) {
 		_ = h.store.DeleteSession(r.Context(), ck.Value)
 	}
 	clearCookie(w, sessionCookie)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// POST /api/v1/notify/test-serverchan — push a test notification using the
+// user's currently saved Server酱 SendKey (NOT the value in any pending form;
+// the user must save first). Returns ok or a 502 with the upstream error.
+func (h *handlers) testServerChan(w http.ResponseWriter, r *http.Request) {
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	if u.ServerChanKey == "" {
+		writeErr(w, http.StatusBadRequest, "尚未保存 Server酱 SendKey")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	client := notify.NewServerChan(u.ServerChanKey)
+	if err := client.Send(ctx,
+		"[wangui] Server酱 测试推送",
+		fmt.Sprintf("如果你收到了这条消息，说明 Server酱 配置已生效。\n\n**姓名**：%s\n\n**学号**：`%s`\n\n**时间**：%s",
+			u.UserName, u.UserNumber, time.Now().Format("2006-01-02 15:04:05")),
+	); err != nil {
+		writeErr(w, http.StatusBadGateway, "推送失败: "+err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

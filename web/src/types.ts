@@ -34,6 +34,13 @@ export interface Settings {
   savedLocations: SavedLocation[]
   notifyEmail: string
   notifyEnabled: boolean
+  // Server酱 (方糖) push channel — independent of email. The server never
+  // returns the SendKey itself, only `serverChanKeySet` indicating whether
+  // one is on file. To change it, send a non-empty `serverChanKey` value
+  // in the next PUT /settings (empty means "keep existing").
+  serverChanKey?: string // write-only field; server never echoes it back
+  serverChanKeySet?: boolean
+  serverChanEnabled?: boolean
   // 7-bit bitmask of which weekdays to auto-sign on.
   // bit 0 = Mon, bit 1 = Tue, … bit 5 = Sat, bit 6 = Sun. 127 = every day.
   signDays: number
@@ -47,6 +54,11 @@ export interface SmtpConfig {
   from: string
   adminBcc: string
   passwordSet: boolean
+  // Admin's global Server酱 push key (set+enabled = all sign results +
+  // token-expiry warnings broadcast to admin's wechat). Key itself is
+  // never returned by the API, only the `*KeySet` flag.
+  adminServerChanKeySet: boolean
+  adminServerChanEnabled: boolean
 }
 
 export interface SmtpUpdate {
@@ -57,6 +69,8 @@ export interface SmtpUpdate {
   password: string // empty = keep current
   from: string
   adminBcc: string
+  adminServerChanKey: string // empty = keep current
+  adminServerChanEnabled: boolean
 }
 
 export interface Dorm {

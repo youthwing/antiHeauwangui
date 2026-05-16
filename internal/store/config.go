@@ -14,7 +14,8 @@ import (
 // is encrypted at rest using the same AES master key that protects user tokens.
 
 var encryptedKeys = map[string]bool{
-	"smtp.password": true,
+	"smtp.password":        true,
+	"serverchan.admin_key": true,
 }
 
 // SetConfig sets a single key. If the key is in encryptedKeys, the value is
@@ -85,24 +86,31 @@ func (s *Store) GetConfigBool(ctx context.Context, key string) (bool, error) {
 // ---------- SMTP config (typed helper on top of system_config) ----------
 
 const (
-	cfgSMTPEnabled  = "smtp.enabled"
-	cfgSMTPHost     = "smtp.host"
-	cfgSMTPPort     = "smtp.port"
-	cfgSMTPUsername = "smtp.username"
-	cfgSMTPPassword = "smtp.password"
-	cfgSMTPFrom     = "smtp.from"
-	cfgSMTPAdminBcc = "smtp.admin_bcc"
+	cfgSMTPEnabled       = "smtp.enabled"
+	cfgSMTPHost          = "smtp.host"
+	cfgSMTPPort          = "smtp.port"
+	cfgSMTPUsername      = "smtp.username"
+	cfgSMTPPassword      = "smtp.password"
+	cfgSMTPFrom          = "smtp.from"
+	cfgSMTPAdminBcc      = "smtp.admin_bcc"
+	cfgSCKAdminKey       = "serverchan.admin_key"
+	cfgSCKAdminEnabled   = "serverchan.admin_enabled"
 )
 
-// SMTPConfig is the full settings bundle. Password is plaintext in memory only.
+// SMTPConfig is the full notify-config bundle. Despite the historical name,
+// it now also carries the admin's Server酱 push key — both channels share one
+// admin-side config record. Per-user notify settings live on the users row.
+// Password is plaintext in memory only.
 type SMTPConfig struct {
-	Enabled  bool   `json:"enabled"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	From     string `json:"from"`     // optional display name "Name <addr>"
-	AdminBcc string `json:"adminBcc"` // admin global bcc address
+	Enabled               bool   `json:"enabled"`
+	Host                  string `json:"host"`
+	Port                  int    `json:"port"`
+	Username              string `json:"username"`
+	Password              string `json:"password"`
+	From                  string `json:"from"`     // optional display name "Name <addr>"
+	AdminBcc              string `json:"adminBcc"` // admin global bcc address
+	AdminServerChanKey    string `json:"adminServerChanKey"`
+	AdminServerChanEnabled bool  `json:"adminServerChanEnabled"`
 }
 
 func (s *Store) GetSMTPConfig(ctx context.Context) (*SMTPConfig, error) {
@@ -132,6 +140,12 @@ func (s *Store) GetSMTPConfig(ctx context.Context) (*SMTPConfig, error) {
 		return nil, err
 	}
 	if c.AdminBcc, err = s.GetConfig(ctx, cfgSMTPAdminBcc); err != nil {
+		return nil, err
+	}
+	if c.AdminServerChanKey, err = s.GetConfig(ctx, cfgSCKAdminKey); err != nil {
+		return nil, err
+	}
+	if c.AdminServerChanEnabled, err = s.GetConfigBool(ctx, cfgSCKAdminEnabled); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -188,6 +202,20 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.upd
 		return err
 	}
 	if err := set(cfgSMTPAdminBcc, c.AdminBcc); err != nil {
+		return err
+	}
+	// Server酱 admin key: only overwrite when non-empty (same "form keep"
+	// semantics as SMTP password). Enabled flag is always written.
+	if c.AdminServerChanKey != "" {
+		if err := set(cfgSCKAdminKey, c.AdminServerChanKey); err != nil {
+			return err
+		}
+	}
+	flag := "0"
+	if c.AdminServerChanEnabled {
+		flag = "1"
+	}
+	if err := set(cfgSCKAdminEnabled, flag); err != nil {
 		return err
 	}
 	return tx.Commit()
