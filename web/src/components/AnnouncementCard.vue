@@ -22,8 +22,11 @@ const props = withDefaults(
     /** Show updated-at and the expiry hint. Admin list wants extra detail; the
      *  Dashboard panel prefers a cleaner card. */
     detailed?: boolean
+    /** Compact mode: smaller padding/typography, no footer hairline. Used in
+     *  the sidebar where horizontal space is tight (~232px content width). */
+    compact?: boolean
   }>(),
-  { detailed: false },
+  { detailed: false, compact: false },
 )
 
 interface LevelStyle {
@@ -124,26 +127,37 @@ const isExpired = computed(() => {
 
 <template>
   <article
-    class="rounded-2xl ring-1 overflow-hidden transition-colors"
-    :class="[style.ringClass, style.bgClass, isExpired ? 'opacity-50' : '']"
+    class="ring-1 overflow-hidden transition-colors"
+    :class="[
+      style.ringClass,
+      style.bgClass,
+      isExpired ? 'opacity-50' : '',
+      compact ? 'rounded-lg' : 'rounded-2xl',
+    ]"
   >
     <!-- Header strip: icon + level badge + title -->
-    <header class="px-5 pt-4 pb-3 flex items-start gap-3">
+    <header
+      class="flex items-start gap-2"
+      :class="compact ? 'px-3 pt-2.5 pb-1.5' : 'px-5 pt-4 pb-3 gap-3'"
+    >
       <component
         :is="style.icon"
-        class="w-5 h-5 mt-0.5 shrink-0"
-        :class="style.iconClass"
+        class="shrink-0"
+        :class="[style.iconClass, compact ? 'w-3.5 h-3.5 mt-0.5' : 'w-5 h-5 mt-0.5']"
       />
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2 mb-1 flex-wrap">
+        <div class="flex items-center gap-1.5 mb-1 flex-wrap">
           <span
-            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wide"
-            :class="style.badgeClass"
+            class="inline-flex items-center rounded font-medium tracking-wide"
+            :class="[style.badgeClass, compact ? 'px-1 py-0 text-[9px]' : 'px-1.5 py-0.5 text-[10px]']"
           >
             {{ style.badgeLabel }}
           </span>
-          <span class="text-[10px] text-zinc-500 font-mono-token tabular-nums">
-            {{ formatDateTime(a.createdAt) }}
+          <span
+            class="text-zinc-500 font-mono-token tabular-nums"
+            :class="compact ? 'text-[9px]' : 'text-[10px]'"
+          >
+            {{ compact ? formatDateTime(a.createdAt).slice(5, 16) : formatDateTime(a.createdAt) }}
           </span>
           <span
             v-if="detailed && a.expiresAt"
@@ -160,8 +174,8 @@ const isExpired = computed(() => {
           </span>
         </div>
         <h3
-          class="text-base sm:text-lg font-bold tracking-tight break-words"
-          :class="style.titleClass"
+          class="font-bold tracking-tight break-words"
+          :class="[style.titleClass, compact ? 'text-xs leading-snug' : 'text-base sm:text-lg']"
         >
           {{ a.title }}
         </h3>
@@ -169,15 +183,18 @@ const isExpired = computed(() => {
     </header>
 
     <!-- Body: content with the inline-markdown subset rendered -->
-    <div class="px-5 pb-4 sm:pb-5">
+    <div :class="compact ? 'px-3 pb-3' : 'px-5 pb-4 sm:pb-5'">
       <div
-        class="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed announcement-prose"
+        class="text-zinc-700 dark:text-zinc-300 leading-relaxed announcement-prose"
+        :class="compact ? 'text-[11px] leading-relaxed' : 'text-sm'"
         v-html="contentHTML"
       />
     </div>
 
-    <!-- Footer hairline accent in the level's color so cards stack distinctively -->
+    <!-- Footer hairline accent in the level's color so cards stack
+         distinctively. Skipped in compact mode to save vertical space. -->
     <div
+      v-if="!compact"
       class="h-1"
       :class="a.level === 'info'
         ? 'bg-gradient-to-r from-transparent via-blue-500/40 to-transparent'

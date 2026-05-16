@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   LayoutDashboard,
@@ -7,13 +7,16 @@ import {
   ScrollText,
   User as UserIcon,
   LogOut,
+  Megaphone,
 } from 'lucide-vue-next'
 import Logo from './Logo.vue'
 import Avatar from './Avatar.vue'
 import ThemeToggle from './ThemeToggle.vue'
 import SidebarNav, { type NavItem } from './SidebarNav.vue'
+import AnnouncementCard from './AnnouncementCard.vue'
 import { useAuth } from '../stores/auth'
-import { api } from '../api'
+import { api, listAnnouncements } from '../api'
+import type { Announcement } from '../types'
 import { showToast } from '../lib/toast'
 
 const router = useRouter()
@@ -25,6 +28,19 @@ const items: NavItem[] = [
   { to: '/records', label: '签到记录', icon: ScrollText },
   { to: '/account', label: '账号', icon: UserIcon },
 ]
+
+// Announcements live at the layout level (not the Dashboard view) so the
+// admin's notices follow the user across every page. 60s poll picks up
+// freshly-published notices without a refresh.
+const announcements = ref<Announcement[]>([])
+async function loadAnnouncements() {
+  try {
+    announcements.value = await listAnnouncements()
+  } catch {
+    announcements.value = []
+  }
+}
+let pollHandle: number | undefined
 
 async function logout() {
   try {
@@ -38,6 +54,11 @@ async function logout() {
 
 onMounted(() => {
   if (!auth.state.initialized) auth.init()
+  loadAnnouncements()
+  pollHandle = window.setInterval(loadAnnouncements, 60_000)
+})
+onUnmounted(() => {
+  if (pollHandle) clearInterval(pollHandle)
 })
 </script>
 
@@ -51,9 +72,31 @@ onMounted(() => {
         <Logo :size="34" text="勿外传" />
       </div>
 
-      <div class="flex-1 px-3 py-5">
+      <div class="px-3 py-5">
         <p class="px-3 mb-2 text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-600 font-medium">导航</p>
         <SidebarNav :items="items" />
+      </div>
+
+      <!-- Spacer that pushes announcements + user-info to the bottom. -->
+      <div class="flex-1"></div>
+
+      <!-- Announcements (sidebar slot): sits just above the user-info block.
+           Compact card variant so titles + a short body fit the narrow
+           sidebar; scrollable if there are many. -->
+      <div
+        v-if="announcements.length > 0"
+        class="px-3 py-3 border-t border-black/[0.05] dark:border-white/[0.04] space-y-1.5 max-h-[40vh] overflow-y-auto"
+      >
+        <p class="px-1 mb-1 text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-600 font-medium flex items-center gap-1">
+          <Megaphone class="w-3 h-3" />
+          公告 · {{ announcements.length }}
+        </p>
+        <AnnouncementCard
+          v-for="a in announcements"
+          :key="a.id"
+          :a="a"
+          :compact="true"
+        />
       </div>
 
       <div class="px-3 py-3 border-t border-black/[0.05] dark:border-white/[0.04] space-y-1">
@@ -99,6 +142,20 @@ onMounted(() => {
 
     <!-- Main — fills the space right of the sidebar, with inner padding -->
     <main class="relative flex-1 min-w-0">
+      <!-- Mobile-only announcement strip. The sidebar slot is desktop-only
+           (sidebar is hidden under md:); on mobile we render the same
+           cards in the main flow so users on phones still see notices. -->
+      <div
+        v-if="announcements.length > 0"
+        class="md:hidden px-3 pt-3 space-y-2"
+      >
+        <AnnouncementCard
+          v-for="a in announcements"
+          :key="a.id"
+          :a="a"
+        />
+      </div>
+
       <div class="px-3 sm:px-6 md:px-10 lg:px-14 py-4 sm:py-6 md:py-8 pb-24 md:pb-16">
         <RouterView v-slot="{ Component }">
           <Transition name="fade" mode="out-in">
