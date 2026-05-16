@@ -36,7 +36,9 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAdmin: true },
     children: [
       { path: '', name: 'admin-dashboard', component: () => import('./views/admin/Dashboard.vue') },
-      { path: 'tonight', name: 'admin-tonight', component: () => import('./views/admin/Tonight.vue') },
+      { path: 'monitor', name: 'admin-monitor', component: () => import('./views/admin/Monitor.vue') },
+      // Backward compat: /tonight kept as a redirect so any bookmarks still work.
+      { path: 'tonight', redirect: '/rosekhlifa/monitor' },
       { path: 'codes', name: 'admin-codes', component: () => import('./views/admin/Codes.vue') },
       { path: 'dorms', name: 'admin-dorms', component: () => import('./views/admin/Dorms.vue') },
       { path: 'users', name: 'admin-users', component: () => import('./views/admin/Users.vue') },

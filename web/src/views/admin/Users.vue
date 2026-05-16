@@ -5,23 +5,19 @@ import {
   Search,
   RefreshCw,
   X,
-  Power,
-  Trash2,
   KeyRound,
   Copy,
-  Building2,
-  PlayCircle,
-  Clock,
-  History,
-  Ticket,
-  CalendarDays,
   AlertCircle,
   Check,
   QrCode as QrCodeIcon,
+  LayoutGrid,
+  List as ListIcon,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-vue-next'
 import type { AdminUser, Dorm, SchoolCheckinStatus } from '../../types'
 import { adminApi } from '../../api'
-import { formatDateTime } from '../../lib/format'
+import { formatDateTime, formatRemaining } from '../../lib/format'
 import { showToast } from '../../lib/toast'
 import { copyText } from '../../lib/clipboard'
 import {
@@ -30,6 +26,7 @@ import {
   detectSchoolOauthInput,
 } from '../../lib/schoolOauth'
 import Avatar from '../../components/Avatar.vue'
+import UserCard from '../../components/admin/UserCard.vue'
 
 const users = ref<AdminUser[]>([])
 const dorms = ref<Dorm[]>([])
@@ -49,6 +46,40 @@ const togglingDisabled = ref<Record<string, boolean>>({})
 // School "today status" per user. 'loading' marker = fetch in flight.
 type StatusEntry = SchoolCheckinStatus | 'loading' | undefined
 const statusByUser = ref<Record<string, StatusEntry>>({})
+
+// View-mode toggle. Persisted to localStorage so refreshing keeps the choice.
+type ViewMode = 'card' | 'list'
+const viewMode = ref<ViewMode>('card')
+function initViewMode() {
+  try {
+    const v = localStorage.getItem('admin-users-view')
+    if (v === 'card' || v === 'list') viewMode.value = v
+  } catch {
+    /* localStorage unavailable, keep default */
+  }
+}
+function setViewMode(m: ViewMode) {
+  viewMode.value = m
+  try {
+    localStorage.setItem('admin-users-view', m)
+  } catch {
+    /* ignore */
+  }
+}
+
+// In list view, clicking a row opens this drawer with the full UserCard
+// inside so admin can edit everything without leaving the page.
+const drawerUserId = ref<string | null>(null)
+const drawerUser = computed(() => {
+  if (!drawerUserId.value) return null
+  return users.value.find(u => u.userId === drawerUserId.value) ?? null
+})
+function openDrawer(u: AdminUser) {
+  drawerUserId.value = u.userId
+}
+function closeDrawer() {
+  drawerUserId.value = null
+}
 
 // PIN reset modal state
 const resetting = ref(false)
@@ -71,7 +102,6 @@ async function load() {
     ])
     users.value = u
     dorms.value = d as unknown as Dorm[]
-    // Fan out school CheckinStatus calls in parallel after rendering.
     fetchAllStatus()
   } catch (e: any) {
     showToast('err', e.message || '加载失败')
@@ -81,12 +111,9 @@ async function load() {
 }
 
 async function fetchAllStatus() {
-  // Mark every user as 'loading' first so the UI shows a skeleton.
   const next: Record<string, StatusEntry> = {}
   for (const u of users.value) next[u.userId] = 'loading'
   statusByUser.value = next
-  // Fan out concurrently. We don't await all — let each card update as it
-  // comes in. Settle errors silently per-user (the card shows 'error').
   await Promise.allSettled(
     users.value.map(async u => {
       try {
@@ -115,6 +142,7 @@ async function refreshStatus(u: AdminUser) {
 }
 
 onMounted(() => {
+  initViewMode()
   load()
   tickHandle = window.setInterval(() => (now.value = new Date()), 30_000)
 })
@@ -147,7 +175,6 @@ async function changeDorm(u: AdminUser, dormId: number) {
   try {
     const updated = await adminApi.updateUser(u.userId, { dormId })
     Object.assign(u, updated)
-    // server returns the new user; pick up dormName via reload to be safe
     await load()
     showToast('ok', dormId === 0 ? '已解绑宿舍楼' : '已切换宿舍楼')
   } catch (e: any) {
@@ -225,6 +252,7 @@ async function remove(u: AdminUser) {
   try {
     await adminApi.deleteUser(u.userId)
     showToast('ok', '已删除')
+    if (drawerUserId.value === u.userId) drawerUserId.value = null
     await load()
   } catch (e: any) {
     showToast('err', e.message || '删除失败')
@@ -283,60 +311,58 @@ watch(refreshTarget, v => {
   if (!v) rCallback.value = ''
 })
 
-// --- display helpers ---
+// --- list-view helpers ---
 
-const DAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const
-
-function dayBit(jsDay: number): number {
-  // JS Date.getDay(): 0 = Sun, 1 = Mon, ..., 6 = Sat
-  // Our bitmask: 0 = Mon, ..., 5 = Sat, 6 = Sun
+function listDayBit(jsDay: number): number {
   return (jsDay + 6) % 7
 }
-
-const todayBit = computed(() => dayBit(now.value.getDay()))
+const todayBit = computed(() => listDayBit(now.value.getDay()))
 
 function signsToday(u: AdminUser): boolean {
   return (u.signDays & (1 << todayBit.value)) !== 0
 }
 
-function signTimeStr(u: AdminUser): string {
-  return `22:${String(u.triggerMinute).padStart(2, '0')}`
+const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日']
+
+function signDaysSummary(mask: number): string {
+  const m = mask & 0x7f
+  if (m === 0x7f) return '每天'
+  if (m === 0x1f) return '工作日'
+  if (m === 0x60) return '周末'
+  // Compact representation: list enabled days
+  const days = []
+  for (let i = 0; i < 7; i++) {
+    if (m & (1 << i)) days.push(WEEK_LABELS[i])
+  }
+  return days.length === 0 ? '从不' : '周' + days.join('、')
 }
 
-function tokenUrgency(u: AdminUser): 'expired' | 'soon' | 'ok' {
-  const cur = Math.floor(now.value.getTime() / 1000)
-  if (u.tokenExp <= cur) return 'expired'
-  if (u.tokenExp - cur < 48 * 3600) return 'soon'
-  return 'ok'
-}
-
-// Map our coarse state bucket → chip color + label.
-function statusChip(s: StatusEntry): { tone: string; label: string; hint: string } {
-  if (s === 'loading') return { tone: 'loading', label: '加载中…', hint: '' }
-  if (!s) return { tone: 'unknown', label: '未知', hint: '' }
+function shortStatus(s: StatusEntry): { tone: string; text: string } {
+  if (s === 'loading') return { tone: 'zinc', text: '…' }
+  if (!s) return { tone: 'zinc', text: '—' }
   switch (s.state) {
     case 'signed':
-      return { tone: 'ok', label: '学校：已签', hint: s.message }
+      return { tone: 'emerald', text: '已签' }
     case 'canSign':
-      return { tone: 'amber', label: '学校：待签', hint: s.message }
+      return { tone: 'amber', text: '待签' }
     case 'pending':
-      return { tone: 'zinc', label: '学校：未开放', hint: s.message }
+      return { tone: 'zinc', text: '未开放' }
     case 'exempt':
-      return { tone: 'blue', label: '学校：' + (s.exemptReason || s.message || '请假/免签'), hint: s.message }
+      return { tone: 'blue', text: s.exemptReason || '请假/免签' }
     case 'boarding':
-      return { tone: 'blue', label: '学校：走读/外宿', hint: s.message }
+      return { tone: 'blue', text: '走读' }
     case 'tokenExpired':
-      return { tone: 'red', label: 'Token 失效', hint: '需要刷新' }
+      return { tone: 'red', text: 'Token 失效' }
     case 'error':
-      return { tone: 'red', label: '查询失败', hint: s.message }
+      return { tone: 'red', text: '查询失败' }
     default:
-      return { tone: 'zinc', label: s.state, hint: s.message }
+      return { tone: 'zinc', text: s.state }
   }
 }
 
-function statusChipClass(tone: string): string {
+function shortStatusClass(tone: string): string {
   switch (tone) {
-    case 'ok':
+    case 'emerald':
       return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25'
     case 'amber':
       return 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
@@ -345,54 +371,30 @@ function statusChipClass(tone: string): string {
     case 'red':
       return 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/30'
     case 'zinc':
-      return 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 ring-1 ring-zinc-500/25'
-    case 'loading':
-      return 'bg-zinc-500/5 text-zinc-500 ring-1 ring-black/[0.06] dark:ring-white/[0.06]'
     default:
-      return 'bg-zinc-500/10 text-zinc-500 ring-1 ring-zinc-500/20'
+      return 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 ring-1 ring-zinc-500/20'
   }
 }
 
-function statusDotClass(status: string): string {
-  switch (status) {
-    case 'success':
-    case 'already':
-    case 'exempt':
-      return 'bg-emerald-400'
-    case 'failed':
-      return 'bg-red-400'
-    case 'skipped':
-      return 'bg-zinc-500'
-    default:
-      return 'bg-zinc-400'
-  }
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'success':
-      return '成功'
-    case 'already':
-      return '已签'
-    case 'exempt':
-      return '免签'
-    case 'failed':
-      return '失败'
-    case 'skipped':
-      return '跳过'
-    default:
-      return status
+function busyFor(u: AdminUser) {
+  return {
+    sign: !!signing.value[u.userId],
+    dorm: !!bindingDorm.value[u.userId],
+    auto: !!togglingAuto.value[u.userId],
+    days: !!savingDays.value[u.userId],
+    disabled: !!togglingDisabled.value[u.userId],
+    resetting: resetting.value,
   }
 }
 </script>
 
 <template>
   <div class="space-y-4">
-    <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+    <header class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">用户</h1>
         <p class="text-sm text-zinc-500 mt-1">
-          每张卡片显示一个用户的全部配置 + 今晚学校状态 + 手动操作。
+          每个用户的全部配置 + 今晚学校状态 + 手动操作。卡片态详尽，列表态点击进抽屉。
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -404,6 +406,31 @@ function statusLabel(status: string): string {
             placeholder="搜索姓名 / 学号 / 邀请码"
             class="w-full pl-9 pr-3 py-2 bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
           />
+        </div>
+        <!-- View-mode toggle -->
+        <div class="inline-flex bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg p-0.5">
+          <button
+            @click="setViewMode('card')"
+            :class="viewMode === 'card'
+              ? 'bg-emerald-500 text-zinc-950'
+              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
+            title="卡片态"
+          >
+            <LayoutGrid class="w-3.5 h-3.5" />
+            卡片
+          </button>
+          <button
+            @click="setViewMode('list')"
+            :class="viewMode === 'list'
+              ? 'bg-emerald-500 text-zinc-950'
+              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
+            title="列表态（紧凑）"
+          >
+            <ListIcon class="w-3.5 h-3.5" />
+            列表
+          </button>
         </div>
         <button @click="load" :disabled="loading" title="重新加载 + 重拉学校状态"
           class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 px-2 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1">
@@ -427,280 +454,168 @@ function statusLabel(status: string): string {
       还没有用户
     </div>
 
-    <!-- Card grid -->
+    <!-- Card view -->
     <section
-      v-else
+      v-else-if="viewMode === 'card'"
       class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"
     >
-      <article
+      <UserCard
         v-for="u in users"
         :key="u.userId"
-        class="flex flex-col rounded-2xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
-        :class="u.isDisabled ? 'opacity-60' : ''"
-      >
-        <!-- Header -->
-        <header class="p-4 flex items-start gap-3 border-b border-black/[0.05] dark:border-white/[0.04]">
-          <Avatar
-            :src="u.userAvatarUrl"
-            :name="u.userName"
-            :size="44"
-            rounded="lg"
-          />
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                {{ u.userName }}
-              </h3>
-              <span
-                v-if="u.isDisabled"
-                class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30"
-              >
-                已禁用
-              </span>
-            </div>
-            <p class="text-[11px] text-zinc-500 font-mono-token truncate mt-0.5">
-              {{ u.userNumber }}
-            </p>
-            <p
-              v-if="u.userSection || u.userClass"
-              class="text-[11px] text-zinc-500 truncate"
-            >
-              {{ u.userSection }}{{ u.userSection && u.userClass ? ' · ' : '' }}{{ u.userClass }}
-            </p>
-            <p
-              v-if="u.inviteCode"
-              class="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono-token truncate mt-0.5 inline-flex items-center gap-1"
-            >
-              <Ticket class="w-2.5 h-2.5" />
-              {{ u.inviteCode }}
-            </p>
-          </div>
-          <div class="flex flex-col gap-1 shrink-0">
-            <button
-              @click="toggleDisabled(u)"
-              :disabled="togglingDisabled[u.userId]"
-              :title="u.isDisabled ? '启用' : '禁用'"
-              class="p-1.5 rounded text-zinc-500 dark:text-zinc-400 hover:bg-amber-500/10 hover:text-amber-400 transition-colors disabled:opacity-50"
-            >
-              <Power class="w-4 h-4" />
-            </button>
-            <button
-              @click="remove(u)"
-              title="删除"
-              class="p-1.5 rounded text-zinc-500 dark:text-zinc-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-            >
-              <Trash2 class="w-4 h-4" />
-            </button>
-          </div>
-        </header>
-
-        <!-- Today's school status (top, prominent) -->
-        <div class="px-4 pt-3">
-          <div class="flex items-center justify-between gap-2 text-xs">
-            <span
-              class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium"
-              :class="statusChipClass(statusChip(statusByUser[u.userId]).tone)"
-              :title="statusChip(statusByUser[u.userId]).hint || ''"
-            >
-              <span
-                v-if="statusChip(statusByUser[u.userId]).tone === 'loading'"
-                class="h-2.5 w-2.5 rounded-full border-2 border-zinc-400 border-t-transparent wangui-spin"
-              />
-              <span v-else class="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-              {{ statusChip(statusByUser[u.userId]).label }}
-            </span>
-            <button
-              @click="refreshStatus(u)"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              title="重拉学校状态"
-            >
-              <RefreshCw class="w-3 h-3" />
-            </button>
-          </div>
-          <p
-            v-if="statusByUser[u.userId] && statusByUser[u.userId] !== 'loading' && (statusByUser[u.userId] as SchoolCheckinStatus).message"
-            class="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 truncate"
-          >
-            {{ (statusByUser[u.userId] as SchoolCheckinStatus).message }}
-          </p>
-        </div>
-
-        <!-- Body fields -->
-        <div class="p-4 space-y-2.5 text-xs flex-1">
-          <!-- Dorm picker -->
-          <div class="flex items-center gap-2">
-            <Building2 class="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-            <span class="text-zinc-500 shrink-0 w-14">宿舍楼</span>
-            <select
-              :value="u.dormId ?? 0"
-              :disabled="bindingDorm[u.userId]"
-              @change="(e) => changeDorm(u, +((e.target as HTMLSelectElement).value))"
-              class="flex-1 min-w-0 bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1 text-xs focus-ring text-zinc-900 dark:text-zinc-200 disabled:opacity-50"
-            >
-              <option :value="0">— 未绑定 —</option>
-              <option v-for="d in dorms" :key="d.id" :value="d.id">{{ d.name }}</option>
-            </select>
-          </div>
-
-          <!-- Auto sign toggle -->
-          <div class="flex items-center gap-2">
-            <PlayCircle class="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-            <span class="text-zinc-500 shrink-0 w-14">自动签到</span>
-            <button
-              type="button"
-              :disabled="togglingAuto[u.userId]"
-              @click="toggleAuto(u)"
-              :class="u.autoSign ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
-              class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50"
-            >
-              <span
-                :class="u.autoSign ? 'translate-x-4' : 'translate-x-0.5'"
-                class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-              />
-            </button>
-            <span class="text-[11px]" :class="u.autoSign ? 'text-emerald-500 dark:text-emerald-300' : 'text-zinc-500'">
-              {{ u.autoSign ? '已开启' : '已关闭' }}
-            </span>
-          </div>
-
-          <!-- SignDays week picker -->
-          <div class="flex items-start gap-2">
-            <CalendarDays class="w-3.5 h-3.5 text-zinc-500 shrink-0 mt-0.5" />
-            <span class="text-zinc-500 shrink-0 w-14 mt-0.5">签到周</span>
-            <div class="flex-1 flex flex-wrap items-center gap-1">
-              <button
-                v-for="(label, i) in DAY_LABELS"
-                :key="i"
-                type="button"
-                :disabled="savingDays[u.userId]"
-                @click="toggleDay(u, i)"
-                :title="(u.signDays & (1 << i)) ? '点击关闭周' + label : '点击开启周' + label"
-                :class="(u.signDays & (1 << i))
-                  ? (todayBit === i
-                    ? 'bg-emerald-500 text-zinc-950 ring-2 ring-emerald-400/40'
-                    : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30')
-                  : (todayBit === i
-                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40'
-                    : 'bg-zinc-200 dark:bg-zinc-800/70 text-zinc-500 dark:text-zinc-500 ring-1 ring-black/[0.06] dark:ring-white/[0.05]')"
-                class="w-6 h-6 rounded text-[11px] font-medium transition-all disabled:opacity-50"
-              >
-                {{ label }}
-              </button>
-              <span
-                v-if="!signsToday(u)"
-                class="ml-1 text-[10px] text-amber-500 dark:text-amber-400 font-medium"
-              >
-                · 今天不签
-              </span>
-            </div>
-          </div>
-
-          <!-- Sign time -->
-          <div class="flex items-center gap-2">
-            <Clock class="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-            <span class="text-zinc-500 shrink-0 w-14">签到时刻</span>
-            <span
-              class="font-semibold tabular-nums"
-              :class="signsToday(u) ? 'text-emerald-500 dark:text-emerald-300' : 'text-zinc-500'"
-            >
-              {{ signTimeStr(u) }}
-            </span>
-            <span class="text-[10px] text-zinc-500">±{{ u.jitterSec }}s</span>
-          </div>
-
-          <!-- Token row -->
-          <div class="flex items-center gap-2">
-            <KeyRound class="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-            <span class="text-zinc-500 shrink-0 w-14">Token</span>
-            <span
-              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0"
-              :class="tokenUrgency(u) === 'expired'
-                ? 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'
-                : tokenUrgency(u) === 'soon'
-                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
-                  : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25'"
-            >
-              <span
-                class="w-1 h-1 rounded-full"
-                :class="tokenUrgency(u) === 'expired' ? 'bg-red-400' : tokenUrgency(u) === 'soon' ? 'bg-amber-400' : 'bg-emerald-400'"
-              />
-              {{ tokenUrgency(u) === 'expired' ? '已失效' : tokenUrgency(u) === 'soon' ? '快过期' : '有效' }}
-            </span>
-            <span class="text-[10px] text-zinc-500 truncate flex-1" :title="formatDateTime(u.tokenExp)">
-              {{ formatDateTime(u.tokenExp) }}
-            </span>
-            <button
-              @click="openRefresh(u)"
-              :class="tokenUrgency(u) === 'expired'
-                ? 'bg-red-500 hover:bg-red-400 text-white'
-                : tokenUrgency(u) === 'soon'
-                  ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950'
-                  : 'bg-white/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-emerald-500/40'"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors shrink-0"
-              title="让朋友重新扫码以刷新 Token"
-            >
-              <RefreshCw class="w-3 h-3" />
-              刷新
-            </button>
-          </div>
-        </div>
-
-        <!-- Recent records -->
-        <div
-          v-if="u.recentRecords && u.recentRecords.length > 0"
-          class="px-4 pb-3"
-        >
-          <div class="flex items-center gap-1.5 mb-1.5">
-            <History class="w-3 h-3 text-zinc-500" />
-            <span class="text-[10px] text-zinc-500 uppercase tracking-wide">最近记录</span>
-          </div>
-          <ul class="space-y-1">
-            <li
-              v-for="r in u.recentRecords.slice(0, 3)"
-              :key="r.id"
-              class="flex items-center gap-2 text-[11px]"
-            >
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="statusDotClass(r.status)" />
-              <span class="shrink-0 text-zinc-700 dark:text-zinc-300 font-medium w-7">
-                {{ statusLabel(r.status) }}
-              </span>
-              <span class="text-zinc-500 font-mono-token text-[10px] shrink-0">
-                {{ formatDateTime(r.occurredAt) }}
-              </span>
-              <span
-                v-if="r.message"
-                class="text-zinc-500 truncate"
-                :title="r.message"
-              >
-                · {{ r.message }}
-              </span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Actions -->
-        <footer class="px-4 py-3 border-t border-black/[0.05] dark:border-white/[0.04] flex gap-2">
-          <button
-            @click="signNow(u)"
-            :disabled="signing[u.userId]"
-            class="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
-            title="代签到（应急 / 测试）"
-          >
-            <PlayCircle class="w-3.5 h-3.5" />
-            {{ signing[u.userId] ? '签到中…' : '立即签到' }}
-          </button>
-          <button
-            @click="resetPin(u)"
-            :disabled="resetting"
-            class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-emerald-500/40 transition-colors"
-            title="重置 PIN（强制对方下次激活/登录）"
-          >
-            <KeyRound class="w-3.5 h-3.5" />
-            PIN
-          </button>
-        </footer>
-      </article>
+        :user="u"
+        :dorms="dorms"
+        :status="statusByUser[u.userId]"
+        :now="now"
+        :busy="busyFor(u)"
+        @sign="signNow(u)"
+        @change-dorm="(id: number) => changeDorm(u, id)"
+        @toggle-auto="toggleAuto(u)"
+        @toggle-day="(b: number) => toggleDay(u, b)"
+        @toggle-disabled="toggleDisabled(u)"
+        @reset-pin="resetPin(u)"
+        @refresh-token="openRefresh(u)"
+        @refresh-status="refreshStatus(u)"
+        @remove="remove(u)"
+      />
     </section>
+
+    <!-- List view -->
+    <section
+      v-else
+      class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
+    >
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-white/50 dark:bg-zinc-950/50 border-b border-black/[0.08] dark:border-white/[0.06]">
+            <tr class="text-left text-[10px] text-zinc-500 uppercase tracking-wide">
+              <th class="px-4 py-3 font-medium">用户</th>
+              <th class="px-4 py-3 font-medium">学院 / 班级</th>
+              <th class="px-4 py-3 font-medium">宿舍楼</th>
+              <th class="px-4 py-3 font-medium">自动 / 周次</th>
+              <th class="px-4 py-3 font-medium">时刻</th>
+              <th class="px-4 py-3 font-medium">学校状态</th>
+              <th class="px-4 py-3 font-medium">Token</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-black/[0.05] dark:divide-white/[0.04]">
+            <tr
+              v-for="u in users"
+              :key="u.userId"
+              @click="openDrawer(u)"
+              class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors cursor-pointer"
+              :class="u.isDisabled ? 'opacity-60' : ''"
+            >
+              <!-- User -->
+              <td class="px-4 py-2.5">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <Avatar :src="u.userAvatarUrl" :name="u.userName" :size="32" rounded="lg" />
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-sm font-medium truncate">{{ u.userName }}</span>
+                      <span
+                        v-if="u.isDisabled"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30 shrink-0"
+                      >
+                        禁
+                      </span>
+                    </div>
+                    <p class="text-[11px] text-zinc-500 font-mono-token truncate">{{ u.userNumber }}</p>
+                  </div>
+                </div>
+              </td>
+              <!-- Section / Class -->
+              <td class="px-4 py-2.5 text-xs text-zinc-600 dark:text-zinc-400">
+                <div class="truncate">{{ u.userSection || '—' }}</div>
+                <div class="truncate text-[11px] text-zinc-500">{{ u.userClass || '—' }}</div>
+              </td>
+              <!-- Dorm -->
+              <td class="px-4 py-2.5 text-xs">
+                <span
+                  v-if="u.dormName"
+                  class="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25"
+                >
+                  {{ u.dormName }}
+                </span>
+                <span v-else class="text-zinc-500">未绑定</span>
+              </td>
+              <!-- Auto / SignDays -->
+              <td class="px-4 py-2.5 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span
+                    class="w-1.5 h-1.5 rounded-full"
+                    :class="u.autoSign ? 'bg-emerald-500' : 'bg-zinc-500'"
+                  />
+                  <span :class="u.autoSign ? 'text-emerald-600 dark:text-emerald-300' : 'text-zinc-500'">
+                    {{ u.autoSign ? '自动开' : '自动关' }}
+                  </span>
+                </div>
+                <div class="text-[11px] text-zinc-500 mt-0.5">{{ signDaysSummary(u.signDays) }}</div>
+              </td>
+              <!-- Trigger time -->
+              <td class="px-4 py-2.5 text-xs">
+                <span
+                  class="font-mono-token tabular-nums font-medium"
+                  :class="signsToday(u) ? 'text-emerald-600 dark:text-emerald-300' : 'text-zinc-500'"
+                >
+                  22:{{ String(u.triggerMinute).padStart(2, '0') }}
+                </span>
+                <div class="text-[10px] text-zinc-500">±{{ u.jitterSec }}s</div>
+              </td>
+              <!-- School status -->
+              <td class="px-4 py-2.5 text-xs">
+                <span
+                  class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                  :class="shortStatusClass(shortStatus(statusByUser[u.userId]).tone)"
+                >
+                  {{ shortStatus(statusByUser[u.userId]).text }}
+                </span>
+              </td>
+              <!-- Token -->
+              <td class="px-4 py-2.5">
+                <CheckCircle2 v-if="u.tokenValid" class="w-3.5 h-3.5 text-emerald-400 inline" />
+                <XCircle v-else class="w-3.5 h-3.5 text-red-400 inline" />
+                <span class="ml-1 text-xs text-zinc-500 tabular-nums">
+                  {{ formatRemaining(Math.max(0, u.tokenExp - Math.floor(Date.now() / 1000))) }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Drawer: opens when a list row is clicked, shows the full UserCard -->
+    <Transition name="drawer">
+      <div v-if="drawerUser" class="fixed inset-0 z-50 flex" @click.self="closeDrawer">
+        <div class="flex-1 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-sm" @click="closeDrawer" />
+        <aside class="w-full max-w-md bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 overflow-y-auto">
+          <div class="sticky top-0 z-10 p-3 bg-zinc-100/95 dark:bg-zinc-900/95 backdrop-blur border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
+            <span class="text-xs text-zinc-500 truncate">用户详情 · 所有编辑都立即生效</span>
+            <button @click="closeDrawer"
+              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors p-1 rounded hover:bg-black/5 dark:hover:bg-white/5">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+          <UserCard
+            :user="drawerUser"
+            :dorms="dorms"
+            :status="statusByUser[drawerUser.userId]"
+            :now="now"
+            :busy="busyFor(drawerUser)"
+            :drawer="true"
+            @sign="signNow(drawerUser)"
+            @change-dorm="(id: number) => drawerUser && changeDorm(drawerUser, id)"
+            @toggle-auto="drawerUser && toggleAuto(drawerUser)"
+            @toggle-day="(b: number) => drawerUser && toggleDay(drawerUser, b)"
+            @toggle-disabled="drawerUser && toggleDisabled(drawerUser)"
+            @reset-pin="drawerUser && resetPin(drawerUser)"
+            @refresh-token="drawerUser && openRefresh(drawerUser)"
+            @refresh-status="drawerUser && refreshStatus(drawerUser)"
+            @remove="drawerUser && remove(drawerUser)"
+          />
+        </aside>
+      </div>
+    </Transition>
 
     <!-- New PIN modal (after admin reset) -->
     <Transition name="modal">
@@ -844,6 +759,10 @@ function statusLabel(status: string): string {
 </template>
 
 <style scoped>
+.drawer-enter-active, .drawer-leave-active { transition: opacity 0.2s ease; }
+.drawer-enter-active aside, .drawer-leave-active aside { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.drawer-enter-from, .drawer-leave-to { opacity: 0; }
+.drawer-enter-from aside, .drawer-leave-to aside { transform: translateX(100%); }
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 </style>
