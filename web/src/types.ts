@@ -116,6 +116,22 @@ export interface SignRecord {
   occurredAt: number
 }
 
+// Aggregate stats derived from a user's sign records. Computed on each
+// /me/stats call; no DB counters to keep in sync.
+export interface UserStats {
+  currentStreak: number   // consecutive sign-days successfully signed up to today
+  longestStreak: number   // best historical streak (within 365 days)
+  monthSigned: number     // sign-days this month that were signed
+  monthExpected: number   // sign-days this month so far (per signDays mask)
+  monthRate: number       // monthSigned / monthExpected (0..1)
+  totalSuccess: number
+  totalAlready: number
+  totalExempt: number
+  totalFailed: number
+  totalSkipped: number
+  firstSignAt: number     // unix sec of oldest record we found; 0 if none
+}
+
 // ---- Admin types ----
 
 export interface InviteCode {

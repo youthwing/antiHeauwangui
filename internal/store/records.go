@@ -47,6 +47,51 @@ FROM sign_records WHERE user_id = ? ORDER BY occurred_at DESC LIMIT ?
 	return scanRecords(rows)
 }
 
+// ListRecordsBetween returns every record for a user with occurred_at in
+// [from, to] (both inclusive at second resolution). Newest first. Used by
+// the stats endpoint to compute streaks + monthly aggregates without
+// hitting an arbitrary LIMIT.
+func (s *Store) ListRecordsBetween(ctx context.Context, userID string, from, to time.Time) ([]Record, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, user_id, rule_id, status, message, occurred_at
+FROM sign_records
+WHERE user_id = ? AND occurred_at >= ? AND occurred_at <= ?
+ORDER BY occurred_at DESC
+`, userID, from.Unix(), to.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanRecords(rows)
+}
+
+// ListAllRecordsBetween (admin) returns every record across all users with
+// occurred_at in [from, to]. Used by the CSV export.
+func (s *Store) ListAllRecordsBetween(ctx context.Context, from, to time.Time) ([]Record, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT r.id, r.user_id, COALESCE(u.user_name,'') AS user_name,
+       r.rule_id, r.status, r.message, r.occurred_at
+FROM sign_records r LEFT JOIN users u ON u.user_id = r.user_id
+WHERE r.occurred_at >= ? AND r.occurred_at <= ?
+ORDER BY r.occurred_at DESC
+`, from.Unix(), to.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]Record, 0)
+	for rows.Next() {
+		var r Record
+		var ts int64
+		if err := rows.Scan(&r.ID, &r.UserID, &r.UserName, &r.RuleID, &r.Status, &r.Message, &ts); err != nil {
+			return nil, err
+		}
+		r.OccurredAt = time.Unix(ts, 0)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // ListAllRecords (admin) returns the most recent records across all users.
 func (s *Store) ListAllRecords(ctx context.Context, limit int) ([]Record, error) {
 	if limit <= 0 || limit > 500 {

@@ -14,6 +14,11 @@ import {
   List as ListIcon,
   CheckCircle2,
   XCircle,
+  Power,
+  Trash2,
+  PlayCircle,
+  CheckSquare,
+  Square,
 } from 'lucide-vue-next'
 import type { AdminUser, Dorm, SchoolCheckinStatus } from '../../types'
 import { adminApi } from '../../api'
@@ -64,6 +69,93 @@ function setViewMode(m: ViewMode) {
     localStorage.setItem('admin-users-view', m)
   } catch {
     /* ignore */
+  }
+}
+
+// Multi-select for bulk operations in list view. Set of userIds.
+const selectedIds = ref<Set<string>>(new Set())
+const bulkBusy = ref(false)
+
+function isSelected(uid: string): boolean {
+  return selectedIds.value.has(uid)
+}
+function toggleSelect(uid: string) {
+  const next = new Set(selectedIds.value)
+  if (next.has(uid)) next.delete(uid)
+  else next.add(uid)
+  selectedIds.value = next
+}
+const allSelected = computed(
+  () => users.value.length > 0 && selectedIds.value.size === users.value.length,
+)
+const someSelected = computed(
+  () => selectedIds.value.size > 0 && selectedIds.value.size < users.value.length,
+)
+function toggleSelectAll() {
+  if (allSelected.value) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(users.value.map(u => u.userId))
+  }
+}
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+// Drop any selected ids that no longer exist after a reload (e.g. after bulk delete).
+function pruneSelection() {
+  const valid = new Set(users.value.map(u => u.userId))
+  const next = new Set<string>()
+  for (const id of selectedIds.value) if (valid.has(id)) next.add(id)
+  selectedIds.value = next
+}
+
+async function bulkAction(action: 'enable' | 'disable' | 'sign' | 'delete') {
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0 || bulkBusy.value) return
+  const targets = users.value.filter(u => ids.includes(u.userId))
+  const label = {
+    enable: '启用',
+    disable: '禁用',
+    sign: '立即签到',
+    delete: '删除',
+  }[action]
+  const warn = action === 'delete'
+    ? `删除 ${ids.length} 个用户？将同时释放他们的邀请码。\n这个操作不可撤销。`
+    : `${label} ${ids.length} 个用户？`
+  if (!confirm(warn)) return
+  bulkBusy.value = true
+  let ok = 0
+  let fail = 0
+  try {
+    const results = await Promise.allSettled(
+      targets.map(u => {
+        switch (action) {
+          case 'enable':
+            return adminApi.updateUser(u.userId, { isDisabled: false })
+          case 'disable':
+            return adminApi.updateUser(u.userId, { isDisabled: true })
+          case 'sign':
+            return adminApi.signNowFor(u.userId)
+          case 'delete':
+            return adminApi.deleteUser(u.userId)
+        }
+      }),
+    )
+    for (const r of results) {
+      if (r.status === 'fulfilled') ok++
+      else fail++
+    }
+    if (fail === 0) {
+      showToast('ok', `${label}已完成 (${ok})`)
+    } else if (ok === 0) {
+      showToast('err', `${label}全部失败 (${fail})`)
+    } else {
+      showToast('err', `${label}部分失败：成功 ${ok} / 失败 ${fail}`)
+    }
+    await load()
+    pruneSelection()
+  } finally {
+    bulkBusy.value = false
   }
 }
 
@@ -488,6 +580,19 @@ function busyFor(u: AdminUser) {
         <table class="w-full text-sm">
           <thead class="bg-white/50 dark:bg-zinc-950/50 border-b border-black/[0.08] dark:border-white/[0.06]">
             <tr class="text-left text-[10px] text-zinc-500 uppercase tracking-wide">
+              <!-- Header checkbox toggles all -->
+              <th class="px-4 py-3 font-medium w-10">
+                <button
+                  type="button"
+                  @click="toggleSelectAll"
+                  class="inline-flex items-center justify-center w-4 h-4 text-zinc-500 hover:text-emerald-400 transition-colors"
+                  :title="allSelected ? '取消全选' : '全选'"
+                >
+                  <CheckSquare v-if="allSelected" class="w-4 h-4 text-emerald-400" />
+                  <Square v-else-if="someSelected" class="w-4 h-4 text-emerald-400/60" />
+                  <Square v-else class="w-4 h-4" />
+                </button>
+              </th>
               <th class="px-4 py-3 font-medium">用户</th>
               <th class="px-4 py-3 font-medium">学院 / 班级</th>
               <th class="px-4 py-3 font-medium">宿舍楼</th>
@@ -503,8 +608,18 @@ function busyFor(u: AdminUser) {
               :key="u.userId"
               @click="openDrawer(u)"
               class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors cursor-pointer"
-              :class="u.isDisabled ? 'opacity-60' : ''"
+              :class="[u.isDisabled ? 'opacity-60' : '', isSelected(u.userId) ? 'bg-emerald-500/[0.06]' : '']"
             >
+              <!-- Checkbox (stops row click) -->
+              <td class="px-4 py-2.5 w-10" @click.stop="toggleSelect(u.userId)">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center w-4 h-4 text-zinc-500 hover:text-emerald-400 transition-colors"
+                >
+                  <CheckSquare v-if="isSelected(u.userId)" class="w-4 h-4 text-emerald-400" />
+                  <Square v-else class="w-4 h-4" />
+                </button>
+              </td>
               <!-- User -->
               <td class="px-4 py-2.5">
                 <div class="flex items-center gap-2.5 min-w-0">
@@ -583,6 +698,65 @@ function busyFor(u: AdminUser) {
         </table>
       </div>
     </section>
+
+    <!-- Floating bulk-action bar — only shown in list view with >0 selected. -->
+    <Transition name="bulkbar">
+      <div
+        v-if="viewMode === 'list' && selectedIds.size > 0"
+        class="fixed bottom-24 md:bottom-6 inset-x-0 z-30 flex justify-center pointer-events-none"
+      >
+        <div class="pointer-events-auto bg-zinc-900/95 dark:bg-zinc-100/95 backdrop-blur ring-1 ring-emerald-500/40 rounded-2xl shadow-2xl px-3 py-2 flex items-center gap-2 max-w-[calc(100vw-1.5rem)]">
+          <span class="text-xs font-medium text-zinc-200 dark:text-zinc-800 px-2">
+            已选 {{ selectedIds.size }}
+          </span>
+          <span class="h-5 w-px bg-zinc-700 dark:bg-zinc-300"></span>
+          <button
+            @click="bulkAction('sign')"
+            :disabled="bulkBusy"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-emerald-300 dark:text-emerald-700 hover:bg-emerald-500/15 disabled:opacity-50 transition-colors"
+            title="批量立即签到"
+          >
+            <PlayCircle class="w-3.5 h-3.5" />
+            立即签
+          </button>
+          <button
+            @click="bulkAction('enable')"
+            :disabled="bulkBusy"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-blue-300 dark:text-blue-700 hover:bg-blue-500/15 disabled:opacity-50 transition-colors"
+            title="批量启用"
+          >
+            <Power class="w-3.5 h-3.5" />
+            启用
+          </button>
+          <button
+            @click="bulkAction('disable')"
+            :disabled="bulkBusy"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-amber-300 dark:text-amber-700 hover:bg-amber-500/15 disabled:opacity-50 transition-colors"
+            title="批量禁用"
+          >
+            <Power class="w-3.5 h-3.5" />
+            禁用
+          </button>
+          <button
+            @click="bulkAction('delete')"
+            :disabled="bulkBusy"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-red-300 dark:text-red-700 hover:bg-red-500/15 disabled:opacity-50 transition-colors"
+            title="批量删除（不可撤销）"
+          >
+            <Trash2 class="w-3.5 h-3.5" />
+            删除
+          </button>
+          <span class="h-5 w-px bg-zinc-700 dark:bg-zinc-300"></span>
+          <button
+            @click="clearSelection"
+            class="inline-flex items-center justify-center p-1.5 rounded-md text-zinc-400 dark:text-zinc-500 hover:bg-zinc-700/50 dark:hover:bg-zinc-300/50 transition-colors"
+            title="清除选择"
+          >
+            <X class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Drawer: opens when a list row is clicked, shows the full UserCard -->
     <Transition name="drawer">
@@ -765,4 +939,6 @@ function busyFor(u: AdminUser) {
 .drawer-enter-from aside, .drawer-leave-to aside { transform: translateX(100%); }
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
+.bulkbar-enter-active, .bulkbar-leave-active { transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.bulkbar-enter-from, .bulkbar-leave-to { opacity: 0; transform: translateY(12px); }
 </style>

@@ -56,6 +56,40 @@ const now = ref(new Date())
 let tickHandle: number | undefined
 let pollHandle: number | undefined
 
+// --- Server-Sent Events: real-time push of sign results / token warnings /
+// rules changes. EventSource auto-reconnects on drops; we use a ref so the
+// UI can show a connection-state pill.
+const sseStatus = ref<'connecting' | 'open' | 'closed'>('closed')
+const lastEvent = ref<{ type: string; at: number } | null>(null)
+const flashRows = ref<Record<string, number>>({}) // userId → expiresAt unix ms
+let sseSource: EventSource | null = null
+let flashTimer: number | undefined
+
+function flashRow(userId: string) {
+  flashRows.value[userId] = Date.now() + 4000
+  if (!flashTimer) {
+    flashTimer = window.setInterval(() => {
+      const cur = Date.now()
+      let changed = false
+      const next: Record<string, number> = {}
+      for (const k in flashRows.value) {
+        if (flashRows.value[k] > cur) next[k] = flashRows.value[k]
+        else changed = true
+      }
+      if (changed) flashRows.value = next
+      if (Object.keys(next).length === 0 && flashTimer) {
+        clearInterval(flashTimer)
+        flashTimer = undefined
+      }
+    }, 500)
+  }
+}
+
+function isFlashing(userId: string): boolean {
+  const exp = flashRows.value[userId]
+  return !!exp && exp > Date.now()
+}
+
 const signing = ref<Record<string, boolean>>({})
 
 type StatusEntry = SchoolCheckinStatus | 'loading' | 'skipped' | undefined
@@ -436,18 +470,80 @@ function filterCount(key: 'all' | Category): number {
   return counts.value[key as Category]
 }
 
+function openSSE() {
+  if (sseSource) {
+    sseSource.close()
+    sseSource = null
+  }
+  sseStatus.value = 'connecting'
+  // EventSource sends cookies by default (same-origin), so the admin
+  // session cookie auths the stream like any other admin endpoint.
+  const es = new EventSource('/api/v1/rosekhlifa/events')
+  sseSource = es
+  es.addEventListener('hello', () => {
+    sseStatus.value = 'open'
+  })
+  es.addEventListener('sign.result', (e: MessageEvent) => {
+    try {
+      const data = JSON.parse(e.data)
+      const p = data.payload || {}
+      lastEvent.value = { type: data.type, at: data.at }
+      // Briefly highlight the affected row and refresh status for it.
+      if (p.userId) {
+        flashRow(p.userId)
+        // Reload after a short delay so the DB record + state lands.
+        window.setTimeout(load, 800)
+      }
+    } catch {
+      /* ignore malformed event */
+    }
+  })
+  es.addEventListener('window.open', () => {
+    lastEvent.value = { type: 'window.open', at: Math.floor(Date.now() / 1000) }
+    load()
+  })
+  es.addEventListener('window.close', () => {
+    lastEvent.value = { type: 'window.close', at: Math.floor(Date.now() / 1000) }
+    load()
+  })
+  es.addEventListener('token.warn', (e: MessageEvent) => {
+    try {
+      const data = JSON.parse(e.data)
+      lastEvent.value = { type: data.type, at: data.at }
+    } catch { /* ignore */ }
+  })
+  es.addEventListener('school.rules', (e: MessageEvent) => {
+    try {
+      const data = JSON.parse(e.data)
+      lastEvent.value = { type: data.type, at: data.at }
+    } catch { /* ignore */ }
+  })
+  es.onerror = () => {
+    sseStatus.value = 'closed'
+    // EventSource auto-reconnects per the retry: directive; nothing else
+    // to do here. Browsers will hit /events again with the next backoff.
+  }
+}
+
 onMounted(() => {
   filterFromStorage()
   load()
   // Clock tick — drives "now" displays and phase transitions
   tickHandle = window.setInterval(() => (now.value = new Date()), 30_000)
-  // Auto-refresh data + status every 60s while the page is open. Cleared
-  // on unmount so leaving the page stops school-API traffic.
+  // Auto-refresh data + status every 60s while the page is open. SSE
+  // covers most updates, but the periodic poll is a safety net in case
+  // any event got dropped (or the connection was briefly down).
   pollHandle = window.setInterval(load, 60_000)
+  openSSE()
 })
 onUnmounted(() => {
   if (tickHandle) clearInterval(tickHandle)
   if (pollHandle) clearInterval(pollHandle)
+  if (flashTimer) clearInterval(flashTimer)
+  if (sseSource) {
+    sseSource.close()
+    sseSource = null
+  }
 })
 </script>
 
@@ -458,6 +554,22 @@ onUnmounted(() => {
         <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Activity class="w-5 h-5 text-emerald-400" />
           监控看板
+          <!-- SSE connection indicator -->
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ring-1"
+            :class="sseStatus === 'open'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/30'
+              : sseStatus === 'connecting'
+                ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-500/30'
+                : 'bg-red-500/10 text-red-700 dark:text-red-300 ring-red-500/30'"
+            :title="sseStatus === 'open' ? '实时事件已连接' : sseStatus === 'connecting' ? '连接中…' : '已断开（每 60s 仍轮询）'"
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full"
+              :class="sseStatus === 'open' ? 'bg-emerald-400 animate-pulse' : sseStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'"
+            />
+            {{ sseStatus === 'open' ? '实时' : sseStatus === 'connecting' ? '连接中' : '已断开' }}
+          </span>
         </h1>
         <p class="text-sm text-zinc-500 mt-1">
           {{ phaseLabel }} ·
@@ -465,6 +577,9 @@ onUnmounted(() => {
             上次拉取 {{ formatDateTime(Math.floor(lastFetch.getTime() / 1000)) }}
           </span>
           <span class="ml-2 text-[11px] text-zinc-500">· 自动每 60s 重拉</span>
+          <span v-if="lastEvent" class="ml-2 text-[11px] text-emerald-500 dark:text-emerald-400">
+            · 上一事件 {{ lastEvent.type }} @ {{ formatDateTime(lastEvent.at) }}
+          </span>
         </p>
       </div>
       <button @click="load" :disabled="loading"
@@ -561,7 +676,10 @@ onUnmounted(() => {
             <tr
               v-for="r in filteredRows"
               :key="r.userId"
-              :class="rowTimeState(r) === 'now' ? 'bg-amber-500/[0.06]' : ''"
+              :class="[
+                rowTimeState(r) === 'now' ? 'bg-amber-500/[0.06]' : '',
+                isFlashing(r.userId) ? 'row-flash' : '',
+              ]"
               class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
             >
               <!-- Time -->
@@ -692,7 +810,20 @@ onUnmounted(() => {
     </section>
 
     <p class="text-[11px] text-zinc-500 dark:text-zinc-600">
-      自动每 60 秒重拉一次（页面打开时）。学校状态以 xhbcs 接口实时返回为准，仅对「今晚要签」分类拉取以节省 API。
+      实时事件 (SSE) + 每 60 秒兜底轮询。学校状态以 xhbcs 接口实时返回为准，仅对「今晚要签」分类拉取以节省 API。
     </p>
   </div>
 </template>
+
+<style scoped>
+/* Briefly flash a row green when an event for that user arrives via SSE.
+   The animation fades out so the highlight doesn't linger long after the
+   user has noticed. */
+@keyframes row-flash-anim {
+  0%   { background-color: rgba(16, 185, 129, 0.18); }
+  100% { background-color: transparent; }
+}
+.row-flash {
+  animation: row-flash-anim 4s ease-out forwards;
+}
+</style>

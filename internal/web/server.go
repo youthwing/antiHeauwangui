@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"wangui/internal/events"
 	"wangui/internal/scheduler"
 	"wangui/internal/store"
 )
@@ -21,6 +22,7 @@ type Server struct {
 	Addr      string
 	Store     *store.Store
 	Sched     *scheduler.Multi
+	Bus       *events.Bus
 	Logger    *slog.Logger
 	SPAFS     fs.FS
 	AdminPass string // empty means admin disabled
@@ -40,6 +42,7 @@ func (s *Server) Run(ctx context.Context) error {
 	h := &handlers{
 		store:        s.Store,
 		sched:        s.Sched,
+		bus:          s.Bus,
 		log:          s.Logger,
 		adminPass:    s.AdminPass,
 		loginLimiter: newRateLimiter(5, time.Minute),
@@ -61,6 +64,7 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/settings", h.getSettings)
 			r.Put("/settings", h.updateSettings)
 			r.Get("/records", h.records)
+			r.Get("/stats", h.stats)
 			r.Get("/dorms", h.listDorms)
 			r.Post("/sign-now", h.signNow)
 			r.Post("/notify/test-serverchan", h.testServerChan)
@@ -101,6 +105,9 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Delete("/guests/{id}", h.adminDeleteGuest)
 
 			r.Get("/logs", h.adminLogs)
+			r.Get("/records.csv", h.adminExportRecordsCSV)
+			r.Get("/school-rules", h.adminSchoolRules)
+			r.Get("/events", h.adminEvents)
 
 			r.Get("/smtp", h.adminGetSMTP)
 			r.Put("/smtp", h.adminUpdateSMTP)

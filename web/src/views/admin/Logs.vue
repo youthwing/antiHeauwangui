@@ -1,9 +1,33 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RefreshCw, ListFilter, Clock } from 'lucide-vue-next'
+import { RefreshCw, ListFilter, Clock, Download } from 'lucide-vue-next'
 import type { AdminLog, SignStatus } from '../../types'
 import { adminApi } from '../../api'
 import { formatDateTime } from '../../lib/format'
+
+// CSV export: server returns a downloadable file. We trigger a navigation to
+// the endpoint (with credentials) and let the browser handle the save dialog.
+function todayStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function firstOfMonthStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+const exportFrom = ref(firstOfMonthStr())
+const exportTo = ref(todayStr())
+function doExport() {
+  const url = `/api/v1/rosekhlifa/records.csv?from=${exportFrom.value}&to=${exportTo.value}`
+  // Use a hidden anchor to trigger the download. window.open would open a
+  // new tab on iOS Safari which is jarring.
+  const a = document.createElement('a')
+  a.href = url
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
 
 const logs = ref<AdminLog[]>([])
 const loading = ref(false)
@@ -76,6 +100,36 @@ function info(s: string) { return meta[s] || meta.failed }
         </span>
       </button>
     </div>
+
+    <!-- CSV export: range picker + download. The server-side export bypasses
+         the in-memory 200-row cap and includes 学号 / 姓名. -->
+    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-200 mb-0.5">导出 CSV</p>
+        <p class="text-[11px] text-zinc-500">
+          完整流水（含 学号 / 姓名 / 时间），UTF-8 + BOM，Excel 直接打开不乱码。
+        </p>
+      </div>
+      <div class="flex items-end gap-2">
+        <div>
+          <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">从</label>
+          <input type="date" v-model="exportFrom"
+            class="bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs font-mono-token focus-ring text-zinc-900 dark:text-zinc-200" />
+        </div>
+        <div>
+          <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">到</label>
+          <input type="date" v-model="exportTo"
+            class="bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs font-mono-token focus-ring text-zinc-900 dark:text-zinc-200" />
+        </div>
+        <button
+          @click="doExport"
+          class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+        >
+          <Download class="w-3.5 h-3.5" />
+          下载
+        </button>
+      </div>
+    </section>
 
     <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div v-if="loading && logs.length === 0" class="flex items-center justify-center py-12">

@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   TrendingUp,
   ArrowRight,
+  ScrollText,
 } from 'lucide-vue-next'
 import type { AdminStats, AdminLog } from '../../types'
 import { adminApi } from '../../api'
@@ -16,12 +17,29 @@ const stats = ref<AdminStats | null>(null)
 const recentLogs = ref<AdminLog[]>([])
 const loading = ref(true)
 
+// School-rules snapshot: filled by daily 18:00 sweep.
+interface SchoolRule {
+  ruleId: number
+  ruleName: string
+  startTime: string
+  endTime: string
+  description: string
+}
+const schoolRules = ref<SchoolRule[]>([])
+const schoolRulesUpdatedAt = ref(0)
+
 async function loadAll() {
   loading.value = true
   try {
-    const [s, l] = await Promise.all([adminApi.stats(), adminApi.logs(10)])
+    const [s, l, sr] = await Promise.all([
+      adminApi.stats(),
+      adminApi.logs(10),
+      adminApi.schoolRules(),
+    ])
     stats.value = s
     recentLogs.value = l
+    schoolRules.value = Array.isArray(sr.rules) ? (sr.rules as SchoolRule[]) : []
+    schoolRulesUpdatedAt.value = sr.updatedAt
   } finally {
     loading.value = false
   }
@@ -130,6 +148,45 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
           <p class="text-2xl font-bold tabular-nums" :class="b.color">{{ b.value }}</p>
         </div>
       </div>
+    </section>
+
+    <!-- School rules snapshot — refreshed daily at 18:00 by the scheduler;
+         admin gets emailed if it changes between two probes. -->
+    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+      <div class="flex items-center justify-between mb-3 gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <ScrollText class="w-4 h-4 text-zinc-500" />
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">学校签到规则</h2>
+        </div>
+        <span v-if="schoolRulesUpdatedAt > 0" class="text-[11px] text-zinc-500 font-mono-token shrink-0">
+          {{ formatDateTime(schoolRulesUpdatedAt) }}
+        </span>
+      </div>
+      <div v-if="schoolRules.length === 0" class="text-xs text-zinc-500">
+        尚未抓取规则快照（每天 18:00 自动抓一次）。规则变化会邮件 + Server酱 推送。
+      </div>
+      <ul v-else class="space-y-2">
+        <li
+          v-for="r in schoolRules"
+          :key="r.ruleId"
+          class="rounded-lg bg-white/70 dark:bg-zinc-950/40 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-200">
+                <span class="text-[10px] font-mono-token text-zinc-500 mr-1.5">#{{ r.ruleId }}</span>
+                {{ r.ruleName || '(无名)' }}
+              </p>
+              <p v-if="r.description" class="text-[11px] text-zinc-500 mt-1 leading-relaxed">
+                {{ r.description }}
+              </p>
+            </div>
+            <span class="shrink-0 text-xs text-emerald-400 font-mono-token tabular-nums whitespace-nowrap">
+              {{ r.startTime }} – {{ r.endTime }}
+            </span>
+          </div>
+        </li>
+      </ul>
     </section>
 
     <!-- Recent activity -->

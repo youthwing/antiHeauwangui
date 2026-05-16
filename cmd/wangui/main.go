@@ -18,6 +18,7 @@ import (
 	"wangui/internal/api"
 	"wangui/internal/backup"
 	"wangui/internal/config"
+	"wangui/internal/events"
 	"wangui/internal/notify"
 	"wangui/internal/scheduler"
 	"wangui/internal/store"
@@ -128,7 +129,13 @@ func runServe(addr, dataDir string) error {
 	defer st.Close()
 	logger.Info("store ready", "data_dir", dataDir)
 
+	// In-memory event bus. Backend components publish to it (scheduler,
+	// notifier), and the admin SSE endpoint streams events to connected
+	// browsers. Dies on process restart; no persistence.
+	bus := events.New()
+
 	sched := scheduler.NewMulti(st, logger)
+	sched.Bus = bus
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	sched.Start(ctx)
@@ -166,6 +173,7 @@ func runServe(addr, dataDir string) error {
 		Addr:      addr,
 		Store:     st,
 		Sched:     sched,
+		Bus:       bus,
 		Logger:    logger,
 		SPAFS:     spaFS(),
 		AdminPass: adminPass,

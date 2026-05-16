@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"wangui/internal/events"
 	"wangui/internal/notify"
 	"wangui/internal/scheduler"
 	"wangui/internal/store"
@@ -27,6 +28,7 @@ func validPin(s string) bool { return pinPattern.MatchString(s) }
 type handlers struct {
 	store     *store.Store
 	sched     *scheduler.Multi
+	bus       *events.Bus
 	log       *slog.Logger
 	adminPass string // plain text from env; empty means admin disabled
 

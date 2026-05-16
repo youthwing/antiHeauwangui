@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	mathrand "math/rand/v2"
@@ -17,6 +18,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	apiclient "wangui/internal/api"
+	"wangui/internal/events"
 	"wangui/internal/notify"
 	"wangui/internal/scheduler"
 	"wangui/internal/store"
@@ -514,6 +516,17 @@ func (h *handlers) adminSignNowForUser(w http.ResponseWriter, r *http.Request) {
 		Status: res.Status, Message: res.Message,
 	})
 	h.log.Info("admin sign-now", "target_user", id, "status", res.Status)
+	if h.bus != nil {
+		h.bus.PublishJSON(events.TypeSignResult, map[string]any{
+			"userId":   id,
+			"userName": u.UserName,
+			"status":   res.Status,
+			"message":  res.Message,
+			"attempt":  0,
+			"terminal": true,
+			"adminTriggered": true,
+		})
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  res.Status,
 		"message": res.Message,
@@ -814,6 +827,103 @@ func (h *handlers) adminTestSMTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sentTo": target})
+}
+
+// GET /api/v1/rosekhlifa/records.csv?from=YYYY-MM-DD&to=YYYY-MM-DD
+//
+// Streams a CSV of every sign record in the date range. Used by admin to
+// archive logs (e.g. if the school ever asks for evidence of activity).
+// Defaults: from = first day of current month, to = today.
+//
+// Columns:
+//   id, occurred_at_iso, user_id, user_name, user_number, status, message, rule_id
+//
+// occurred_at is ISO 8601 in the server's local timezone (CST) for Excel
+// friendliness — raw unix timestamps confuse non-technical users.
+func (h *handlers) adminExportRecordsCSV(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	loc := time.Now().Location()
+	now := time.Now().In(loc)
+	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
+	to := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, loc)
+	if v := q.Get("from"); v != "" {
+		if t, err := time.ParseInLocation("2006-01-02", v, loc); err == nil {
+			from = t
+		}
+	}
+	if v := q.Get("to"); v != "" {
+		if t, err := time.ParseInLocation("2006-01-02", v, loc); err == nil {
+			to = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, loc)
+		}
+	}
+	if to.Before(from) {
+		writeErr(w, http.StatusBadRequest, "to 必须不早于 from")
+		return
+	}
+
+	recs, err := h.store.ListAllRecordsBetween(r.Context(), from, to)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+
+	// Build a user_id → (number, name) index so we can include 学号 in the
+	// CSV without an N+1 lookup per row.
+	users, _ := h.store.ListUsers(r.Context(), store.UserListFilter{Limit: 500})
+	numByID := map[string]string{}
+	nameByID := map[string]string{}
+	for _, u := range users {
+		numByID[u.UserID] = u.UserNumber
+		nameByID[u.UserID] = u.UserName
+	}
+
+	filename := "wangui-records-" +
+		from.Format("20060102") + "-" + to.Format("20060102") + ".csv"
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	// UTF-8 BOM so Excel auto-detects the encoding and shows 中文 correctly.
+	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+
+	cw := csv.NewWriter(w)
+	defer cw.Flush()
+	_ = cw.Write([]string{"id", "occurred_at", "user_id", "user_name", "user_number", "status", "message", "rule_id"})
+	for _, rec := range recs {
+		name := rec.UserName
+		if name == "" {
+			name = nameByID[rec.UserID]
+		}
+		_ = cw.Write([]string{
+			strconv.FormatInt(rec.ID, 10),
+			rec.OccurredAt.In(loc).Format("2006-01-02 15:04:05"),
+			rec.UserID,
+			name,
+			numByID[rec.UserID],
+			rec.Status,
+			rec.Message,
+			strconv.Itoa(rec.RuleID),
+		})
+	}
+}
+
+// GET /api/v1/rosekhlifa/school-rules — return the most recent cached rules
+// snapshot taken by the daily rules-watch sweep, plus when it was taken.
+// If never sampled (fresh DB), returns null + 0.
+func (h *handlers) adminSchoolRules(w http.ResponseWriter, r *http.Request) {
+	snap, err := h.store.GetConfig(r.Context(), "schoolrules.snapshot")
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "查询失败")
+		return
+	}
+	tsStr, _ := h.store.GetConfig(r.Context(), "schoolrules.updated_at")
+	updatedAt, _ := strconv.ParseInt(tsStr, 10, 64)
+	var rules any
+	if snap != "" {
+		_ = json.Unmarshal([]byte(snap), &rules)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"rules":     rules,
+		"updatedAt": updatedAt,
+	})
 }
 
 // GET /api/v1/admin/logs — recent sign records across all users

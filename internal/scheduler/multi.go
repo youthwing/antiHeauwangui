@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
 	"wangui/internal/api"
+	"wangui/internal/events"
 	"wangui/internal/notify"
 	"wangui/internal/store"
 )
@@ -28,6 +30,17 @@ type Multi struct {
 	store    *store.Store
 	log      *slog.Logger
 	notifier *notify.Dispatcher
+	// Bus is the in-memory event bus. Set by main after construction; nil
+	// is treated as "publishing disabled" so tests and tools that build a
+	// Multi without the bus still work.
+	Bus *events.Bus
+}
+
+func (m *Multi) publish(eventType string, payload any) {
+	if m.Bus == nil {
+		return
+	}
+	m.Bus.PublishJSON(eventType, payload)
 }
 
 func NewMulti(s *store.Store, l *slog.Logger) *Multi {
@@ -42,6 +55,7 @@ func (m *Multi) Start(ctx context.Context) {
 	go m.loop(ctx)
 	go m.guestCleanupLoop(ctx)
 	go m.tokenWarnLoop(ctx)
+	go m.rulesWatchLoop(ctx)
 }
 
 // TokenWarnThreshold is the "send warning" cutoff. Anything inside this
@@ -74,6 +88,88 @@ func nextTokenWarnTime(now time.Time) time.Time {
 	return today.Add(24 * time.Hour)
 }
 
+// rulesWatchLoop pings the school's /checkin/available-rules once a day at
+// 18:00 (well outside the sign window) using any healthy user's token. If
+// the rules list changed since yesterday — e.g. a holiday rule was added,
+// or 22:00–22:30 became 21:30–22:00 — we cache the new snapshot and notify
+// admin so they can prepare instead of getting surprised at 22:00.
+func (m *Multi) rulesWatchLoop(ctx context.Context) {
+	for {
+		next := nextRulesWatchTime(time.Now())
+		m.log.Info("rules-watch armed", "next", next.Format(time.RFC3339))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Until(next)):
+		}
+		m.runRulesWatchSweep(ctx)
+	}
+}
+
+func nextRulesWatchTime(now time.Time) time.Time {
+	today := time.Date(now.Year(), now.Month(), now.Day(), 18, 0, 0, 0, now.Location())
+	if today.After(now) {
+		return today
+	}
+	return today.Add(24 * time.Hour)
+}
+
+func (m *Multi) runRulesWatchSweep(ctx context.Context) {
+	users, err := m.store.ListUsers(ctx, store.UserListFilter{Limit: 50})
+	if err != nil {
+		m.log.Error("rules-watch list users", "err", err.Error())
+		return
+	}
+	// Find a non-guest user with a valid token. Guests' tokens may exist
+	// briefly but their accounts disappear daily; we want a stable account.
+	var probe *store.User
+	for _, u := range users {
+		if u.IsGuest || u.IsDisabled {
+			continue
+		}
+		if time.Until(u.TokenExp) > time.Hour {
+			probe = u
+			break
+		}
+	}
+	if probe == nil {
+		m.log.Warn("rules-watch: no healthy user to probe with")
+		return
+	}
+	c := api.New(probe.Token)
+	probeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	rules, err := c.AvailableRules(probeCtx)
+	if err != nil {
+		m.log.Warn("rules-watch probe failed", "user", probe.UserID, "err", err.Error())
+		return
+	}
+	// Build the new digest. We hash rule id + name + start + end + desc so
+	// even a single-character description tweak triggers a notification.
+	current, _ := json.Marshal(rules)
+	prev, _ := m.store.GetConfig(ctx, "schoolrules.snapshot")
+	if prev != "" && prev == string(current) {
+		m.log.Info("rules-watch: unchanged", "rules", len(rules))
+		return
+	}
+	if err := m.store.SetConfig(ctx, "schoolrules.snapshot", string(current)); err != nil {
+		m.log.Warn("rules-watch persist failed", "err", err.Error())
+	}
+	if err := m.store.SetConfig(ctx, "schoolrules.updated_at",
+		strconv.FormatInt(time.Now().Unix(), 10)); err != nil {
+		m.log.Warn("rules-watch persist ts", "err", err.Error())
+	}
+	// First run on a fresh DB: persist the snapshot but skip the email —
+	// there's no "previous" to diff against, so the change isn't real.
+	if prev == "" {
+		m.log.Info("rules-watch: initial snapshot stored", "rules", len(rules))
+		return
+	}
+	m.log.Info("rules-watch: changed, dispatching", "rules", len(rules))
+	m.notifier.DispatchRulesChanged(rules, prev, string(current))
+	m.publish(events.TypeRulesChanged, map[string]any{"count": len(rules)})
+}
+
 func (m *Multi) runTokenWarnSweep(ctx context.Context) {
 	users, err := m.store.ListUsers(ctx, store.UserListFilter{Limit: 500})
 	if err != nil {
@@ -101,6 +197,11 @@ func (m *Multi) runTokenWarnSweep(ctx context.Context) {
 		if err := m.store.MarkTokenWarned(ctx, u.UserID, now); err != nil {
 			m.log.Warn("mark token-warned", "user", u.UserID, "err", err.Error())
 		}
+		m.publish(events.TypeTokenWarn, map[string]any{
+			"userId":    u.UserID,
+			"userName":  u.UserName,
+			"hoursLeft": hoursLeft,
+		})
 		warned++
 	}
 	m.log.Info("token-warn sweep done", "scanned", len(users), "warned", warned)
@@ -143,6 +244,7 @@ func (m *Multi) runGuestCleanup(ctx context.Context) {
 		m.log.Info("cleanup deleted guest", "user", g.UserID, "label", g.Label, "name", g.Name)
 	}
 	m.notifier.DispatchGuestCleanup(expired)
+	m.publish(events.TypeGuestCleanup, map[string]any{"count": len(expired)})
 }
 
 func (m *Multi) loop(ctx context.Context) {
@@ -183,6 +285,10 @@ func (m *Multi) runWindow(ctx context.Context) {
 		return
 	}
 	m.log.Info("window opened", "auto_sign_users", len(ids), "deadline", end.Format(time.RFC3339))
+	m.publish(events.TypeWindowOpen, map[string]any{
+		"users":    len(ids),
+		"deadline": end.Unix(),
+	})
 
 	var wg sync.WaitGroup
 	for _, id := range ids {
@@ -194,6 +300,10 @@ func (m *Multi) runWindow(ctx context.Context) {
 	}
 	wg.Wait()
 	m.log.Info("window closed")
+	m.publish(events.TypeWindowClose, map[string]any{
+		"users": len(ids),
+		"at":    time.Now().Unix(),
+	})
 }
 
 func (m *Multi) runForUser(ctx context.Context, userID string, deadline time.Time) {
@@ -260,6 +370,16 @@ func (m *Multi) runForUser(ctx context.Context, userID string, deadline time.Tim
 		m.log.Info("attempt",
 			"user", userID, "attempt", attempt,
 			"status", res.Status, "msg", res.Message)
+		// Always publish so the admin monitor board updates in real time
+		// even for transient failed attempts mid-retry.
+		m.publish(events.TypeSignResult, map[string]any{
+			"userId":   userID,
+			"userName": cur.UserName,
+			"status":   res.Status,
+			"message":  res.Message,
+			"attempt":  attempt,
+			"terminal": res.Terminal(),
+		})
 		if res.Terminal() {
 			// Send notification on terminal outcome (success / already / exempt).
 			m.notifier.DispatchSignResult(cur, notify.SignResult{Status: res.Status, Message: res.Message})

@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -227,6 +228,85 @@ func (d *Dispatcher) dispatchTokenWarning(u *store.User, hoursLeft int) {
 			d.log("token-warn serverchan to admin failed", "err", err.Error())
 		}
 	}
+}
+
+// DispatchRulesChanged notifies admin (email + Server酱) when the school's
+// /checkin/available-rules differs from the previously cached snapshot.
+// The raw JSON snapshots are passed in so the message can include both
+// human-readable summaries and the diff. Non-blocking.
+func (d *Dispatcher) DispatchRulesChanged(rules any, prevJSON, currentJSON string) {
+	go d.dispatchRulesChangedSync(rules, prevJSON, currentJSON)
+}
+
+func (d *Dispatcher) dispatchRulesChangedSync(rules any, prevJSON, currentJSON string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cfg, err := d.Store.GetSMTPConfig(ctx)
+	if err != nil {
+		return
+	}
+
+	// Build a short summary listing each rule's id/name/window.
+	summary := summarizeRules(rules)
+	subject := "[勿外传] 学校晚归规则有变化"
+	text := fmt.Sprintf("学校 /checkin/available-rules 接口返回的规则与昨天不同。\n\n%s\n\n时间：%s\n",
+		summary, time.Now().Format("2006-01-02 15:04:05"))
+	html := fmt.Sprintf(`<!doctype html><html><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#fafafa;padding:24px;color:#18181b;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+  <div style="padding:18px 22px;background:#3b82f6;color:#fff;">
+    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">勿外传 · 学校规则变化</div>
+    <div style="font-size:20px;font-weight:700;margin-top:4px;">规则有变化</div>
+  </div>
+  <div style="padding:18px 22px;font-size:14px;line-height:1.7;color:#3f3f46;">
+    <p>学校晚归系统返回的可用规则与上次记录不同：</p>
+    <pre style="background:#f4f4f5;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">%s</pre>
+  </div>
+  <div style="padding:12px 22px;font-size:11px;color:#a1a1aa;background:#fafafa;border-top:1px solid #e5e7eb;">
+    勿外传 · 仅内部使用 · 自动发送，请勿回复
+  </div>
+</div></body></html>`, summary)
+
+	if cfg.Enabled && cfg.Host != "" && cfg.Username != "" && cfg.AdminBcc != "" {
+		client := &EmailClient{Host: cfg.Host, Port: cfg.Port, Username: cfg.Username, Password: cfg.Password, From: cfg.From}
+		if err := client.Send(Message{To: cfg.AdminBcc, Subject: subject, Text: text, HTML: html}); err != nil {
+			d.log("rules-changed email failed", "err", err.Error())
+		}
+	}
+	if cfg.AdminServerChanEnabled && cfg.AdminServerChanKey != "" {
+		body := "学校 /checkin/available-rules 接口返回的规则与上次不同：\n\n" + summary
+		if err := NewServerChan(cfg.AdminServerChanKey).Send(ctx, "⚠️ 学校晚归规则有变化", body); err != nil {
+			d.log("rules-changed serverchan failed", "err", err.Error())
+		}
+	}
+	_ = prevJSON
+	_ = currentJSON
+}
+
+func summarizeRules(rules any) string {
+	// Best-effort: rules is []api.Rule but we accept any to avoid import cycle.
+	// Marshal-then-unmarshal to a local struct so we can format it nicely.
+	type rule struct {
+		RuleID      int    `json:"ruleId"`
+		RuleName    string `json:"ruleName"`
+		StartTime   string `json:"startTime"`
+		EndTime     string `json:"endTime"`
+		Description string `json:"description"`
+	}
+	raw, _ := json.Marshal(rules)
+	var rs []rule
+	_ = json.Unmarshal(raw, &rs)
+	if len(rs) == 0 {
+		return "(空规则列表)"
+	}
+	var b strings.Builder
+	for i, r := range rs {
+		fmt.Fprintf(&b, "%d. [#%d] %s\n   时段：%s – %s\n",
+			i+1, r.RuleID, nonBlank(r.RuleName, "(无名)"), r.StartTime, r.EndTime)
+		if r.Description != "" {
+			fmt.Fprintf(&b, "   说明：%s\n", r.Description)
+		}
+	}
+	return b.String()
 }
 
 // DispatchGuestCleanup sends one summary email to admin listing the guests

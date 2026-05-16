@@ -15,6 +15,7 @@ import type {
   GuestCreateReq,
   GuestUpdateReq,
   SchoolCheckinStatus,
+  UserStats,
 } from './types'
 
 export interface SchoolAuthPayload {
@@ -84,6 +85,7 @@ export const api = {
       body: JSON.stringify(s),
     }),
   records: () => request<SignRecord[]>('/records'),
+  stats: () => request<UserStats>('/stats'),
   dorms: () => request<Dorm[]>('/dorms'),
   signNow: () =>
     request<{ status: string; message: string }>('/sign-now', { method: 'POST' }),
@@ -229,4 +231,7 @@ export const adminApi = {
     request<{ ok: boolean }>('/rosekhlifa/serverchan/test', {
       method: 'POST',
     }),
+
+  schoolRules: () =>
+    request<{ rules: unknown; updatedAt: number }>('/rosekhlifa/school-rules'),
 }

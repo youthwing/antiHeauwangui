@@ -12,8 +12,12 @@ import {
   MapPin,
   Bell,
   BellOff,
+  Flame,
+  CalendarCheck,
+  TrendingUp,
+  Trophy,
 } from 'lucide-vue-next'
-import type { SignRecord } from '../types'
+import type { SignRecord, UserStats } from '../types'
 import { useAuth } from '../stores/auth'
 import { api } from '../api'
 import { formatDateTime, formatRemaining } from '../lib/format'
@@ -22,13 +26,14 @@ import Avatar from '../components/Avatar.vue'
 
 const auth = useAuth()
 const records = ref<SignRecord[]>([])
+const stats = ref<UserStats | null>(null)
 const now = ref(new Date())
 const signing = ref(false)
 
 let timer: number | null = null
 onMounted(async () => {
   await auth.init()
-  await loadRecords()
+  await Promise.all([loadRecords(), loadStats()])
   // Tick every 30s. During the 22:00–22:35 window, also re-pull records
   // so the "今日签到" status auto-transitions from "正在尝试" → "已完成"
   // without the user having to refresh.
@@ -37,7 +42,7 @@ onMounted(async () => {
     const h = now.value.getHours()
     const m = now.value.getMinutes()
     if (h === 22 && m <= 35) {
-      await loadRecords()
+      await Promise.all([loadRecords(), loadStats()])
     }
   }, 30_000)
 })
@@ -51,6 +56,35 @@ async function loadRecords() {
   } catch {
     records.value = []
   }
+}
+
+async function loadStats() {
+  try {
+    stats.value = await api.stats()
+  } catch {
+    stats.value = null
+  }
+}
+
+// Visual tone for the streak chip based on current streak length.
+const streakTone = computed(() => {
+  const n = stats.value?.currentStreak ?? 0
+  if (n >= 30) return 'fire' // amber/red — on fire
+  if (n >= 7) return 'good'  // emerald — solid
+  if (n >= 1) return 'mild'  // blue — getting there
+  return 'cold'              // zinc — nothing yet
+})
+
+// Compact percentage display for monthly progress.
+const monthPct = computed(() => {
+  const s = stats.value
+  if (!s || s.monthExpected === 0) return 0
+  return Math.round(s.monthRate * 100)
+})
+
+async function refreshStats() {
+  // Triggered after manual sign so the streak/月统计 react instantly.
+  await loadStats()
 }
 
 const me = computed(() => auth.state.me)
@@ -181,6 +215,7 @@ async function signNow() {
     else if (res.status === 'exempt') showToast('ok', res.message || '免签')
     else showToast('err', res.message || '签到失败')
     await loadRecords()
+    await refreshStats()
     await auth.refresh()
   } catch (e: any) {
     showToast('err', e.message || '签到失败')
@@ -301,6 +336,105 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
           <BellOff v-else class="w-3.5 h-3.5 shrink-0" />
           <span class="font-medium truncate">{{ notifyState.sub }}</span>
         </RouterLink>
+      </div>
+    </section>
+
+    <!-- Stats strip (streak + 月度 + 累计) -->
+    <section
+      v-if="stats"
+      class="grid grid-cols-2 sm:grid-cols-4 gap-2"
+    >
+      <!-- Current streak — tone shifts as the user gets hotter. -->
+      <div
+        class="rounded-xl ring-1 p-3"
+        :class="streakTone === 'fire'
+          ? 'bg-gradient-to-br from-amber-500/15 to-red-500/10 ring-amber-500/30'
+          : streakTone === 'good'
+            ? 'bg-emerald-500/10 ring-emerald-500/25'
+            : streakTone === 'mild'
+              ? 'bg-blue-500/10 ring-blue-500/25'
+              : 'bg-white/85 dark:bg-zinc-900/60 ring-black/[0.08] dark:ring-white/[0.06]'"
+      >
+        <div class="flex items-center gap-1.5 mb-1">
+          <Flame
+            class="w-3.5 h-3.5"
+            :class="streakTone === 'fire' ? 'text-amber-400' : streakTone === 'good' ? 'text-emerald-400' : streakTone === 'mild' ? 'text-blue-400' : 'text-zinc-500'"
+          />
+          <span class="text-[10px] uppercase tracking-wide text-zinc-500">连签</span>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span
+            class="text-2xl font-bold tabular-nums"
+            :class="streakTone === 'fire' ? 'text-amber-400' : streakTone === 'good' ? 'text-emerald-400' : streakTone === 'mild' ? 'text-blue-400' : 'text-zinc-500'"
+          >
+            {{ stats.currentStreak }}
+          </span>
+          <span class="text-xs text-zinc-500">天</span>
+        </div>
+        <p class="text-[10px] text-zinc-500 mt-1 truncate" :title="`历史最长 ${stats.longestStreak} 天`">
+          最长 {{ stats.longestStreak }} 天
+        </p>
+      </div>
+
+      <!-- Month progress -->
+      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
+        <div class="flex items-center gap-1.5 mb-1">
+          <CalendarCheck class="w-3.5 h-3.5 text-zinc-500" />
+          <span class="text-[10px] uppercase tracking-wide text-zinc-500">本月</span>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-2xl font-bold tabular-nums">{{ stats.monthSigned }}</span>
+          <span class="text-xs text-zinc-500">/ {{ stats.monthExpected }}</span>
+        </div>
+        <div class="mt-1.5 h-1 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+          <div
+            class="h-full bg-emerald-500 transition-[width] duration-500"
+            :style="`width: ${monthPct}%`"
+          />
+        </div>
+        <p class="text-[10px] text-zinc-500 mt-1 tabular-nums">{{ monthPct }}% 已完成</p>
+      </div>
+
+      <!-- Lifetime total -->
+      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
+        <div class="flex items-center gap-1.5 mb-1">
+          <TrendingUp class="w-3.5 h-3.5 text-zinc-500" />
+          <span class="text-[10px] uppercase tracking-wide text-zinc-500">总签到</span>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-2xl font-bold tabular-nums">
+            {{ stats.totalSuccess + stats.totalAlready }}
+          </span>
+          <span class="text-xs text-zinc-500">次</span>
+        </div>
+        <p class="text-[10px] text-zinc-500 mt-1 truncate" :title="`成功 ${stats.totalSuccess} · 已签 ${stats.totalAlready} · 失败 ${stats.totalFailed}`">
+          <span v-if="stats.totalExempt > 0">+{{ stats.totalExempt }} 免签 · </span>
+          <span class="text-red-400" v-if="stats.totalFailed > 0">{{ stats.totalFailed }} 失败</span>
+          <span v-else>0 失败</span>
+        </p>
+      </div>
+
+      <!-- Best ever -->
+      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
+        <div class="flex items-center gap-1.5 mb-1">
+          <Trophy class="w-3.5 h-3.5 text-zinc-500" />
+          <span class="text-[10px] uppercase tracking-wide text-zinc-500">最佳记录</span>
+        </div>
+        <div class="flex items-baseline gap-1">
+          <span class="text-2xl font-bold tabular-nums">{{ stats.longestStreak }}</span>
+          <span class="text-xs text-zinc-500">天</span>
+        </div>
+        <p class="text-[10px] text-zinc-500 mt-1 truncate">
+          <template v-if="stats.currentStreak >= stats.longestStreak && stats.currentStreak > 0">
+            🔥 当前正在刷新记录
+          </template>
+          <template v-else-if="stats.longestStreak > 0">
+            历史最长连签
+          </template>
+          <template v-else>
+            等你第一次破纪录
+          </template>
+        </p>
       </div>
     </section>
 
