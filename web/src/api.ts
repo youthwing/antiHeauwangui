@@ -32,6 +32,11 @@ export function listAnnouncements(): Promise<Announcement[]> {
   return request('/announcements')
 }
 
+// Lifetime "已为全站用户签到 N 次" tagline counter. Public, single int.
+export function getPlatformStats(): Promise<{ totalSigns: number }> {
+  return request('/platform-stats')
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch('/api/v1' + path, {
     credentials: 'include',

@@ -8,6 +8,7 @@ import {
   User as UserIcon,
   LogOut,
   Megaphone,
+  Sparkles,
 } from 'lucide-vue-next'
 import Logo from './Logo.vue'
 import Avatar from './Avatar.vue'
@@ -15,7 +16,7 @@ import ThemeToggle from './ThemeToggle.vue'
 import SidebarNav, { type NavItem } from './SidebarNav.vue'
 import AnnouncementCard from './AnnouncementCard.vue'
 import { useAuth } from '../stores/auth'
-import { api, listAnnouncements } from '../api'
+import { api, listAnnouncements, getPlatformStats } from '../api'
 import type { Announcement } from '../types'
 import { showToast } from '../lib/toast'
 
@@ -40,6 +41,18 @@ async function loadAnnouncements() {
     announcements.value = []
   }
 }
+
+// Lifetime "已为全站用户签到 N 次" counter. Loaded once on mount and
+// refreshed on the same 60s tick as announcements.
+const totalSigns = ref<number | null>(null)
+async function loadPlatformStats() {
+  try {
+    const s = await getPlatformStats()
+    totalSigns.value = s.totalSigns
+  } catch {
+    /* keep last value on failure; chip just doesn't tick this round */
+  }
+}
 let pollHandle: number | undefined
 
 async function logout() {
@@ -55,7 +68,11 @@ async function logout() {
 onMounted(() => {
   if (!auth.state.initialized) auth.init()
   loadAnnouncements()
-  pollHandle = window.setInterval(loadAnnouncements, 60_000)
+  loadPlatformStats()
+  pollHandle = window.setInterval(() => {
+    loadAnnouncements()
+    loadPlatformStats()
+  }, 60_000)
 })
 onUnmounted(() => {
   if (pollHandle) clearInterval(pollHandle)
@@ -70,6 +87,21 @@ onUnmounted(() => {
     >
       <div class="px-5 py-5 border-b border-black/[0.05] dark:border-white/[0.04]">
         <Logo :size="34" text="勿外传" />
+        <!-- Lifetime success-sign counter — small system-wide "brag" chip
+             so users on every page can see the platform's accumulated
+             impact. Hidden until the first count loads to avoid a 0 flash. -->
+        <div
+          v-if="totalSigns !== null && totalSigns > 0"
+          class="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-gradient-to-r from-emerald-500/10 to-amber-500/10 ring-1 ring-emerald-500/20 text-zinc-700 dark:text-zinc-300"
+          :title="`从开服至今，wangui 已成功为大家签到 ${totalSigns.toLocaleString()} 次`"
+        >
+          <Sparkles class="w-3 h-3 text-amber-400" />
+          <span>已为大家签到</span>
+          <span class="font-mono-token tabular-nums font-semibold text-emerald-600 dark:text-emerald-300">
+            {{ totalSigns.toLocaleString() }}
+          </span>
+          <span>次</span>
+        </div>
       </div>
 
       <div class="px-3 py-5">

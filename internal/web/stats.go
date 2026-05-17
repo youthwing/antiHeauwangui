@@ -7,6 +7,21 @@ import (
 	"wangui/internal/store"
 )
 
+// GET /api/v1/platform-stats — tiny public-ish endpoint surfacing the
+// lifetime "wangui signed N times for everyone" counter shown in the user
+// sidebar. No auth: it's a flat number, not user-scoped data. Cached lightly
+// in the browser via no-store but with an implicit 60s app-level poll.
+func (h *handlers) platformStats(w http.ResponseWriter, r *http.Request) {
+	n, err := h.store.CountSuccessRecords(r.Context())
+	if err != nil {
+		// Don't fail the whole sidebar over a stats blip — return 0 so
+		// the chip just shows nothing for a moment.
+		writeJSON(w, http.StatusOK, map[string]any{"totalSigns": 0})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"totalSigns": n})
+}
+
 // stats computes per-user sign-in aggregates: current/longest streak, the
 // in-progress month's signed-vs-expected count, and lifetime success/failure
 // totals. Everything is derived on-the-fly from sign_records — no extra

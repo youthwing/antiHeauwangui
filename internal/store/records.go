@@ -120,6 +120,19 @@ ORDER BY r.occurred_at DESC LIMIT ?
 	return out, rows.Err()
 }
 
+// CountSuccessRecords returns the lifetime count of records the scheduler
+// actually completed a fresh sign for (status="success"). Used for the
+// "已为全站用户签到 N 次" tagline in the user sidebar — we count only true
+// successes, not "already signed" (which means we tried but the user
+// had already signed manually). Cheap query — single COUNT.
+func (s *Store) CountSuccessRecords(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sign_records WHERE status = 'success'`,
+	).Scan(&n)
+	return n, err
+}
+
 // CountTodayRecords groups today's records by status for the admin dashboard.
 func (s *Store) CountTodayRecords(ctx context.Context) (map[string]int, error) {
 	today := time.Now()

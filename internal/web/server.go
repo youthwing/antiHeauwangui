@@ -58,6 +58,9 @@ func (s *Server) Run(ctx context.Context) error {
 		// them through /me-scoped sessions, but we don't need auth on the
 		// list itself — the data is non-sensitive (admin-authored notices).
 		r.Get("/announcements", h.listAnnouncements)
+		// Lifetime success-sign counter for the user sidebar's brag chip.
+		// Single number; no sensitive fields.
+		r.Get("/platform-stats", h.platformStats)
 
 		// User endpoints
 		r.Group(func(r chi.Router) {
