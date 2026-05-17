@@ -77,6 +77,11 @@ type User struct {
 	// token starts the warning cycle over.
 	TokenWarnedAt int64
 
+	// SkipDates is a JSON array of "YYYY-MM-DD" strings the user has marked
+	// "I won't be on campus" — scheduler skips those dates silently. Used
+	// for the Dashboard "今晚不在校" button to avoid the谎报位置 risk.
+	SkipDates string
+
 	PinHash []byte // bcrypt hash of the 4–6 digit login PIN; nil = no PIN set
 
 	CreatedAt time.Time
@@ -92,6 +97,7 @@ const userColumns = `user_id, user_name, user_number, user_section, user_class,
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
   server_chan_key, server_chan_enabled, token_warned_at,
+  skip_dates,
   created_at, updated_at`
 
 // UpsertUser inserts a new user or updates identity + token of an existing one.
@@ -128,6 +134,9 @@ func (s *Store) UpsertUser(ctx context.Context, u *User) error {
 	if u.SignDates == "" {
 		u.SignDates = "[]"
 	}
+	if u.SkipDates == "" {
+		u.SkipDates = "[]"
+	}
 	var expiresAt any
 	if u.ExpiresAt != nil {
 		expiresAt = u.ExpiresAt.Unix()
@@ -142,8 +151,9 @@ INSERT INTO users (
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
   server_chan_key, server_chan_enabled, token_warned_at,
+  skip_dates,
   created_at, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(user_id) DO UPDATE SET
   user_name        = excluded.user_name,
   user_number      = excluded.user_number,
@@ -165,6 +175,7 @@ ON CONFLICT(user_id) DO UPDATE SET
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
 		boolInt(u.IsGuest), u.GuestLabel, u.SignDates, expiresAt,
 		u.ServerChanKey, boolInt(u.ServerChanEnabled), u.TokenWarnedAt,
+		u.SkipDates,
 		u.CreatedAt.Unix(), u.UpdatedAt.Unix())
 	return err
 }
@@ -200,6 +211,7 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 		&u.NotifyEmail, &notifyEnabled, &u.SignDays,
 		&isGuest, &u.GuestLabel, &u.SignDates, &expiresAt,
 		&u.ServerChanKey, &serverChanEnabled, &u.TokenWarnedAt,
+		&u.SkipDates,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -333,6 +345,19 @@ UPDATE users SET
   updated_at      = ?
 WHERE user_id = ?
 `, enc, exp.Unix(), time.Now().Unix(), userID)
+	return err
+}
+
+// UpdateSkipDates replaces the user's skip-dates JSON list. Caller validates
+// the date strings; we store whatever is passed (with a trivial guard
+// against empty string).
+func (s *Store) UpdateSkipDates(ctx context.Context, userID, skipDatesJSON string) error {
+	if skipDatesJSON == "" {
+		skipDatesJSON = "[]"
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET skip_dates = ?, updated_at = ? WHERE user_id = ?`,
+		skipDatesJSON, time.Now().Unix(), userID)
 	return err
 }
 

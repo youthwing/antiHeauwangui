@@ -102,6 +102,16 @@ export const api = {
   dorms: () => request<Dorm[]>('/dorms'),
   signNow: () =>
     request<{ status: string; message: string }>('/sign-now', { method: 'POST' }),
+  // Toggle today (or `date`) in the user's skip-dates list. Used by the
+  // Dashboard "今晚不在校" button. Server prunes expired entries.
+  skipToday: (date?: string) =>
+    request<{ ok: boolean; skipDates: string[]; toggled: string; action: 'skipped' | 'unskipped' }>(
+      '/skip-today',
+      {
+        method: 'POST',
+        body: JSON.stringify(date ? { date } : {}),
+      },
+    ),
   // Push a test message via the user's currently SAVED Server酱 SendKey.
   // Returns 502 with upstream error if the SendKey is invalid.
   testServerChan: () =>

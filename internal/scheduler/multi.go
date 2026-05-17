@@ -56,6 +56,7 @@ func (m *Multi) Start(ctx context.Context) {
 	go m.guestCleanupLoop(ctx)
 	go m.tokenWarnLoop(ctx)
 	go m.rulesWatchLoop(ctx)
+	go m.weeklyDigestLoop(ctx)
 }
 
 // TokenWarnThreshold is the "send warning" cutoff. Anything inside this
@@ -168,6 +169,124 @@ func (m *Multi) runRulesWatchSweep(ctx context.Context) {
 	m.log.Info("rules-watch: changed, dispatching", "rules", len(rules))
 	m.notifier.DispatchRulesChanged(rules, prev, string(current))
 	m.publish(events.TypeRulesChanged, map[string]any{"count": len(rules)})
+}
+
+// weeklyDigestLoop fires every Sunday at 21:00 (an hour before the sign
+// window). Each active non-guest user gets a short "本周战绩" email +
+// Server酱 push: how many days they signed, how many failed, and where
+// they are on their streak. Admin also gets an aggregate digest so they
+// see the system's overall week at a glance.
+func (m *Multi) weeklyDigestLoop(ctx context.Context) {
+	for {
+		next := nextWeeklyDigestTime(time.Now())
+		m.log.Info("weekly-digest armed", "next", next.Format(time.RFC3339))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Until(next)):
+		}
+		m.runWeeklyDigestSweep(ctx)
+	}
+}
+
+func nextWeeklyDigestTime(now time.Time) time.Time {
+	// Next Sunday 21:00 local. If today is Sunday before 21:00, fire today.
+	today := time.Date(now.Year(), now.Month(), now.Day(), 21, 0, 0, 0, now.Location())
+	daysUntilSunday := (7 - int(now.Weekday())) % 7 // Sunday=0
+	if daysUntilSunday == 0 && today.After(now) {
+		return today
+	}
+	if daysUntilSunday == 0 {
+		daysUntilSunday = 7
+	}
+	return today.AddDate(0, 0, daysUntilSunday)
+}
+
+func (m *Multi) runWeeklyDigestSweep(ctx context.Context) {
+	users, err := m.store.ListUsers(ctx, store.UserListFilter{Limit: 500})
+	if err != nil {
+		m.log.Error("weekly-digest list users", "err", err.Error())
+		return
+	}
+	now := time.Now()
+	weekStart := now.AddDate(0, 0, -7)
+	sent := 0
+	for _, u := range users {
+		if u.IsGuest || u.IsDisabled {
+			continue
+		}
+		recs, err := m.store.ListRecordsBetween(ctx, u.UserID, weekStart, now)
+		if err != nil {
+			continue
+		}
+		stats := computeWeeklyStats(recs, weekStart, now)
+		m.notifier.DispatchWeeklyDigest(u, notify.WeeklyStats{
+			From:          stats.From,
+			To:            stats.To,
+			DaysSigned:    stats.DaysSigned,
+			DaysFailed:    stats.DaysFailed,
+			DaysSkipped:   stats.DaysSkipped,
+			TotalAttempts: stats.TotalAttempts,
+			BestDay:       stats.BestDay,
+			BestStatus:    stats.BestStatus,
+		})
+		sent++
+	}
+	m.log.Info("weekly-digest sweep done", "users", sent)
+}
+
+// WeeklyStats is the per-user summary the digest email + Server酱 receive.
+type WeeklyStats struct {
+	From         time.Time
+	To           time.Time
+	DaysSigned   int      // count of distinct days with success/already/exempt
+	DaysFailed   int      // distinct days with failed
+	DaysSkipped  int      // distinct days with skipped (or user marked skip)
+	TotalAttempts int     // raw record count
+	BestDay      string   // YYYY-MM-DD of fastest successful sign, "" if none
+	BestStatus   string   // best outcome status for BestDay
+}
+
+func computeWeeklyStats(recs []store.Record, from, to time.Time) WeeklyStats {
+	s := WeeklyStats{From: from, To: to, TotalAttempts: len(recs)}
+	bestByDay := map[string]string{}
+	for _, r := range recs {
+		key := r.OccurredAt.Format("2006-01-02")
+		if prev, ok := bestByDay[key]; !ok || statusRank(r.Status) > statusRank(prev) {
+			bestByDay[key] = r.Status
+		}
+	}
+	for day, st := range bestByDay {
+		switch st {
+		case "success", "already", "exempt":
+			s.DaysSigned++
+			if s.BestDay == "" || day > s.BestDay {
+				s.BestDay = day
+				s.BestStatus = st
+			}
+		case "failed":
+			s.DaysFailed++
+		case "skipped":
+			s.DaysSkipped++
+		}
+	}
+	return s
+}
+
+func statusRank(st string) int {
+	switch st {
+	case "success":
+		return 5
+	case "already":
+		return 4
+	case "exempt":
+		return 3
+	case "failed":
+		return 2
+	case "skipped":
+		return 1
+	}
+	return 0
 }
 
 func (m *Multi) runTokenWarnSweep(ctx context.Context) {
@@ -326,6 +445,12 @@ func (m *Multi) runForUser(ctx context.Context, userID string, deadline time.Tim
 	} else {
 		if !isSignDay(u.SignDays, time.Now()) {
 			m.log.Info("skip non-sign-day", "user", userID, "sign_days", u.SignDays)
+			return
+		}
+		// User-driven "我不在校" skip list: highest-priority opt-out.
+		// Avoids the谎报位置 risk when the user is genuinely off-campus.
+		if isSignDate(u.SkipDates, time.Now()) {
+			m.log.Info("skip user-marked off-campus", "user", userID)
 			return
 		}
 	}

@@ -16,6 +16,9 @@ import {
   CalendarCheck,
   TrendingUp,
   Trophy,
+  ExternalLink,
+  CalendarX,
+  CalendarCheck2,
 } from 'lucide-vue-next'
 import type { SignRecord, UserStats } from '../types'
 import { useAuth } from '../stores/auth'
@@ -158,6 +161,36 @@ const untilMySign = computed(() => {
   const totalMin = Math.floor(ms / 60000)
   return { h: Math.floor(totalMin / 60), m: totalMin % 60, totalMin }
 })
+
+const todayDateStr = computed(() => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})
+const isSkippedToday = computed(() =>
+  Array.isArray(me.value?.settings.skipDates) &&
+  me.value!.settings.skipDates!.includes(todayDateStr.value),
+)
+const skippingToday = ref(false)
+
+async function toggleSkipToday() {
+  if (skippingToday.value) return
+  const turningOn = !isSkippedToday.value
+  if (turningOn && !confirm(
+    '确定今晚不在校吗？\n\n勾上后 wangui 不会替你签到 —— 防止「人不在校但脚本签到」=谎报位置=违纪。\n\n再点一次可以取消。',
+  )) {
+    return
+  }
+  skippingToday.value = true
+  try {
+    await api.skipToday()
+    await auth.refresh()
+    showToast('ok', turningOn ? '今晚已跳过 · 不会自动签' : '已恢复今晚自动签')
+  } catch (e: any) {
+    showToast('err', e.message || '操作失败')
+  } finally {
+    skippingToday.value = false
+  }
+}
 
 // Notification-channel summary, surfaced as a chip in the hero so the user
 // remembers what they will/won't get pinged on. Reads only the boolean flags
@@ -572,8 +605,9 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
       </RouterLink>
     </div>
 
-    <!-- Action row -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <!-- Action row — 4 buttons: 立即签到 / 今晚跳过 / 配置 / 跳学校 H5 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <!-- 立即签到 -->
       <button
         @click="signNow"
         :disabled="signing"
@@ -587,6 +621,34 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         <p class="text-xs text-emerald-400/70 mt-0.5">在窗口期内手动触发一次</p>
       </button>
 
+      <!-- Z 今晚跳过 / 恢复 -->
+      <button
+        @click="toggleSkipToday"
+        :disabled="skippingToday"
+        class="group rounded-xl ring-1 p-4 text-left transition-all disabled:opacity-50"
+        :class="isSkippedToday
+          ? 'bg-amber-500/10 hover:bg-amber-500/15 ring-amber-500/30 hover:ring-amber-500/50'
+          : 'bg-white/85 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-900 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-amber-500/30'"
+        :title="isSkippedToday ? '点击恢复今晚自动签' : '今晚不在校时点这里，wangui 会跳过签到，避免谎报位置'"
+      >
+        <div class="flex items-start justify-between mb-2">
+          <component
+            :is="isSkippedToday ? CalendarX : CalendarCheck2"
+            class="w-5 h-5"
+            :class="isSkippedToday ? 'text-amber-400' : 'text-zinc-500 dark:text-zinc-400'"
+          />
+          <ArrowRight class="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
+            :class="isSkippedToday ? 'text-amber-400/60' : 'text-zinc-500/60'" />
+        </div>
+        <p class="font-semibold text-base" :class="isSkippedToday ? 'text-amber-300' : ''">
+          {{ isSkippedToday ? '今晚已跳过' : '今晚不在校' }}
+        </p>
+        <p class="text-xs mt-0.5" :class="isSkippedToday ? 'text-amber-400/70' : 'text-zinc-500'">
+          {{ isSkippedToday ? '点击恢复 · 今晚不签' : '点这里 · 今晚不替你签到' }}
+        </p>
+      </button>
+
+      <!-- 配置 -->
       <RouterLink
         to="/settings"
         class="group rounded-xl bg-white/85 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-900 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-4 text-left transition-all block"
@@ -600,6 +662,22 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
           {{ me.settings.latitude !== 0 ? '已配置' : '⚠ 未配置坐标' }}
         </p>
       </RouterLink>
+
+      <!-- AF 跳学校 H5 (兜底通道) -->
+      <a
+        href="https://xhbcs.henau.edu.cn"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="group rounded-xl bg-white/85 dark:bg-zinc-900/60 hover:bg-blue-500/[0.08] ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-blue-500/40 p-4 text-left transition-all block"
+        title="跳学校晚归 H5（应急 / 手动签到通道）"
+      >
+        <div class="flex items-start justify-between mb-2">
+          <ExternalLink class="w-5 h-5 text-blue-400" />
+          <ArrowRight class="w-4 h-4 text-zinc-500 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+        <p class="font-semibold text-base">学校晚归页</p>
+        <p class="text-xs text-zinc-500 mt-0.5">应急 · 手动签到通道</p>
+      </a>
     </div>
 
     <!-- Recent records preview -->

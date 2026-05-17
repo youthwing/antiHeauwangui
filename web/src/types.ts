@@ -44,6 +44,10 @@ export interface Settings {
   // 7-bit bitmask of which weekdays to auto-sign on.
   // bit 0 = Mon, bit 1 = Tue, … bit 5 = Sat, bit 6 = Sun. 127 = every day.
   signDays: number
+  // YYYY-MM-DD list of dates the user has explicitly opted out of (e.g.
+  // "我今晚不在校"). Scheduler skips these silently — no failure record.
+  // Server prunes past dates whenever the list is updated.
+  skipDates?: string[]
 }
 
 export interface SmtpConfig {

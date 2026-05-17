@@ -373,10 +373,23 @@ func renderSignEmail(u *store.User, res SignResult) (subject, text, html string)
 		color = "#71717a"
 	}
 	when := time.Now().Format("2006-01-02 15:04:05")
+	tagline := taglineForSign(res.Status)
 
 	subject = fmt.Sprintf("[勿外传] %s · %s", label, u.UserName)
 	text = fmt.Sprintf("姓名：%s\n学号：%s\n结果：%s\n说明：%s\n时间：%s\n",
 		u.UserName, u.UserNumber, label, res.Message, when)
+	if tagline != "" {
+		text = text + "\n— " + tagline + "\n"
+	}
+	// Build the tagline HTML node only when we have one, so the email
+	// doesn't have a hanging empty <em> for skipped/unknown statuses.
+	taglineHTML := ""
+	if tagline != "" {
+		taglineHTML = fmt.Sprintf(
+			`<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #e5e7eb;font-size:12px;color:#71717a;font-style:italic;">— %s</div>`,
+			tagline,
+		)
+	}
 	html = fmt.Sprintf(`<!doctype html><html><body style="font-family: -apple-system,Segoe UI,sans-serif; background:#fafafa; padding:24px; color:#18181b;">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
   <div style="padding:18px 22px;background:%s;color:#fff;">
@@ -388,13 +401,14 @@ func renderSignEmail(u *store.User, res SignResult) (subject, text, html string)
     <div><strong style="color:#71717a;">学号</strong>　%s</div>
     <div><strong style="color:#71717a;">时间</strong>　%s</div>
     <div style="margin-top:10px;padding:10px 12px;background:#f4f4f5;border-radius:8px;font-size:13px;color:#3f3f46;">%s</div>
+    %s
   </div>
   <div style="padding:12px 22px;font-size:11px;color:#a1a1aa;background:#fafafa;border-top:1px solid #e5e7eb;">
     勿外传 · 仅内部使用 · 自动发送，请勿回复
   </div>
 </div>
 </body></html>`,
-		color, label, u.UserName, u.UserNumber, when, res.Message)
+		color, label, u.UserName, u.UserNumber, when, res.Message, taglineHTML)
 	return
 }
 
@@ -423,6 +437,7 @@ func renderSignServerChan(u *store.User, res SignResult) (title, body string) {
 		"**结果**：%s\n\n**姓名**：%s\n\n**学号**：`%s`\n\n**说明**：%s\n\n**时间**：%s",
 		label, u.UserName, u.UserNumber, nonBlank(res.Message, "—"), when,
 	)
+	body = withTagline(body, taglineForSign(res.Status))
 	return
 }
 
@@ -464,6 +479,7 @@ func renderTokenWarnServerChan(u *store.User, hoursLeft int) (title, body string
 		"**姓名**：%s\n\n**学号**：`%s`\n\n**剩余**：%s\n\n**到期**：%s\n\n请尽快打开 wangui 「账号」页重新扫码刷新，否则将无法自动签到。",
 		u.UserName, u.UserNumber, human, u.TokenExp.Format("2006-01-02 15:04"),
 	)
+	body = withTagline(body, taglineForTokenWarn())
 	return
 }
 

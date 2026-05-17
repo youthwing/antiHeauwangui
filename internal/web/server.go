@@ -74,6 +74,7 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/stats", h.stats)
 			r.Get("/dorms", h.listDorms)
 			r.Post("/sign-now", h.signNow)
+			r.Post("/skip-today", h.skipToday)
 			r.Post("/notify/test-serverchan", h.testServerChan)
 			r.Post("/logout", h.logout)
 			r.Delete("/me", h.deleteMe)

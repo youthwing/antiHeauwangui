@@ -328,6 +328,8 @@ func meDTO(u *store.User) map[string]any {
 }
 
 func settingsDTO(u *store.User) map[string]any {
+	skipDates := []string{}
+	_ = json.Unmarshal([]byte(u.SkipDates), &skipDates)
 	return map[string]any{
 		"autoSign":          u.AutoSign,
 		"dormId":            u.DormID,
@@ -349,7 +351,72 @@ func settingsDTO(u *store.User) map[string]any {
 		"signDays":          u.SignDays,
 		"serverChanKeySet":  u.ServerChanKey != "",
 		"serverChanEnabled": u.ServerChanEnabled,
+		"skipDates":         skipDates,
 	}
+}
+
+// POST /api/v1/skip-today — toggle today's date in the user's skip_dates
+// JSON list. Idempotent: calling it twice in a row enables then disables.
+// Body optional; if absent, defaults to today.
+//
+// Why a dedicated endpoint instead of going through /settings: the action
+// is "skip just tonight" — a single button on Dashboard. Wrapping it in
+// the full settings PUT makes the UI weird, and we get a chance to clean
+// up past skip dates while we're at it.
+func (h *handlers) skipToday(w http.ResponseWriter, r *http.Request) {
+	uid := userIDOf(r)
+	u, err := h.store.GetUser(r.Context(), uid)
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	var req struct {
+		Date string `json:"date"` // optional; default today
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	loc := time.Now().Location()
+	target := time.Now().In(loc).Format("2006-01-02")
+	if req.Date != "" {
+		if _, err := time.ParseInLocation("2006-01-02", req.Date, loc); err == nil {
+			target = req.Date
+		}
+	}
+
+	var dates []string
+	_ = json.Unmarshal([]byte(u.SkipDates), &dates)
+	// Drop entries older than today — keeps the list bounded.
+	today := time.Now().In(loc).Format("2006-01-02")
+	pruned := make([]string, 0, len(dates))
+	toggledOff := false
+	for _, d := range dates {
+		if d < today {
+			continue // expired
+		}
+		if d == target {
+			toggledOff = true
+			continue // toggle removes
+		}
+		pruned = append(pruned, d)
+	}
+	action := "skipped"
+	if !toggledOff {
+		pruned = append(pruned, target)
+		action = "skipped"
+	} else {
+		action = "unskipped"
+	}
+	raw, _ := json.Marshal(pruned)
+	if err := h.store.UpdateSkipDates(r.Context(), uid, string(raw)); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存失败")
+		return
+	}
+	h.log.Info("skip-date toggled", "user", uid, "date", target, "action", action)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":        true,
+		"skipDates": pruned,
+		"toggled":   target,
+		"action":    action,
+	})
 }
 
 // ---------- GET /api/v1/dorms ----------

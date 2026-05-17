@@ -166,6 +166,10 @@ CREATE TABLE IF NOT EXISTS dorm_locations (
 		// Last time a token-expiry warning was sent for the current token.
 		// Reset to 0 on UpdateToken so each token cycle warns at most once.
 		{"users", "token_warned_at", "INTEGER NOT NULL DEFAULT 0"},
+		// User-driven "I won't be on campus" skip list. JSON array of
+		// YYYY-MM-DD strings. Scheduler treats any date in the list as
+		// "skip silently" — no sign attempt, no failure record.
+		{"users", "skip_dates", "TEXT NOT NULL DEFAULT '[]'"},
 		{"dorm_locations", "send_address_fields", "INTEGER NOT NULL DEFAULT 0"},
 		{"web_sessions", "is_admin", "INTEGER NOT NULL DEFAULT 0"},
 	}
