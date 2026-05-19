@@ -233,15 +233,15 @@ const previewSchedule = computed(() => {
     </header>
 
     <!-- Section 1: 自动签到 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-4 gap-3">
         <div class="flex items-center gap-2">
           <Power class="w-4 h-4 text-zinc-500" />
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">自动签到</h2>
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">自动签到</h2>
         </div>
         <button
           @click="toggleAutoSign"
-          :class="form.autoSign ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+          :class="form.autoSign ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
           class="relative w-11 h-6 rounded-full transition-colors"
         >
           <span
@@ -257,7 +257,7 @@ const previewSchedule = computed(() => {
       </p>
 
       <!-- Sign-day schedule (which weekdays to auto-sign on) -->
-      <div class="mb-5 p-3 rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04]">
+      <div class="mb-5 p-3 rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04]">
         <div class="flex items-center justify-between mb-3 gap-2">
           <span class="text-[10px] text-zinc-500 tracking-wide uppercase">签到日期</span>
           <div class="flex gap-1">
@@ -265,24 +265,24 @@ const previewSchedule = computed(() => {
               type="button"
               @click="applyPreset(PRESETS.every)"
               :class="activePreset === 'every'
-                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-                : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'"
+                ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/30'
+                : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-[#161b22] dark:hover:text-zinc-200'"
               class="text-[11px] px-2.5 py-1 rounded-md transition-colors"
             >每天</button>
             <button
               type="button"
               @click="applyPreset(PRESETS.weekday)"
               :class="activePreset === 'weekday'
-                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-                : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'"
+                ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/30'
+                : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-[#161b22] dark:hover:text-zinc-200'"
               class="text-[11px] px-2.5 py-1 rounded-md transition-colors"
             >工作日</button>
             <button
               type="button"
               @click="applyPreset(PRESETS.weekend)"
               :class="activePreset === 'weekend'
-                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-                : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'"
+                ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/30'
+                : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-[#161b22] dark:hover:text-zinc-200'"
               class="text-[11px] px-2.5 py-1 rounded-md transition-colors"
             >周末</button>
           </div>
@@ -295,8 +295,8 @@ const previewSchedule = computed(() => {
             type="button"
             @click="toggleDay(i)"
             :class="hasDay(form.signDays, i)
-              ? 'bg-emerald-500 text-zinc-950 ring-1 ring-emerald-400 shadow-[0_0_0_2px_rgba(16,185,129,0.15)]'
-              : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-500 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'"
+              ? 'bg-red-500 text-[#0d1117] ring-1 ring-red-400 shadow-[0_0_0_2px_rgba(16,185,129,0.15)]'
+              : 'bg-zinc-200/60 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-500 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-[#161b22] dark:hover:text-zinc-200'"
             class="py-1.5 rounded-md text-xs font-medium transition-all"
           >{{ label }}</button>
         </div>
@@ -317,44 +317,44 @@ const previewSchedule = computed(() => {
         <button
           type="button"
           @click="showScheduleFaq = !showScheduleFaq"
-          class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+          class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-red-400 transition-colors inline-flex items-center gap-1"
         >
           <span>ⓘ 这 4 个数字啥意思？</span>
           <span class="text-zinc-600">{{ showScheduleFaq ? '收起' : '展开看说明' }}</span>
         </button>
         <Transition name="expand">
-          <div v-if="showScheduleFaq" class="mt-2 rounded-lg bg-blue-500/[0.05] ring-1 ring-blue-500/20 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-2.5 overflow-hidden">
+          <div v-if="showScheduleFaq" class="mt-2 rounded-lg bg-sky-500/[0.05] ring-1 ring-sky-500/20 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-2.5 overflow-hidden">
             <p>
               系统每天 22:00 整点醒来，但不会让所有用户都在 22:00:00 这一秒同时签到 —— 那样 5 个学号同 IP 集中发请求会很显眼，且每天看你都"卡在 22:00 没结果"也会焦虑。下面 4 个参数控制具体的延迟。
             </p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
               <div>
-                <p class="text-emerald-300 font-medium">首次触发分钟</p>
+                <p class="text-red-300 font-medium">首次触发分钟</p>
                 <p class="text-zinc-500 mt-0.5">
                   从 22:00 起再等几分钟。<strong>激活账号时系统已为你随机分配过一次（0–27 分钟）</strong>，每个用户不同。你的当前值意味着每天大约 22:{{ String(form.triggerMinute).padStart(2, '0') }} 左右签。
                 </p>
               </div>
               <div>
-                <p class="text-emerald-300 font-medium">抖动秒数</p>
+                <p class="text-red-300 font-medium">抖动秒数</p>
                 <p class="text-zinc-500 mt-0.5">
                   在上面那个分钟基础上，再随机往后推 0–{{ form.jitterSec }} 秒。每天具体的"秒数"都不同，避免每天精确到秒的规律。
                 </p>
               </div>
               <div>
-                <p class="text-emerald-300 font-medium">重试次数</p>
+                <p class="text-red-300 font-medium">重试次数</p>
                 <p class="text-zinc-500 mt-0.5">
                   第一次签失败（网络问题 / 学校 API 抽风）后，再试几次。默认 3 次，4 次机会总共。
                 </p>
               </div>
               <div>
-                <p class="text-emerald-300 font-medium">重试间隔</p>
+                <p class="text-red-300 font-medium">重试间隔</p>
                 <p class="text-zinc-500 mt-0.5">
                   两次重试之间等几分钟。默认 5 分钟，配合"重试 3 次" = 最多覆盖 20 分钟（接近 22:30 截止）。
                 </p>
               </div>
             </div>
             <p class="text-zinc-500 mt-2">
-              <strong class="text-zinc-400">大白话总结</strong>：你的预定签到时刻 ≈ <span class="font-mono-token text-emerald-300">22:{{ String(form.triggerMinute).padStart(2, '0') }}</span>，实际可能再往后 0–{{ form.jitterSec }} 秒。如果你没动过这些参数，<strong>什么都不用改，默认很合理</strong>。
+              <strong class="text-zinc-400">大白话总结</strong>：你的预定签到时刻 ≈ <span class="font-mono-token text-red-300">22:{{ String(form.triggerMinute).padStart(2, '0') }}</span>，实际可能再往后 0–{{ form.jitterSec }} 秒。如果你没动过这些参数，<strong>什么都不用改，默认很合理</strong>。
             </p>
           </div>
         </Transition>
@@ -369,7 +369,7 @@ const previewSchedule = computed(() => {
             v-model.number="form.triggerMinute"
             type="number"
             min="0" max="29"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200"
           />
           <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">22:00 后多少分钟开始 · 0–29</p>
         </div>
@@ -381,7 +381,7 @@ const previewSchedule = computed(() => {
             v-model.number="form.jitterSec"
             type="number"
             min="0" max="600"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200"
           />
           <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">在上面时刻再加 0~N 秒随机</p>
         </div>
@@ -393,7 +393,7 @@ const previewSchedule = computed(() => {
             v-model.number="form.retryCount"
             type="number"
             min="0" max="5"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200"
           />
           <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">失败后再试几次 · 默认 3</p>
         </div>
@@ -405,13 +405,13 @@ const previewSchedule = computed(() => {
             v-model.number="form.retryGapMin"
             type="number"
             min="1" max="15"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200"
           />
           <p class="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">两次重试之间等几分钟</p>
         </div>
       </div>
 
-      <div class="mt-5 p-3 rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04]">
+      <div class="mt-5 p-3 rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04]">
         <div class="flex items-center gap-2 mb-2">
           <Clock class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[10px] text-zinc-500 tracking-wide uppercase">本配置下的尝试时刻</span>
@@ -421,7 +421,7 @@ const previewSchedule = computed(() => {
             v-for="(t, i) in previewSchedule"
             :key="t"
             class="px-2 py-0.5 rounded text-xs font-mono-token tabular-nums"
-            :class="i === 0 ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
+            :class="i === 0 ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/30' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
           >
             {{ t }}<span v-if="i === 0" class="ml-1 text-[9px] opacity-70">主</span>
           </span>
@@ -431,7 +431,7 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 2: 我的宿舍楼 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <Building2 class="w-4 h-4 text-zinc-500" />
         <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">我的宿舍楼</h2>
@@ -451,7 +451,7 @@ const previewSchedule = computed(() => {
               :value="form.dormId ?? ''"
               @change="(e: any) => selectDorm(e.target.value ? Number(e.target.value) : null)"
               :disabled="savingDorm || loadingDorms || dorms.length === 0"
-              class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-sm focus-ring text-zinc-900 dark:text-zinc-200 appearance-none cursor-pointer disabled:opacity-50"
+              class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-sm focus-ring text-[#161b22] dark:text-zinc-200 appearance-none cursor-pointer disabled:opacity-50"
             >
               <option value="">
                 {{ dorms.length === 0 ? '管理员还没有添加宿舍楼' : '— 请选择 —' }}
@@ -466,18 +466,18 @@ const previewSchedule = computed(() => {
         <!-- Current selection card -->
         <div
           v-if="currentDorm"
-          class="rounded-lg bg-emerald-500/[0.07] ring-1 ring-emerald-500/25 p-4"
+          class="rounded-lg bg-red-500/[0.07] ring-1 ring-red-500/25 p-4"
         >
           <div class="flex items-start gap-3">
-            <MapPin class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <MapPin class="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-emerald-200">{{ currentDorm.name }}</p>
-              <p class="text-xs text-emerald-400/70 mt-1 break-all">
+              <p class="text-sm font-medium text-red-200">{{ currentDorm.name }}</p>
+              <p class="text-xs text-red-400/70 mt-1 break-all">
                 {{ currentDorm.address || '未配置地址' }}
               </p>
-              <p class="text-[10px] text-emerald-400/50 mt-1.5 font-mono-token tabular-nums">
+              <p class="text-[10px] text-red-400/50 mt-1.5 font-mono-token tabular-nums">
                 {{ currentDorm.latitude.toFixed(6) }}, {{ currentDorm.longitude.toFixed(6) }}
-                <span class="ml-1 text-emerald-400/30">(WGS84)</span>
+                <span class="ml-1 text-red-400/30">(WGS84)</span>
               </p>
             </div>
           </div>
@@ -500,15 +500,15 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 3: 邮件通知 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-4 gap-3">
         <div class="flex items-center gap-2">
           <Mail class="w-4 h-4 text-zinc-500" />
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">邮件通知</h2>
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">邮件通知</h2>
         </div>
         <button
           @click="form.notifyEnabled = !form.notifyEnabled"
-          :class="form.notifyEnabled ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+          :class="form.notifyEnabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
           class="relative w-11 h-6 rounded-full transition-colors"
         >
           <span
@@ -526,7 +526,7 @@ const previewSchedule = computed(() => {
         type="email"
         placeholder="you@example.com"
         :disabled="!form.notifyEnabled"
-        class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
+        class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
       />
       <p class="text-[11px] text-zinc-500 mt-2">
         只在自动签到的「最终结果」时发一封；手动「立即签到」不发邮件。
@@ -534,15 +534,15 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 3.5: Server酱 微信推送 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-3 gap-3">
         <div class="flex items-center gap-2">
           <Bell class="w-4 h-4 text-zinc-500" />
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">Server 酱 (微信推送)</h2>
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">Server 酱 (微信推送)</h2>
         </div>
         <button
           @click="serverChanEnabled = !serverChanEnabled"
-          :class="serverChanEnabled ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+          :class="serverChanEnabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
           class="relative w-11 h-6 rounded-full transition-colors shrink-0"
         >
           <span
@@ -559,7 +559,7 @@ const previewSchedule = computed(() => {
       <button
         type="button"
         @click="showServerChanFaq = !showServerChanFaq"
-        class="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors mb-2"
+        class="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors mb-2"
       >
         <HelpCircle class="w-3.5 h-3.5" />
         {{ showServerChanFaq ? '收起说明' : '什么是 Server 酱 / SendKey 在哪拿？' }}
@@ -567,15 +567,15 @@ const previewSchedule = computed(() => {
       <Transition name="expand">
         <div
           v-if="showServerChanFaq"
-          class="rounded-lg bg-zinc-100 dark:bg-zinc-950/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-3 mb-3 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-2"
+          class="rounded-lg bg-zinc-100 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-3 mb-3 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-2"
         >
           <p>
-            <strong class="text-zinc-900 dark:text-zinc-200">Server 酱（方糖）</strong> 是一个免费的「程序→微信」推送服务。配置后，wangui 在
+            <strong class="text-[#161b22] dark:text-zinc-200">Server 酱（方糖）</strong> 是一个免费的「程序→微信」推送服务。配置后，wangui 在
             发生事件时（签到成功 / 失败 / Token 快过期）会调它的接口，你的微信就能立即收到通知。
           </p>
           <ol class="list-decimal pl-5 space-y-1">
-            <li>访问 <code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">sct.ftqq.com</code>，用微信扫码登录</li>
-            <li>登录后在「SendKey」页面看到形如 <code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">SCT123...AbCdEf</code> 的字符串</li>
+            <li>访问 <code class="bg-white/70 dark:bg-[#161b22]/70 px-1 rounded font-mono-token">sct.ftqq.com</code>，用微信扫码登录</li>
+            <li>登录后在「SendKey」页面看到形如 <code class="bg-white/70 dark:bg-[#161b22]/70 px-1 rounded font-mono-token">SCT123...AbCdEf</code> 的字符串</li>
             <li>把这串 SendKey 粘到下面输入框 → 打开开关 → 保存配置 → 点「发测试推送」</li>
             <li>微信收到「Server 酱测试推送」即成功</li>
           </ol>
@@ -584,7 +584,7 @@ const previewSchedule = computed(() => {
             sctp 前缀的 key 自动走 Server 酱³ 的 push.ft07.com。
           </p>
           <p>
-            <strong class="text-zinc-900 dark:text-zinc-200">隐私</strong>：SendKey 等同于「允许任何人给你的微信发消息」，
+            <strong class="text-[#161b22] dark:text-zinc-200">隐私</strong>：SendKey 等同于「允许任何人给你的微信发消息」，
             不要分享给别人。wangui 把它<strong>加密存储</strong>，从不在网页上回显，只在发送时取出使用。
           </p>
         </div>
@@ -594,7 +594,7 @@ const previewSchedule = computed(() => {
         <span>SendKey</span>
         <span
           v-if="serverChanKeySet && !serverChanKey"
-          class="text-emerald-600 dark:text-emerald-400 normal-case tracking-normal"
+          class="text-red-600 dark:text-red-400 normal-case tracking-normal"
         >
           ✓ 已设置，留空保持不变
         </span>
@@ -606,12 +606,12 @@ const previewSchedule = computed(() => {
           :placeholder="serverChanKeySet ? '保持不变（输入新值才覆盖）' : 'SCT... 或 sctp...'"
           :disabled="!serverChanEnabled && !serverChanKeySet"
           autocomplete="off"
-          class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 pr-10 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token disabled:opacity-50"
+          class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 pr-10 text-sm focus-ring text-[#161b22] dark:text-zinc-200 font-mono-token disabled:opacity-50"
         />
         <button
           @click="showServerChanKey = !showServerChanKey"
           type="button"
-          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-100"
         >
           <component :is="showServerChanKey ? EyeOff : Eye" class="w-3.5 h-3.5" />
         </button>
@@ -626,7 +626,7 @@ const previewSchedule = computed(() => {
           @click="testServerChanPush"
           :disabled="testingServerChan || !serverChanKeySet"
           :title="serverChanKeySet ? '使用已保存的 SendKey 发一条' : '请先保存 SendKey'"
-          class="inline-flex items-center gap-1.5 bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-blue-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+          class="inline-flex items-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
         >
           <Send class="w-3 h-3" :class="testingServerChan ? 'wangui-spin' : ''" />
           {{ testingServerChan ? '推送中…' : '发测试推送' }}
@@ -635,10 +635,10 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 4: 设备信息 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <Smartphone class="w-4 h-4 text-zinc-500" />
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">设备信息</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">设备信息</h2>
       </div>
       <p class="text-xs text-zinc-500 leading-relaxed mb-4">
         会随签到请求一起发送，让后端审计看起来像真实手机签到。
@@ -647,7 +647,7 @@ const previewSchedule = computed(() => {
         <div>
           <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">deviceModel</label>
           <select v-model="form.deviceModel"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200">
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200">
             <option value="iPhone">iPhone</option>
             <option value="Android">Android</option>
           </select>
@@ -655,7 +655,7 @@ const previewSchedule = computed(() => {
         <div>
           <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">deviceSystem</label>
           <select v-model="form.deviceSystem"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200">
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200">
             <option value="iOS">iOS</option>
             <option value="Android">Android</option>
           </select>
@@ -675,7 +675,7 @@ const previewSchedule = computed(() => {
       <button
         @click="saveAll"
         :disabled="saving"
-        class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-semibold px-5 py-2 rounded-xl transition-colors inline-flex items-center gap-1.5 shadow-[0_8px_20px_-8px_rgba(16,185,129,0.5)]"
+        class="bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-semibold px-5 py-2 rounded-xl transition-colors inline-flex items-center gap-1.5 shadow-[0_8px_20px_-8px_rgba(16,185,129,0.5)]"
       >
         <Save class="w-3.5 h-3.5" />
         {{ saving ? '保存中…' : '保存配置' }}

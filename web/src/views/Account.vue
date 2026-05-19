@@ -194,17 +194,17 @@ async function logout() {
     <!-- Token 状态 -->
     <section
       ref="tokenSectionRef"
-      :class="tokenPrefilledFlash ? 'ring-emerald-500/60 shadow-[0_0_24px_rgba(16,185,129,0.25)]' : 'ring-black/[0.08] dark:ring-white/[0.06]'"
-      class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 p-5 transition-shadow duration-300"
+      :class="tokenPrefilledFlash ? 'ring-red-500/60 shadow-[0_0_24px_rgba(16,185,129,0.25)]' : 'ring-black/[0.08] dark:ring-white/[0.06]'"
+      class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 p-5 transition-shadow duration-300"
     >
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
           <KeyRound class="w-4 h-4 text-zinc-500" />
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">学校 Token</h2>
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">学校 Token</h2>
         </div>
         <span
           v-if="me.token.isValid"
-          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/15 text-red-400 ring-1 ring-red-500/30"
         >
           <CheckCircle2 class="w-3 h-3" />
           有效
@@ -251,14 +251,14 @@ async function logout() {
           <Transition name="fade">
             <span
               v-if="tokenPrefilledFlash"
-              class="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium"
+              class="inline-flex items-center gap-1 text-[11px] text-red-400 font-medium"
             >
               <CheckCircle2 class="w-3 h-3" />
               已自动填入待更新的 JWT
             </span>
           </Transition>
         </div>
-        <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+        <div class="rounded-xl bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
           <div class="flex flex-col sm:flex-row gap-4">
             <div class="shrink-0 self-center sm:self-start">
               <div class="w-36 h-36 rounded-xl bg-white ring-1 ring-black/[0.06] p-2 flex items-center justify-center overflow-hidden">
@@ -283,7 +283,7 @@ async function logout() {
                 <button
                   type="button"
                   @click="copyWechatUrl"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-red-500/40 transition-colors"
                 >
                   <Copy class="w-3 h-3" />
                   复制授权链接
@@ -291,7 +291,7 @@ async function logout() {
                 <button
                   type="button"
                   @click="refreshWechatQr"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-red-500/40 transition-colors"
                 >
                   <RefreshCw class="w-3 h-3" />
                   刷新二维码
@@ -307,32 +307,32 @@ async function logout() {
         <textarea
           v-model="callbackUrl"
           placeholder="https://xhbcs.henau.edu.cn/?code=...&state=STATE#/checkin"
-          class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 h-24 resize-none focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+          class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 h-24 resize-none focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
         />
         <button
           @click="showLegacyToken = !showLegacyToken"
           type="button"
-          class="mt-2 text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+          class="mt-2 text-[11px] text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors"
         >
           {{ showLegacyToken ? '收起手动 JWT 兜底' : '高级选项：手动粘贴 JWT' }}
         </button>
         <Transition name="expand">
           <div
             v-if="showLegacyToken"
-            class="mt-2 overflow-hidden rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
+            class="mt-2 overflow-hidden rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
           >
             <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2">仅在扫码流程异常时使用，直接粘贴学校 JWT。</p>
             <textarea
               v-model="newToken"
               placeholder="eyJ..."
-              class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 font-mono-token h-24 resize-none focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+              class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 font-mono-token h-24 resize-none focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
             />
           </div>
         </Transition>
         <button
           @click="saveToken"
           :disabled="savingToken || (!newToken.trim() && !callbackUrl.trim())"
-          class="mt-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed"
+          class="mt-2 bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed"
         >
           {{ savingToken ? '保存中…' : '更新 Token' }}
         </button>
@@ -340,10 +340,10 @@ async function logout() {
     </section>
 
     <!-- 修改 PIN -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <ShieldCheck class="w-4 h-4 text-zinc-500" />
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">登录 PIN</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">登录 PIN</h2>
       </div>
       <p class="text-xs text-zinc-500 mb-4">用于学号 + PIN 登录。4–6 位数字。</p>
       <div class="space-y-3">
@@ -357,7 +357,7 @@ async function logout() {
             autocomplete="current-password"
             maxlength="6"
             placeholder="••••"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token tracking-[0.4em] text-center"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token tracking-[0.4em] text-center"
           />
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -371,7 +371,7 @@ async function logout() {
               autocomplete="new-password"
               maxlength="6"
               placeholder="4–6 位"
-              class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token tracking-[0.4em] text-center"
+              class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token tracking-[0.4em] text-center"
             />
           </div>
           <div>
@@ -383,7 +383,7 @@ async function logout() {
               inputmode="numeric"
               maxlength="6"
               placeholder="重复"
-              class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token tracking-[0.4em] text-center"
+              class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token tracking-[0.4em] text-center"
             />
           </div>
         </div>
@@ -397,7 +397,7 @@ async function logout() {
         <button
           @click="savePin"
           :disabled="!canSavePin"
-          class="bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed"
+          class="bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:cursor-not-allowed"
         >
           {{ savingPin ? '保存中…' : '更新 PIN' }}
         </button>
@@ -405,18 +405,18 @@ async function logout() {
     </section>
 
     <!-- 邀请码 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <Ticket class="w-4 h-4 text-zinc-500" />
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">绑定的邀请码</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">绑定的邀请码</h2>
       </div>
-      <div class="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04]">
-        <span class="font-mono-token text-base text-zinc-900 dark:text-zinc-200 tracking-wider">
+      <div class="flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04]">
+        <span class="font-mono-token text-base text-[#161b22] dark:text-zinc-200 tracking-wider">
           {{ me.inviteCode || '—' }}
         </span>
         <button
           @click="copyInvite"
-          class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 px-2 py-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5"
+          class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 px-2 py-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5"
         >
           <Copy class="w-3.5 h-3.5" />
           复制
@@ -428,10 +428,10 @@ async function logout() {
     </section>
 
     <!-- 退出 / 危险区 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <button
         @click="logout"
-        class="w-full text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors py-2"
+        class="w-full text-sm text-zinc-700 dark:text-zinc-300 hover:text-[#161b22] dark:hover:text-zinc-100 transition-colors py-2"
       >
         退出登录
       </button>
@@ -468,7 +468,7 @@ async function logout() {
             <input
               v-model="confirmText"
               placeholder="注销账号"
-              class="w-full bg-white dark:bg-zinc-950 ring-1 ring-red-500/20 rounded-lg px-3 py-2 text-sm focus-ring focus:!ring-red-500/40 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+              class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-red-500/20 rounded-lg px-3 py-2 text-sm focus-ring focus:!ring-red-500/40 text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
             />
           </div>
 

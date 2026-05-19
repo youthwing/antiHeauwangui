@@ -25,15 +25,15 @@ const router = useRouter()
 const admin = useAdminAuth()
 
 const items: NavItem[] = [
-  { to: '/rosekhlifa', label: '概览', icon: LayoutDashboard },
-  { to: '/rosekhlifa/monitor', label: '监控看板', icon: Activity },
-  { to: '/rosekhlifa/announcements', label: '公告', icon: Megaphone },
-  { to: '/rosekhlifa/codes', label: '邀请码', icon: Ticket },
-  { to: '/rosekhlifa/dorms', label: '宿舍楼', icon: Building2 },
-  { to: '/rosekhlifa/users', label: '用户', icon: Users },
-  { to: '/rosekhlifa/guests', label: '临时朋友', icon: UserPlus },
-  { to: '/rosekhlifa/logs', label: '日志', icon: ScrollText },
-  { to: '/rosekhlifa/settings', label: '设置', icon: Cog },
+  { to: '/airvel', label: '概览', icon: LayoutDashboard },
+  { to: '/airvel/monitor', label: '监控看板', icon: Activity },
+  { to: '/airvel/announcements', label: '公告', icon: Megaphone },
+  { to: '/airvel/codes', label: '邀请码', icon: Ticket },
+  { to: '/airvel/dorms', label: '宿舍楼', icon: Building2 },
+  { to: '/airvel/users', label: '用户', icon: Users },
+  { to: '/airvel/guests', label: '临时朋友', icon: UserPlus },
+  { to: '/airvel/logs', label: '日志', icon: ScrollText },
+  { to: '/airvel/settings', label: '设置', icon: Cog },
 ]
 
 async function logout() {
@@ -42,7 +42,7 @@ async function logout() {
   } finally {
     admin.setAdmin(false)
     showToast('ok', '已退出管理员')
-    router.push('/rosekhlifa/login')
+    router.push('/airvel/login')
   }
 }
 
@@ -52,8 +52,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="relative flex flex-col md:flex-row mx-auto max-w-[1700px] bg-white dark:bg-zinc-950 min-h-screen">
-    <aside class="hidden md:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-amber-500/10 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-xl overflow-y-auto">
+  <div class="relative flex flex-col md:flex-row mx-auto max-w-[1700px] bg-white dark:bg-[#0d1117] min-h-screen">
+    <aside class="hidden md:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-amber-500/10 bg-white/60 dark:bg-[#0d1117]/60 backdrop-blur-xl overflow-y-auto">
       <div class="px-5 py-5 border-b border-black/[0.05] dark:border-white/[0.04] flex items-center justify-between gap-2">
         <Logo :size="34" text="晚归管理端" subtitle="仅供运维" />
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30 shrink-0">
@@ -70,7 +70,7 @@ onMounted(() => {
       <div class="px-3 py-3 border-t border-black/[0.05] dark:border-white/[0.04] flex items-center gap-1">
         <button
           @click="logout"
-          class="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          class="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           <LogOut class="w-4 h-4 text-zinc-500" />
           <span>退出管理员</span>
@@ -79,7 +79,7 @@ onMounted(() => {
       </div>
     </aside>
 
-    <header class="md:hidden sticky top-0 z-30 bg-white/85 dark:bg-zinc-950/85 backdrop-blur-xl border-b border-black/[0.08] dark:border-white/[0.06] h-12 flex items-center justify-between px-4">
+    <header class="md:hidden sticky top-0 z-30 bg-white/85 dark:bg-[#0d1117]/85 backdrop-blur-xl border-b border-black/[0.08] dark:border-white/[0.06] h-12 flex items-center justify-between px-4">
       <Logo :size="26" text="晚归管理端" />
       <div class="flex items-center gap-2">
         <ThemeToggle />
@@ -99,7 +99,7 @@ onMounted(() => {
         </RouterView>
       </div>
 
-      <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl border-t border-black/[0.08] dark:border-white/[0.06] flex justify-around py-2">
+      <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/90 dark:bg-[#0d1117]/90 backdrop-blur-xl border-t border-black/[0.08] dark:border-white/[0.06] flex justify-around py-2">
         <RouterLink
           v-for="item in items"
           :key="item.to"

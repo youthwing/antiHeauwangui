@@ -34,8 +34,8 @@ const saving = ref(false)
 const showHelp = ref(false)
 
 const LEVEL_OPTIONS: Array<{ key: AnnouncementLevel; label: string; icon: any; toneClass: string }> = [
-  { key: 'info', label: '通知', icon: Info, toneClass: 'text-blue-500' },
-  { key: 'success', label: '喜报', icon: CheckCircle2, toneClass: 'text-emerald-500' },
+  { key: 'info', label: '通知', icon: Info, toneClass: 'text-sky-500' },
+  { key: 'success', label: '喜报', icon: CheckCircle2, toneClass: 'text-red-500' },
   { key: 'warning', label: '注意', icon: AlertTriangle, toneClass: 'text-amber-500' },
   { key: 'critical', label: '紧急', icon: AlertOctagon, toneClass: 'text-red-500' },
 ]
@@ -163,7 +163,7 @@ function fmtDate(t: number | null): string {
         </p>
       </div>
       <button @click="load" :disabled="loading"
-        class="self-start text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 px-2 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1">
+        class="self-start text-xs text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 px-2 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1">
         <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'wangui-spin' : ''" />
       </button>
     </header>
@@ -171,15 +171,15 @@ function fmtDate(t: number | null): string {
     <!-- Editor: form on the left, live preview on the right. Stacks on small screens. -->
     <section class="grid grid-cols-1 lg:grid-cols-2 gap-3">
       <!-- Form panel -->
-      <div class="rounded-2xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5 space-y-4">
+      <div class="rounded-2xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5 space-y-4">
         <div class="flex items-center justify-between gap-2">
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">
             {{ editId == null ? '新建公告' : `编辑 #${editId}` }}
           </h2>
           <button
             v-if="editId != null"
             @click="resetForm"
-            class="text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 inline-flex items-center gap-1"
+            class="text-[11px] text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 inline-flex items-center gap-1"
           >
             <Plus class="w-3 h-3" />
             改新建
@@ -196,8 +196,8 @@ function fmtDate(t: number | null): string {
               type="button"
               @click="level = opt.key"
               :class="level === opt.key
-                ? 'bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900'
-                : 'bg-white dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+                ? 'bg-[#161b22] dark:bg-zinc-100 text-zinc-100 dark:text-[#161b22]'
+                : 'bg-white dark:bg-[#0d1117] text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200'"
               class="ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg py-2 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors"
             >
               <component :is="opt.icon" class="w-3.5 h-3.5" :class="level === opt.key ? '' : opt.toneClass" />
@@ -215,7 +215,7 @@ function fmtDate(t: number | null): string {
             v-model="title"
             placeholder="例如：本周六 (05/22) 系统维护"
             maxlength="200"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
           />
           <p class="text-[10px] text-zinc-500 mt-1 tabular-nums">{{ title.length }} / 200</p>
         </div>
@@ -227,7 +227,7 @@ function fmtDate(t: number | null): string {
             <button
               type="button"
               @click="showHelp = !showHelp"
-              class="normal-case text-emerald-500 hover:text-emerald-400 inline-flex items-center gap-1 tracking-normal"
+              class="normal-case text-red-500 hover:text-red-400 inline-flex items-center gap-1 tracking-normal"
             >
               {{ showHelp ? '收起说明' : '支持哪些格式？' }}
             </button>
@@ -235,13 +235,13 @@ function fmtDate(t: number | null): string {
           <Transition name="expand">
             <div
               v-if="showHelp"
-              class="rounded-md bg-zinc-100 dark:bg-zinc-950/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-2.5 mb-2 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-1"
+              class="rounded-md bg-zinc-100 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-2.5 mb-2 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-1"
             >
               <p>支持极少量 markdown，方便排版：</p>
               <ul class="list-disc pl-5 space-y-0.5">
-                <li><code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">**粗体**</code> → <strong>粗体</strong></li>
-                <li><code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">*斜体*</code> → <em>斜体</em></li>
-                <li><code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">[链接文字](https://...)</code> → 蓝色链接</li>
+                <li><code class="bg-white/70 dark:bg-[#161b22]/70 px-1 rounded font-mono-token">**粗体**</code> → <strong>粗体</strong></li>
+                <li><code class="bg-white/70 dark:bg-[#161b22]/70 px-1 rounded font-mono-token">*斜体*</code> → <em>斜体</em></li>
+                <li><code class="bg-white/70 dark:bg-[#161b22]/70 px-1 rounded font-mono-token">[链接文字](https://...)</code> → 蓝色链接</li>
                 <li>普通换行 = 换行；<strong>空一行 = 分段</strong></li>
                 <li>不支持 HTML、图片、列表 —— 模板保持统一</li>
               </ul>
@@ -252,7 +252,7 @@ function fmtDate(t: number | null): string {
             placeholder="可以多段。空一行分段。&#10;&#10;支持 **粗体** 和 [链接](https://example.com)。"
             maxlength="10000"
             rows="8"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 leading-relaxed resize-y"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 leading-relaxed resize-y"
           />
           <p class="text-[10px] text-zinc-500 mt-1 tabular-nums">{{ content.length }} / 10000</p>
         </div>
@@ -266,7 +266,7 @@ function fmtDate(t: number | null): string {
             <input
               type="date"
               v-model="expiresDate"
-              class="bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-1.5 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200"
+              class="bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-1.5 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200"
             />
             <button
               v-if="expiresDate"
@@ -286,14 +286,14 @@ function fmtDate(t: number | null): string {
             v-if="editId != null"
             @click="resetForm"
             type="button"
-            class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+            class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors"
           >
             取消
           </button>
           <button
             @click="submit"
             :disabled="!canSubmit"
-            class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            class="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors"
           >
             <Save class="w-3.5 h-3.5" />
             {{ saving ? '保存中…' : editId == null ? '发布公告' : '保存修改' }}
@@ -312,14 +312,14 @@ function fmtDate(t: number | null): string {
     </section>
 
     <!-- Existing announcements list -->
-    <section class="rounded-2xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden">
+    <section class="rounded-2xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden">
       <header class="px-5 py-3 border-b border-black/[0.05] dark:border-white/[0.04]">
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">
           所有公告 ({{ list.length }})
         </h2>
       </header>
       <div v-if="loading && list.length === 0" class="py-12 flex justify-center">
-        <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin" />
+        <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin" />
       </div>
       <div v-else-if="list.length === 0" class="py-12 text-center text-sm text-zinc-500">
         还没有公告。在上面发布一条吧。
@@ -333,9 +333,9 @@ function fmtDate(t: number | null): string {
           <span
             class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 mt-1"
             :class="a.level === 'info'
-              ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+              ? 'bg-sky-500/15 text-blue-700 dark:text-blue-300 ring-1 ring-sky-500/30'
               : a.level === 'success'
-                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30'
+                ? 'bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30'
                 : a.level === 'warning'
                   ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
                   : 'bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30'"
@@ -343,7 +343,7 @@ function fmtDate(t: number | null): string {
             {{ a.level === 'info' ? '通知' : a.level === 'success' ? '喜报' : a.level === 'warning' ? '注意' : '紧急' }}
           </span>
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate">{{ a.title }}</p>
+            <p class="text-sm font-medium text-[#161b22] dark:text-zinc-200 truncate">{{ a.title }}</p>
             <p class="text-[10px] text-zinc-500 font-mono-token tabular-nums">
               发布 {{ fmtDate(a.createdAt) }}
               <span v-if="a.expiresAt"> · 截止 {{ fmtDate(a.expiresAt) }}</span>
@@ -354,7 +354,7 @@ function fmtDate(t: number | null): string {
             <button
               @click="startEdit(a)"
               title="编辑"
-              class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-emerald-400 transition-colors"
+              class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-red-400 transition-colors"
             >
               <Pencil class="w-3.5 h-3.5" />
             </button>

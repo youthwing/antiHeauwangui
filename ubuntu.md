@@ -199,11 +199,11 @@ Referrer-Policy: no-referrer
 
 ### 7.1 管理员登录
 
-打开 `http://你的IP:5555/rosekhlifa/login`（或反代域名 `/rosekhlifa/login`）
+打开 `http://你的IP:5555/airvel/login`（或反代域名 `/airvel/login`）
 
 用 `.env` 里 `WANGUI_ADMIN_PASS` 登录。
 
-> 路径已经从 `/admin` 改成 `/rosekhlifa`（前后端均改），别敲老路径。
+> 路径已经从 `/admin` 改成 `/airvel`（前后端均改），别敲老路径。
 
 ### 7.2 配置邮件通知（可选）
 
@@ -370,7 +370,7 @@ rm -rf /root/wangui
 1. **必须改默认密码**：`.env` 里的 `WANGUI_ADMIN_PASS` 用 16+ 位随机字符。所有在仓库 / 文档 / 聊天记录中出现过的占位密码视同已泄露，**不要原样用**
 2. **主密钥单独备份**：`WANGUI_MASTER_KEY` 抄一份到密码管理器；丢了不可逆
 3. **`.env` 权限 600**：`chmod 600 .env` —— 别让其它用户读到
-4. **管理路径已经混淆**：admin 路径是 `/rosekhlifa` 而不是 `/admin`。**不要在公开渠道提到这个路径**
+4. **管理路径已经混淆**：admin 路径是 `/airvel` 而不是 `/admin`。**不要在公开渠道提到这个路径**
 5. **走 1Panel 反代时**：`docker-compose.yml` port 映射改成 `127.0.0.1:5555:5555`，外面只暴露 1Panel 的 80/443；安全组只放行 22 + 80 + 443
 6. **直接 IP+端口访问时**：必须接受明文 HTTP 风险 —— 学号、PIN、学校 Token 都走明文。最好只自己用、限信任的朋友、别让 5555 端口被搜索引擎扫到
 7. **用 SSH 密钥登录**：禁用密码登录（`sshd_config` 里 `PasswordAuthentication no`）；可选 fail2ban

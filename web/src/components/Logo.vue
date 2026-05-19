@@ -13,9 +13,8 @@ withDefaults(
   <div class="flex items-center gap-3">
     <div
       :style="{ width: size + 'px', height: size + 'px' }"
-      class="relative shrink-0 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30 flex items-center justify-center"
+      class="relative shrink-0 rounded-xl bg-[#e50914] ring-1 ring-[#e50914]/30 shadow-sm shadow-[#e50914]/20 flex items-center justify-center"
     >
-      <!-- House under crescent moon: "晚归" theme -->
       <svg
         :width="size * 0.6"
         :height="size * 0.6"
@@ -25,20 +24,15 @@ withDefaults(
         stroke-width="1.8"
         stroke-linecap="round"
         stroke-linejoin="round"
-        class="text-emerald-400"
+        class="text-white"
       >
-        <path
-          d="M20 3 A3 3 0 1 0 20 7.4 A2.2 2.2 0 0 1 20 3 Z"
-          fill="currentColor"
-          stroke="none"
-        />
-        <path d="M3 14 L12 7 L21 14" />
-        <path d="M5 13 V21 H19 V13" />
-        <path d="M10 21 V16 H14 V21" />
+        <path d="M6 17 V7 L12 11 L18 7 V17" />
+        <path d="M8.5 17 V11.5" />
+        <path d="M15.5 17 V11.5" />
       </svg>
     </div>
     <div v-if="text" class="min-w-0">
-      <p class="font-bold tracking-tight text-zinc-900 dark:text-zinc-50 text-sm leading-tight truncate">
+      <p class="font-bold tracking-tight text-[#161b22] dark:text-zinc-50 text-sm leading-tight truncate">
         {{ text }}
       </p>
       <p v-if="subtitle" class="text-[10px] text-zinc-500 tracking-wider mt-0.5 truncate">

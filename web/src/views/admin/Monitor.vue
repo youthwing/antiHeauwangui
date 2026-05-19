@@ -360,7 +360,7 @@ function rowTimeState(r: Row): 'past' | 'now' | 'future' {
 }
 
 const CATEGORY_META: Record<Category, { tone: string; label: string; icon: any; hint: string }> = {
-  tonight: { tone: 'emerald', label: '今晚要签', icon: Activity, hint: '自动签开启 + 今天在 signDays' },
+  tonight: { tone: 'red', label: '今晚要签', icon: Activity, hint: '自动签开启 + 今天在 signDays' },
   'guest-today': { tone: 'amber', label: '临时·今晚', icon: Moon, hint: '临时朋友今天有签到任务' },
   'days-skip': { tone: 'zinc', label: '周次跳过', icon: CalendarOff, hint: '今天不在 signDays（如周六没勾）' },
   'auto-off': { tone: 'amber', label: '自动签关', icon: PowerOff, hint: '用户主动关闭了自动签到' },
@@ -370,14 +370,12 @@ const CATEGORY_META: Record<Category, { tone: string; label: string; icon: any; 
 
 function categoryClass(tone: string): string {
   switch (tone) {
-    case 'emerald':
-      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25'
+    case 'red':
+      return 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'
     case 'amber':
       return 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
     case 'blue':
-      return 'bg-blue-500/10 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
-    case 'red':
-      return 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/30'
+      return 'bg-sky-500/10 text-blue-700 dark:text-blue-300 ring-1 ring-sky-500/30'
     case 'zinc':
       return 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 ring-1 ring-zinc-500/20'
     default:
@@ -391,7 +389,7 @@ function statusChip(s: StatusEntry, r: Row): { tone: string; label: string; icon
   if (!s || s === 'skipped') return { tone: 'zinc', label: '未拉取', icon: Clock }
   switch (s.state) {
     case 'signed':
-      return { tone: 'emerald', label: '学校已确认签到', icon: UserCheck }
+      return { tone: 'red', label: '学校已确认签到', icon: UserCheck }
     case 'canSign':
       return { tone: 'amber', label: '待签到', icon: Clock }
     case 'pending':
@@ -428,7 +426,7 @@ function recordDotClass(status: string): string {
     case 'success':
     case 'already':
     case 'exempt':
-      return 'bg-emerald-400'
+      return 'bg-red-400'
     case 'failed':
       return 'bg-red-400'
     case 'skipped':
@@ -478,7 +476,7 @@ function openSSE() {
   sseStatus.value = 'connecting'
   // EventSource sends cookies by default (same-origin), so the admin
   // session cookie auths the stream like any other admin endpoint.
-  const es = new EventSource('/api/v1/rosekhlifa/events')
+  const es = new EventSource('/api/v1/airvel/events')
   sseSource = es
   es.addEventListener('hello', () => {
     sseStatus.value = 'open'
@@ -552,13 +550,13 @@ onUnmounted(() => {
     <header class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Activity class="w-5 h-5 text-emerald-400" />
+          <Activity class="w-5 h-5 text-red-400" />
           监控看板
           <!-- SSE connection indicator -->
           <span
             class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ring-1"
             :class="sseStatus === 'open'
-              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/30'
+              ? 'bg-red-500/10 text-red-700 dark:text-red-300 ring-red-500/30'
               : sseStatus === 'connecting'
                 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-500/30'
                 : 'bg-red-500/10 text-red-700 dark:text-red-300 ring-red-500/30'"
@@ -566,7 +564,7 @@ onUnmounted(() => {
           >
             <span
               class="w-1.5 h-1.5 rounded-full"
-              :class="sseStatus === 'open' ? 'bg-emerald-400 animate-pulse' : sseStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'"
+              :class="sseStatus === 'open' ? 'bg-red-400 animate-pulse' : sseStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'"
             />
             {{ sseStatus === 'open' ? '实时' : sseStatus === 'connecting' ? '连接中' : '已断开' }}
           </span>
@@ -577,13 +575,13 @@ onUnmounted(() => {
             上次拉取 {{ formatDateTime(Math.floor(lastFetch.getTime() / 1000)) }}
           </span>
           <span class="ml-2 text-[11px] text-zinc-500">· 自动每 60s 重拉</span>
-          <span v-if="lastEvent" class="ml-2 text-[11px] text-emerald-500 dark:text-emerald-400">
+          <span v-if="lastEvent" class="ml-2 text-[11px] text-red-500 dark:text-red-400">
             · 上一事件 {{ lastEvent.type }} @ {{ formatDateTime(lastEvent.at) }}
           </span>
         </p>
       </div>
       <button @click="load" :disabled="loading"
-        class="self-start inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        class="self-start inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-medium px-4 py-2 rounded-lg transition-colors">
         <RefreshCw class="w-4 h-4" :class="loading ? 'wangui-spin' : ''" />
         立即重拉
       </button>
@@ -591,7 +589,7 @@ onUnmounted(() => {
 
     <!-- Outcome tiles (only meaningful for "tonight" subset) -->
     <section class="grid grid-cols-2 md:grid-cols-5 gap-2">
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
         <p class="text-[10px] uppercase tracking-wide text-zinc-500 mb-1 flex items-center gap-1">
           <UsersIcon class="w-3 h-3" />
           全部用户
@@ -599,15 +597,15 @@ onUnmounted(() => {
         <p class="text-2xl font-bold tabular-nums">{{ counts.total }}</p>
         <p class="text-[10px] text-zinc-500 mt-0.5">含临时朋友</p>
       </div>
-      <div class="rounded-xl bg-emerald-500/10 ring-1 ring-emerald-500/25 p-3">
-        <p class="text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400 mb-1">今晚已签</p>
-        <p class="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-300">{{ outcome.signed }}</p>
+      <div class="rounded-xl bg-red-500/10 ring-1 ring-red-500/25 p-3">
+        <p class="text-[10px] uppercase tracking-wide text-red-600 dark:text-red-400 mb-1">今晚已签</p>
+        <p class="text-2xl font-bold tabular-nums text-red-600 dark:text-red-300">{{ outcome.signed }}</p>
       </div>
       <div class="rounded-xl bg-amber-500/10 ring-1 ring-amber-500/30 p-3">
         <p class="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-1">待签</p>
         <p class="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-300">{{ outcome.pending }}</p>
       </div>
-      <div class="rounded-xl bg-blue-500/10 ring-1 ring-blue-500/30 p-3">
+      <div class="rounded-xl bg-sky-500/10 ring-1 ring-sky-500/30 p-3">
         <p class="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">请假/免签</p>
         <p class="text-2xl font-bold tabular-nums text-blue-600 dark:text-blue-300">{{ outcome.exempt }}</p>
       </div>
@@ -626,15 +624,15 @@ onUnmounted(() => {
         :key="opt.key"
         @click="setFilter(opt.key)"
         :class="activeFilter === opt.key
-          ? 'bg-emerald-500 text-zinc-950 ring-emerald-500'
-          : 'bg-white/85 dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-emerald-500/30'"
+          ? 'bg-red-500 text-[#0d1117] ring-red-500'
+          : 'bg-white/85 dark:bg-[#161b22]/60 text-zinc-700 dark:text-zinc-300 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-red-500/30'"
         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ring-1 transition-colors"
       >
         {{ opt.label }}
         <span
           class="inline-flex items-center justify-center min-w-[1.25rem] px-1 py-0.5 rounded-full text-[10px] tabular-nums"
           :class="activeFilter === opt.key
-            ? 'bg-zinc-950/20 text-zinc-950'
+            ? 'bg-[#0d1117]/20 text-[#0d1117]'
             : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'"
         >
           {{ filterCount(opt.key) }}
@@ -644,13 +642,13 @@ onUnmounted(() => {
 
     <!-- Loading state -->
     <div v-if="loading && rows.length === 0" class="py-20 flex justify-center">
-      <div class="h-6 w-6 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin" />
+      <div class="h-6 w-6 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin" />
     </div>
 
     <!-- Empty state for current filter -->
     <div
       v-else-if="filteredRows.length === 0"
-      class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] py-14 text-center text-sm text-zinc-500"
+      class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] py-14 text-center text-sm text-zinc-500"
     >
       没有符合当前筛选的用户
     </div>
@@ -658,11 +656,11 @@ onUnmounted(() => {
     <!-- Schedule list -->
     <section
       v-else
-      class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
+      class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
     >
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead class="bg-white/50 dark:bg-zinc-950/50 border-b border-black/[0.08] dark:border-white/[0.06]">
+          <thead class="bg-white/50 dark:bg-[#0d1117]/50 border-b border-black/[0.08] dark:border-white/[0.06]">
             <tr class="text-left text-[10px] text-zinc-500 uppercase tracking-wide">
               <th class="px-4 py-2.5 font-medium w-20">时刻</th>
               <th class="px-4 py-2.5 font-medium">用户</th>
@@ -692,7 +690,7 @@ onUnmounted(() => {
                         ? 'text-amber-500 dark:text-amber-300'
                         : rowTimeState(r) === 'past'
                           ? 'text-zinc-500'
-                          : 'text-emerald-500 dark:text-emerald-300'"
+                          : 'text-red-500 dark:text-red-300'"
                     >
                       {{ signTimeStr(r) }}
                     </span>
@@ -708,7 +706,7 @@ onUnmounted(() => {
                   <Avatar :src="r.userAvatarUrl" :name="r.userName" :size="36" rounded="lg" />
                   <div class="min-w-0">
                     <div class="flex items-center gap-1.5">
-                      <span class="text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate">{{ r.userName }}</span>
+                      <span class="text-sm font-medium text-[#161b22] dark:text-zinc-200 truncate">{{ r.userName }}</span>
                       <span
                         v-if="r.isGuest"
                         class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30 shrink-0"
@@ -756,7 +754,7 @@ onUnmounted(() => {
                     </span>
                     <button
                       @click="refreshOne(r)"
-                      class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                       title="重拉学校状态"
                     >
                       <RefreshCw class="w-3 h-3" />
@@ -795,7 +793,7 @@ onUnmounted(() => {
                   v-if="r.category === 'tonight' || r.category === 'guest-today'"
                   @click="signNow(r)"
                   :disabled="signing[r.userId]"
-                  class="inline-flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-xs font-medium px-2.5 py-1.5 rounded-md transition-colors"
+                  class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-xs font-medium px-2.5 py-1.5 rounded-md transition-colors"
                   title="代签到"
                 >
                   <PlayCircle class="w-3.5 h-3.5" />

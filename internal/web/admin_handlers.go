@@ -374,7 +374,7 @@ func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, adminUserDTO(u))
 }
 
-// POST /api/v1/rosekhlifa/users/{id}/token — admin refreshes a user's school
+// POST /api/v1/airvel/users/{id}/token — admin refreshes a user's school
 // token via wechat OAuth callback. Critical for guests, who have no PIN and
 // can't log in to refresh their own token after the ~7-day school JWT expires.
 // The new token's user_id (iss) MUST match {id} so admin can't accidentally
@@ -423,7 +423,7 @@ func (h *handlers) adminRefreshUserToken(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// GET /api/v1/rosekhlifa/users/{id}/checkin-status — fetch the school's
+// GET /api/v1/airvel/users/{id}/checkin-status — fetch the school's
 // view of "what should this user do tonight" without performing a sign.
 // This is how admin sees that a user has filed leave (请假) or that today
 // is a 节假日离校 day — info the school surfaces but our records don't.
@@ -497,7 +497,7 @@ func (h *handlers) adminCheckinStatusForUser(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, out)
 }
 
-// POST /api/v1/rosekhlifa/users/{id}/sign-now — admin signs on behalf of any
+// POST /api/v1/airvel/users/{id}/sign-now — admin signs on behalf of any
 // user (regular or guest). Same logic as the user-side /sign-now: invoke the
 // scheduler once, persist a record. No email dispatch — admin already knows
 // they hit the button.
@@ -689,7 +689,7 @@ func dormDTO(d *store.Dorm, users int) map[string]any {
 
 // ---------- Admin SMTP config ----------
 
-// GET /api/v1/rosekhlifa/smtp — returns config; password is masked.
+// GET /api/v1/airvel/smtp — returns config; password is masked.
 func (h *handlers) adminGetSMTP(w http.ResponseWriter, r *http.Request) {
 	cfg, err := h.store.GetSMTPConfig(r.Context())
 	if err != nil {
@@ -709,7 +709,7 @@ func (h *handlers) adminGetSMTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// PUT /api/v1/rosekhlifa/smtp — update notify config. Empty password keeps
+// PUT /api/v1/airvel/smtp — update notify config. Empty password keeps
 // the existing one; same for adminServerChanKey ("" means keep current).
 func (h *handlers) adminUpdateSMTP(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -766,7 +766,7 @@ func (h *handlers) adminUpdateSMTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/v1/rosekhlifa/serverchan/test — push a test notification to the
+// POST /api/v1/airvel/serverchan/test — push a test notification to the
 // admin's saved Server酱 SendKey.
 func (h *handlers) adminTestServerChan(w http.ResponseWriter, r *http.Request) {
 	cfg, err := h.store.GetSMTPConfig(r.Context())
@@ -791,7 +791,7 @@ func (h *handlers) adminTestServerChan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// POST /api/v1/rosekhlifa/smtp/test — send a real test email to adminBcc
+// POST /api/v1/airvel/smtp/test — send a real test email to adminBcc
 // (or username if no bcc). Uses the *currently-saved* config, not the form.
 func (h *handlers) adminTestSMTP(w http.ResponseWriter, r *http.Request) {
 	cfg, err := h.store.GetSMTPConfig(r.Context())
@@ -829,7 +829,7 @@ func (h *handlers) adminTestSMTP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sentTo": target})
 }
 
-// GET /api/v1/rosekhlifa/records.csv?from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/v1/airvel/records.csv?from=YYYY-MM-DD&to=YYYY-MM-DD
 //
 // Streams a CSV of every sign record in the date range. Used by admin to
 // archive logs (e.g. if the school ever asks for evidence of activity).
@@ -905,7 +905,7 @@ func (h *handlers) adminExportRecordsCSV(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// GET /api/v1/rosekhlifa/school-rules — return the most recent cached rules
+// GET /api/v1/airvel/school-rules — return the most recent cached rules
 // snapshot taken by the daily rules-watch sweep, plus when it was taken.
 // If never sampled (fresh DB), returns null + 0.
 func (h *handlers) adminSchoolRules(w http.ResponseWriter, r *http.Request) {
@@ -1082,7 +1082,7 @@ type guestUpdateReq struct {
 	SignDates []string `json:"signDates"`
 }
 
-// GET /api/v1/rosekhlifa/guests
+// GET /api/v1/airvel/guests
 func (h *handlers) adminListGuests(w http.ResponseWriter, r *http.Request) {
 	guests, err := h.store.ListGuests(r.Context())
 	if err != nil {
@@ -1096,7 +1096,7 @@ func (h *handlers) adminListGuests(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// POST /api/v1/rosekhlifa/guests
+// POST /api/v1/airvel/guests
 //
 // Body: {label, signDates: [...], dormId?, callbackUrl|oauthCode|token}
 //
@@ -1194,7 +1194,7 @@ func (h *handlers) adminCreateGuest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.guestDTO(ctx, reloaded))
 }
 
-// PUT /api/v1/rosekhlifa/guests/{id}
+// PUT /api/v1/airvel/guests/{id}
 //
 // Update label and/or sign_dates. When dates change, expires_at is recomputed.
 func (h *handlers) adminUpdateGuest(w http.ResponseWriter, r *http.Request) {
@@ -1238,7 +1238,7 @@ func (h *handlers) adminUpdateGuest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// DELETE /api/v1/rosekhlifa/guests/{id}
+// DELETE /api/v1/airvel/guests/{id}
 func (h *handlers) adminDeleteGuest(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "id")
 	cur, err := h.store.GetUser(r.Context(), uid)

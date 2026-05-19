@@ -33,7 +33,7 @@ const fontSize = computed(() => Math.round(props.size * 0.45) + 'px')
 
 <template>
   <div
-    class="relative shrink-0 overflow-hidden bg-emerald-500/15 ring-1 ring-emerald-500/30 flex items-center justify-center"
+    class="relative shrink-0 overflow-hidden bg-red-500/15 ring-1 ring-red-500/30 flex items-center justify-center"
     :class="roundedClass"
     :style="{ width: size + 'px', height: size + 'px' }"
   >
@@ -47,7 +47,7 @@ const fontSize = computed(() => Math.round(props.size * 0.45) + 'px')
     />
     <span
       v-else
-      class="text-emerald-400 font-semibold leading-none select-none"
+      class="text-red-400 font-semibold leading-none select-none"
       :style="{ fontSize }"
     >
       {{ initial }}

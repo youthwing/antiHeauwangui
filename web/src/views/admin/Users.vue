@@ -434,7 +434,7 @@ function shortStatus(s: StatusEntry): { tone: string; text: string } {
   if (!s) return { tone: 'zinc', text: '—' }
   switch (s.state) {
     case 'signed':
-      return { tone: 'emerald', text: '已签' }
+      return { tone: 'green', text: '已签' }
     case 'canSign':
       return { tone: 'amber', text: '待签' }
     case 'pending':
@@ -454,14 +454,12 @@ function shortStatus(s: StatusEntry): { tone: string; text: string } {
 
 function shortStatusClass(tone: string): string {
   switch (tone) {
-    case 'emerald':
-      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25'
+    case 'green':
+      return 'bg-green-500/10 text-green-700 dark:text-green-300 ring-1 ring-green-500/25'
     case 'amber':
       return 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
     case 'blue':
-      return 'bg-blue-500/10 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
-    case 'red':
-      return 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/30'
+      return 'bg-sky-500/10 text-blue-700 dark:text-blue-300 ring-1 ring-sky-500/30'
     case 'zinc':
     default:
       return 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 ring-1 ring-zinc-500/20'
@@ -496,16 +494,16 @@ function busyFor(u: AdminUser) {
             v-model="search"
             @keyup.enter="load"
             placeholder="搜索姓名 / 学号 / 邀请码"
-            class="w-full pl-9 pr-3 py-2 bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+            class="w-full pl-9 pr-3 py-2 bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
           />
         </div>
         <!-- View-mode toggle -->
-        <div class="inline-flex bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg p-0.5">
+        <div class="inline-flex bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg p-0.5">
           <button
             @click="setViewMode('card')"
             :class="viewMode === 'card'
-              ? 'bg-emerald-500 text-zinc-950'
-              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'"
+              ? 'bg-red-500 text-[#0d1117]'
+              : 'text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200'"
             class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
             title="卡片态"
           >
@@ -515,8 +513,8 @@ function busyFor(u: AdminUser) {
           <button
             @click="setViewMode('list')"
             :class="viewMode === 'list'
-              ? 'bg-emerald-500 text-zinc-950'
-              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'"
+              ? 'bg-red-500 text-[#0d1117]'
+              : 'text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200'"
             class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors"
             title="列表态（紧凑）"
           >
@@ -525,7 +523,7 @@ function busyFor(u: AdminUser) {
           </button>
         </div>
         <button @click="load" :disabled="loading" title="重新加载 + 重拉学校状态"
-          class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 px-2 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1">
+          class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 px-2 py-2 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1">
           <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'wangui-spin' : ''" />
         </button>
       </div>
@@ -536,12 +534,12 @@ function busyFor(u: AdminUser) {
       v-if="loading && users.length === 0"
       class="py-20 flex items-center justify-center"
     >
-      <div class="h-6 w-6 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin" />
+      <div class="h-6 w-6 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin" />
     </div>
 
     <div
       v-else-if="users.length === 0"
-      class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] py-16 text-center text-sm text-zinc-500"
+      class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] py-16 text-center text-sm text-zinc-500"
     >
       还没有用户
     </div>
@@ -574,22 +572,22 @@ function busyFor(u: AdminUser) {
     <!-- List view -->
     <section
       v-else
-      class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
+      class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
     >
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead class="bg-white/50 dark:bg-zinc-950/50 border-b border-black/[0.08] dark:border-white/[0.06]">
+          <thead class="bg-white/50 dark:bg-[#0d1117]/50 border-b border-black/[0.08] dark:border-white/[0.06]">
             <tr class="text-left text-[10px] text-zinc-500 uppercase tracking-wide">
               <!-- Header checkbox toggles all -->
               <th class="px-4 py-3 font-medium w-10">
                 <button
                   type="button"
                   @click="toggleSelectAll"
-                  class="inline-flex items-center justify-center w-4 h-4 text-zinc-500 hover:text-emerald-400 transition-colors"
+                  class="inline-flex items-center justify-center w-4 h-4 text-zinc-500 hover:text-red-400 transition-colors"
                   :title="allSelected ? '取消全选' : '全选'"
                 >
-                  <CheckSquare v-if="allSelected" class="w-4 h-4 text-emerald-400" />
-                  <Square v-else-if="someSelected" class="w-4 h-4 text-emerald-400/60" />
+                  <CheckSquare v-if="allSelected" class="w-4 h-4 text-red-400" />
+                  <Square v-else-if="someSelected" class="w-4 h-4 text-red-400/60" />
                   <Square v-else class="w-4 h-4" />
                 </button>
               </th>
@@ -608,15 +606,15 @@ function busyFor(u: AdminUser) {
               :key="u.userId"
               @click="openDrawer(u)"
               class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors cursor-pointer"
-              :class="[u.isDisabled ? 'opacity-60' : '', isSelected(u.userId) ? 'bg-emerald-500/[0.06]' : '']"
+              :class="[u.isDisabled ? 'opacity-60' : '', isSelected(u.userId) ? 'bg-red-500/[0.06]' : '']"
             >
               <!-- Checkbox (stops row click) -->
               <td class="px-4 py-2.5 w-10" @click.stop="toggleSelect(u.userId)">
                 <button
                   type="button"
-                  class="inline-flex items-center justify-center w-4 h-4 text-zinc-500 hover:text-emerald-400 transition-colors"
+                  class="inline-flex items-center justify-center w-4 h-4 text-zinc-500 hover:text-red-400 transition-colors"
                 >
-                  <CheckSquare v-if="isSelected(u.userId)" class="w-4 h-4 text-emerald-400" />
+                  <CheckSquare v-if="isSelected(u.userId)" class="w-4 h-4 text-red-400" />
                   <Square v-else class="w-4 h-4" />
                 </button>
               </td>
@@ -647,7 +645,7 @@ function busyFor(u: AdminUser) {
               <td class="px-4 py-2.5 text-xs">
                 <span
                   v-if="u.dormName"
-                  class="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25"
+                  class="inline-flex items-center px-2 py-0.5 rounded-md bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25"
                 >
                   {{ u.dormName }}
                 </span>
@@ -658,9 +656,9 @@ function busyFor(u: AdminUser) {
                 <div class="flex items-center gap-1.5">
                   <span
                     class="w-1.5 h-1.5 rounded-full"
-                    :class="u.autoSign ? 'bg-emerald-500' : 'bg-zinc-500'"
+                    :class="u.autoSign ? 'bg-red-500' : 'bg-zinc-500'"
                   />
-                  <span :class="u.autoSign ? 'text-emerald-600 dark:text-emerald-300' : 'text-zinc-500'">
+                  <span :class="u.autoSign ? 'text-red-600 dark:text-red-300' : 'text-zinc-500'">
                     {{ u.autoSign ? '自动开' : '自动关' }}
                   </span>
                 </div>
@@ -670,7 +668,7 @@ function busyFor(u: AdminUser) {
               <td class="px-4 py-2.5 text-xs">
                 <span
                   class="font-mono-token tabular-nums font-medium"
-                  :class="signsToday(u) ? 'text-emerald-600 dark:text-emerald-300' : 'text-zinc-500'"
+                  :class="signsToday(u) ? 'text-red-600 dark:text-red-300' : 'text-zinc-500'"
                 >
                   22:{{ String(u.triggerMinute).padStart(2, '0') }}
                 </span>
@@ -687,7 +685,7 @@ function busyFor(u: AdminUser) {
               </td>
               <!-- Token -->
               <td class="px-4 py-2.5">
-                <CheckCircle2 v-if="u.tokenValid" class="w-3.5 h-3.5 text-emerald-400 inline" />
+                <CheckCircle2 v-if="u.tokenValid" class="w-3.5 h-3.5 text-red-400 inline" />
                 <XCircle v-else class="w-3.5 h-3.5 text-red-400 inline" />
                 <span class="ml-1 text-xs text-zinc-500 tabular-nums">
                   {{ formatRemaining(Math.max(0, u.tokenExp - Math.floor(Date.now() / 1000))) }}
@@ -705,7 +703,7 @@ function busyFor(u: AdminUser) {
         v-if="viewMode === 'list' && selectedIds.size > 0"
         class="fixed bottom-24 md:bottom-6 inset-x-0 z-30 flex justify-center pointer-events-none"
       >
-        <div class="pointer-events-auto bg-zinc-900/95 dark:bg-zinc-100/95 backdrop-blur ring-1 ring-emerald-500/40 rounded-2xl shadow-2xl px-3 py-2 flex items-center gap-2 max-w-[calc(100vw-1.5rem)]">
+        <div class="pointer-events-auto bg-[#161b22]/95 dark:bg-zinc-100/95 backdrop-blur ring-1 ring-red-500/40 rounded-2xl shadow-2xl px-3 py-2 flex items-center gap-2 max-w-[calc(100vw-1.5rem)]">
           <span class="text-xs font-medium text-zinc-200 dark:text-zinc-800 px-2">
             已选 {{ selectedIds.size }}
           </span>
@@ -713,7 +711,7 @@ function busyFor(u: AdminUser) {
           <button
             @click="bulkAction('sign')"
             :disabled="bulkBusy"
-            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-emerald-300 dark:text-emerald-700 hover:bg-emerald-500/15 disabled:opacity-50 transition-colors"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-red-300 dark:text-red-700 hover:bg-red-500/15 disabled:opacity-50 transition-colors"
             title="批量立即签到"
           >
             <PlayCircle class="w-3.5 h-3.5" />
@@ -722,7 +720,7 @@ function busyFor(u: AdminUser) {
           <button
             @click="bulkAction('enable')"
             :disabled="bulkBusy"
-            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-blue-300 dark:text-blue-700 hover:bg-blue-500/15 disabled:opacity-50 transition-colors"
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-blue-300 dark:text-blue-700 hover:bg-sky-500/15 disabled:opacity-50 transition-colors"
             title="批量启用"
           >
             <Power class="w-3.5 h-3.5" />
@@ -761,12 +759,12 @@ function busyFor(u: AdminUser) {
     <!-- Drawer: opens when a list row is clicked, shows the full UserCard -->
     <Transition name="drawer">
       <div v-if="drawerUser" class="fixed inset-0 z-50 flex" @click.self="closeDrawer">
-        <div class="flex-1 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-sm" @click="closeDrawer" />
-        <aside class="w-full max-w-md bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 overflow-y-auto">
-          <div class="sticky top-0 z-10 p-3 bg-zinc-100/95 dark:bg-zinc-900/95 backdrop-blur border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
+        <div class="flex-1 bg-white/70 dark:bg-[#0d1117]/70 backdrop-blur-sm" @click="closeDrawer" />
+        <aside class="w-full max-w-md bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 overflow-y-auto">
+          <div class="sticky top-0 z-10 p-3 bg-zinc-100/95 dark:bg-[#161b22]/95 backdrop-blur border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <span class="text-xs text-zinc-500 truncate">用户详情 · 所有编辑都立即生效</span>
             <button @click="closeDrawer"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors p-1 rounded hover:bg-black/5 dark:hover:bg-white/5">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors p-1 rounded hover:bg-black/5 dark:hover:bg-white/5">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -793,12 +791,12 @@ function busyFor(u: AdminUser) {
 
     <!-- New PIN modal (after admin reset) -->
     <Transition name="modal">
-      <div v-if="newPinResult" class="fixed inset-0 z-[60] bg-white/85 dark:bg-zinc-950/85 backdrop-blur flex items-center justify-center p-4"
+      <div v-if="newPinResult" class="fixed inset-0 z-[60] bg-white/85 dark:bg-[#0d1117]/85 backdrop-blur flex items-center justify-center p-4"
         @click.self="newPinResult = null">
-        <div class="w-full max-w-sm bg-zinc-100 dark:bg-zinc-900 ring-1 ring-emerald-500/30 rounded-2xl shadow-2xl">
+        <div class="w-full max-w-sm bg-zinc-100 dark:bg-[#161b22] ring-1 ring-red-500/30 rounded-2xl shadow-2xl">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30 flex items-center justify-center shrink-0">
-              <KeyRound class="w-5 h-5 text-emerald-400" />
+            <div class="w-10 h-10 rounded-xl bg-red-500/15 ring-1 ring-red-500/30 flex items-center justify-center shrink-0">
+              <KeyRound class="w-5 h-5 text-red-400" />
             </div>
             <div>
               <h2 class="text-base font-bold">PIN 已重置</h2>
@@ -808,8 +806,8 @@ function busyFor(u: AdminUser) {
 
           <div class="p-5">
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">把这串 PIN 告诉用户（旧 PIN 已作废，所有会话已登出）：</p>
-            <div class="bg-white dark:bg-zinc-950 ring-1 ring-emerald-500/30 rounded-xl px-4 py-5 text-center">
-              <p class="text-4xl font-bold font-mono-token tabular-nums tracking-[0.5em] text-emerald-400 pl-[0.5em]">
+            <div class="bg-white dark:bg-[#0d1117] ring-1 ring-red-500/30 rounded-xl px-4 py-5 text-center">
+              <p class="text-4xl font-bold font-mono-token tabular-nums tracking-[0.5em] text-red-400 pl-[0.5em]">
                 {{ newPinResult.pin }}
               </p>
             </div>
@@ -818,12 +816,12 @@ function busyFor(u: AdminUser) {
 
           <div class="px-5 pb-5 flex gap-2">
             <button @click="copyPin"
-              class="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-medium py-2 rounded-lg transition-colors">
+              class="flex-1 inline-flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-400 text-[#0d1117] text-sm font-medium py-2 rounded-lg transition-colors">
               <Copy class="w-3.5 h-3.5" />
               复制 PIN
             </button>
             <button @click="newPinResult = null"
-              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               我已记下
             </button>
           </div>
@@ -833,16 +831,16 @@ function busyFor(u: AdminUser) {
 
     <!-- Refresh-token modal -->
     <Transition name="modal">
-      <div v-if="refreshTarget" class="fixed inset-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
+      <div v-if="refreshTarget" class="fixed inset-0 z-50 bg-white/80 dark:bg-[#0d1117]/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
         @click.self="refreshTarget = null">
-        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
+        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <h2 class="text-base font-bold flex items-center gap-2">
               <KeyRound class="w-4 h-4 text-amber-400" />
               刷新 Token — {{ refreshTarget.userName }}
             </h2>
             <button @click="refreshTarget = null"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -856,7 +854,7 @@ function busyFor(u: AdminUser) {
             <div class="text-xs text-zinc-500 flex items-center gap-3">
               <Avatar :src="refreshTarget.userAvatarUrl" :name="refreshTarget.userName" :size="32" rounded="lg" />
               <div class="min-w-0 flex-1">
-                <p class="text-sm text-zinc-900 dark:text-zinc-200 truncate">{{ refreshTarget.userName }}</p>
+                <p class="text-sm text-[#161b22] dark:text-zinc-200 truncate">{{ refreshTarget.userName }}</p>
                 <p class="text-[11px] font-mono-token truncate">{{ refreshTarget.userNumber }}</p>
               </div>
               <div class="text-right shrink-0">
@@ -865,7 +863,7 @@ function busyFor(u: AdminUser) {
               </div>
             </div>
 
-            <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+            <div class="rounded-xl bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
               <div class="flex items-center gap-2 mb-2">
                 <QrCodeIcon class="w-3.5 h-3.5 text-zinc-500" />
                 <span class="text-xs text-zinc-500">截图发给朋友</span>
@@ -885,7 +883,7 @@ function busyFor(u: AdminUser) {
                     <li>粘到下面 ↓</li>
                   </ol>
                   <button type="button" @click="rebuildRefreshQr"
-                    class="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors">
+                    class="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-red-500/40 transition-colors">
                     <RefreshCw class="w-3 h-3" />
                     刷新二维码
                   </button>
@@ -897,14 +895,14 @@ function busyFor(u: AdminUser) {
               <label class="block text-xs text-zinc-500 mb-1.5">把朋友给的回调链接粘到这里 *</label>
               <textarea v-model="rCallback"
                 placeholder="https://xhbcs.henau.edu.cn/?code=...&state=..."
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-emerald-500/30 focus:!ring-emerald-500/60 rounded-lg px-3 py-2 h-20 resize-none text-sm font-mono-token text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring" />
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-red-500/30 focus:!ring-red-500/60 rounded-lg px-3 py-2 h-20 resize-none text-sm font-mono-token text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring" />
               <div v-if="rCallbackDetect.kind === 'callback-url'"
-                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-emerald-400 bg-emerald-500/10">
+                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-red-400 bg-red-500/10">
                 <Check class="w-3 h-3" />
                 已识别回调链接
               </div>
               <div v-else-if="rCallbackDetect.kind === 'code'"
-                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-emerald-400 bg-emerald-500/10">
+                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-red-400 bg-red-500/10">
                 <Check class="w-3 h-3" />
                 已识别 code
               </div>
@@ -918,11 +916,11 @@ function busyFor(u: AdminUser) {
 
           <div class="px-5 pb-5 flex justify-end gap-2">
             <button @click="refreshTarget = null"
-              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               取消
             </button>
             <button @click="submitRefresh" :disabled="!rCallbackOk || refreshing"
-              class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              class="bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors">
               {{ refreshing ? '刷新中…' : '刷新 Token' }}
             </button>
           </div>

@@ -42,21 +42,21 @@ interface LevelStyle {
 const LEVEL_STYLES: Record<AnnouncementLevel, LevelStyle> = {
   info: {
     icon: Info,
-    ringClass: 'ring-blue-500/30',
-    bgClass: 'bg-blue-500/[0.07]',
+    ringClass: 'ring-sky-500/30',
+    bgClass: 'bg-sky-500/[0.07]',
     titleClass: 'text-blue-700 dark:text-blue-300',
-    badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30',
+    badgeClass: 'bg-sky-500/15 text-blue-700 dark:text-blue-300 ring-1 ring-sky-500/30',
     badgeLabel: '通知',
-    iconClass: 'text-blue-500 dark:text-blue-400',
+    iconClass: 'text-sky-500 dark:text-blue-400',
   },
   success: {
     icon: CheckCircle2,
-    ringClass: 'ring-emerald-500/30',
-    bgClass: 'bg-emerald-500/[0.07]',
-    titleClass: 'text-emerald-700 dark:text-emerald-300',
-    badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30',
+    ringClass: 'ring-red-500/30',
+    bgClass: 'bg-red-500/[0.07]',
+    titleClass: 'text-red-700 dark:text-red-300',
+    badgeClass: 'bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30',
     badgeLabel: '喜报',
-    iconClass: 'text-emerald-500 dark:text-emerald-400',
+    iconClass: 'text-red-500 dark:text-red-400',
   },
   warning: {
     icon: AlertTriangle,
@@ -97,7 +97,7 @@ function escape(s: string): string {
 function renderInline(text: string): string {
   let s = escape(text)
   s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, label, url) => {
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-emerald-500 dark:text-emerald-300 underline decoration-dotted underline-offset-2 hover:text-emerald-400">${label}</a>`
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-red-500 dark:text-red-300 underline decoration-dotted underline-offset-2 hover:text-red-400">${label}</a>`
   })
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
   s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
@@ -197,9 +197,9 @@ const isExpired = computed(() => {
       v-if="!compact"
       class="h-1"
       :class="a.level === 'info'
-        ? 'bg-gradient-to-r from-transparent via-blue-500/40 to-transparent'
+        ? 'bg-gradient-to-r from-transparent via-sky-500/40 to-transparent'
         : a.level === 'success'
-          ? 'bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent'
+          ? 'bg-gradient-to-r from-transparent via-red-500/40 to-transparent'
           : a.level === 'warning'
             ? 'bg-gradient-to-r from-transparent via-amber-500/40 to-transparent'
             : 'bg-gradient-to-r from-transparent via-red-500/40 to-transparent'"

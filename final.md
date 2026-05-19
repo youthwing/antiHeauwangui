@@ -21,8 +21,8 @@
 │                       浏览器 (用户/管理员)                       │
 │                                                                │
 │   ┌─────────────────┐                  ┌──────────────────┐   │
-│   │ /login          │                  │ /rosekhlifa/login│   │
-│   │ /  /settings    │   Vue 3 SPA      │ /rosekhlifa/*    │   │
+│   │ /login          │                  │ /airvel/login│   │
+│   │ /  /settings    │   Vue 3 SPA      │ /airvel/*    │   │
 │   │ /records /...   │  + vue-router    │  (admin pages)   │   │
 │   └─────────────────┘                  └──────────────────┘   │
 │              │                                  │             │
@@ -38,10 +38,10 @@
         │  │ chi router (HTTP server :4444)         │  │
         │  │  ├─ /api/v1/login          (公开)      │  │
         │  │  ├─ /api/v1/activate       (公开)      │  │
-        │  │  ├─ /api/v1/rosekhlifa/login (公开)    │  │
+        │  │  ├─ /api/v1/airvel/login (公开)    │  │
         │  │  ├─ /api/v1/me, /settings, /sign-now   │  │
         │  │  │      (用户 cookie 鉴权)              │  │
-        │  │  ├─ /api/v1/rosekhlifa/*               │  │
+        │  │  ├─ /api/v1/airvel/*               │  │
         │  │  │      (管理员 cookie 鉴权)            │  │
         │  │  └─ /*  (embed.FS SPA 静态文件 + 字体)  │  │
         │  └────────────────────────────────────────┘  │
@@ -278,7 +278,7 @@ CREATE TABLE web_sessions (
 |---|---|---|
 | POST | `/login` | 学号 + PIN 登录（已激活用户） |
 | POST | `/activate` | 卡密 + 学校 JWT + PIN（首次激活） |
-| POST | `/rosekhlifa/login` | 管理员密码登录 |
+| POST | `/airvel/login` | 管理员密码登录 |
 
 ### 用户端点（需 `wangui_session` cookie）
 
@@ -299,24 +299,24 @@ CREATE TABLE web_sessions (
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/rosekhlifa/me` | 检查 admin 登录态 |
-| POST | `/rosekhlifa/logout` | 退出 |
-| GET | `/rosekhlifa/stats` | 概览数据 |
-| GET | `/rosekhlifa/codes` | 卡密列表（含 `boundUserName`） |
-| POST | `/rosekhlifa/codes` | 批量生成卡密 |
-| PUT | `/rosekhlifa/codes/{code}` | 改备注 / 启用禁用 |
-| DELETE | `/rosekhlifa/codes/{code}` | 删除（仅未用） |
-| GET | `/rosekhlifa/users` | 用户列表（含 `dormName`） |
-| GET | `/rosekhlifa/users/{id}` | 单用户详情 + 最近签到 |
-| PUT | `/rosekhlifa/users/{id}` | 禁用 / 启用 / 改 autoSign |
-| POST | `/rosekhlifa/users/{id}/pin` | 重置用户 PIN（可生成 6 位随机） |
-| DELETE | `/rosekhlifa/users/{id}` | 删用户 + 释放卡密 |
-| GET | `/rosekhlifa/dorms` | 宿舍楼列表（含 `users` count） |
-| POST | `/rosekhlifa/dorms` | 添加宿舍楼 |
-| PUT | `/rosekhlifa/dorms/{id}` | 修改 |
-| DELETE | `/rosekhlifa/dorms/{id}` | 删除（仅无用户绑定） |
-| GET | `/rosekhlifa/dorms/{id}/users` | 该宿舍楼的绑定用户列表 |
-| GET | `/rosekhlifa/logs` | 全局签到流水（含 userName） |
+| GET | `/airvel/me` | 检查 admin 登录态 |
+| POST | `/airvel/logout` | 退出 |
+| GET | `/airvel/stats` | 概览数据 |
+| GET | `/airvel/codes` | 卡密列表（含 `boundUserName`） |
+| POST | `/airvel/codes` | 批量生成卡密 |
+| PUT | `/airvel/codes/{code}` | 改备注 / 启用禁用 |
+| DELETE | `/airvel/codes/{code}` | 删除（仅未用） |
+| GET | `/airvel/users` | 用户列表（含 `dormName`） |
+| GET | `/airvel/users/{id}` | 单用户详情 + 最近签到 |
+| PUT | `/airvel/users/{id}` | 禁用 / 启用 / 改 autoSign |
+| POST | `/airvel/users/{id}/pin` | 重置用户 PIN（可生成 6 位随机） |
+| DELETE | `/airvel/users/{id}` | 删用户 + 释放卡密 |
+| GET | `/airvel/dorms` | 宿舍楼列表（含 `users` count） |
+| POST | `/airvel/dorms` | 添加宿舍楼 |
+| PUT | `/airvel/dorms/{id}` | 修改 |
+| DELETE | `/airvel/dorms/{id}` | 删除（仅无用户绑定） |
+| GET | `/airvel/dorms/{id}/users` | 该宿舍楼的绑定用户列表 |
+| GET | `/airvel/logs` | 全局签到流水（含 userName） |
 
 ---
 
@@ -443,7 +443,7 @@ CREATE TABLE web_sessions (
 | **暴力破解登录** | IP 限流 5 次/分钟（in-memory，重启清零） |
 | **用户枚举** | "学号或 PIN 不正确" 统一报错；不存在的 user 也跑假 bcrypt（时序防御） |
 | **会话劫持** | HttpOnly cookie；生产环境 HTTPS Only |
-| **Admin 路径扫描** | `/admin/*` 已改成 `/rosekhlifa/*`，前后端均改 |
+| **Admin 路径扫描** | `/admin/*` 已改成 `/airvel/*`，前后端均改 |
 | **同一 user_id 绑多张卡密** | activate 时 Guard：已有卡密的 user_id 拒绝新激活 |
 | **空坐标签到** | 调度器 + 用户端均 check `lat == 0` → 标记 failed |
 | **学校 API 拒签** | 调度器记录失败原因，retry 3 次。token 401 → 标记 "token 已失效" |
@@ -499,7 +499,7 @@ cd ..  && go build -o wangui.exe ./cmd/wangui
 |---|---|
 | **监听端口** | `127.0.0.1:4444` |
 | **管理员密码** | `RoseKhlifa880818`（生产请改） |
-| **管理员路径** | `/rosekhlifa/login` |
+| **管理员路径** | `/airvel/login` |
 | **学校签到窗口** | 22:00 – 22:30 |
 | **新用户默认触发** | 22:02 + 0~180s jitter |
 | **默认重试** | 3 次，每 5 分钟一次 |
@@ -513,7 +513,7 @@ cd ..  && go build -o wangui.exe ./cmd/wangui
 
 **实现位置**：`internal/notify/email.go` (smtp 客户端) + `internal/notify/dispatch.go` (业务封装)
 
-**配置方式**：管理员后台 `/rosekhlifa/settings` → SMTP 表单
+**配置方式**：管理员后台 `/airvel/settings` → SMTP 表单
 - Host / Port (默认 smtp.gmail.com:587, STARTTLS)
 - 发件人邮箱 (SMTP Username)
 - 应用专用密码 (Gmail App Password, 16 位) → **AES-GCM 加密后存 SQLite**
@@ -536,9 +536,9 @@ cd ..  && go build -o wangui.exe ./cmd/wangui
 | ✗ | ✗ | 不发 |
 
 **API 端点**：
-- `GET /api/v1/rosekhlifa/smtp` — 读配置（密码字段返 `passwordSet: bool`，不回密码本体）
-- `PUT /api/v1/rosekhlifa/smtp` — 改配置（password 空字符串 = 保留旧值）
-- `POST /api/v1/rosekhlifa/smtp/test` — 发测试邮件给 adminBcc / 自己
+- `GET /api/v1/airvel/smtp` — 读配置（密码字段返 `passwordSet: bool`，不回密码本体）
+- `PUT /api/v1/airvel/smtp` — 改配置（password 空字符串 = 保留旧值）
+- `POST /api/v1/airvel/smtp/test` — 发测试邮件给 adminBcc / 自己
 
 **用户端**：`/settings` → 「邮件通知」section → toggle + email input
 

@@ -75,7 +75,7 @@ async function loadStats() {
 const streakTone = computed(() => {
   const n = stats.value?.currentStreak ?? 0
   if (n >= 30) return 'fire' // amber/red — on fire
-  if (n >= 7) return 'good'  // emerald — solid
+  if (n >= 7) return 'good'  // red — solid
   if (n >= 1) return 'mild'  // blue — getting there
   return 'cold'              // zinc — nothing yet
 })
@@ -113,7 +113,7 @@ const tokenColor = computed(() => {
   if (s <= 0) return 'text-red-400'
   if (s < 24 * 3600) return 'text-red-400'
   if (s < 3 * 24 * 3600) return 'text-amber-400'
-  return 'text-emerald-400'
+  return 'text-red-400'
 })
 
 // Today's most recent record (any status). Used by the Today-status card
@@ -195,7 +195,7 @@ async function toggleSkipToday() {
 // Notification-channel summary, surfaced as a chip in the hero so the user
 // remembers what they will/won't get pinged on. Reads only the boolean flags
 // + the keySet marker — the actual SendKey never reaches the browser.
-type NotifyTone = 'emerald' | 'amber' | 'zinc'
+type NotifyTone = 'red' | 'amber' | 'zinc'
 const notifyState = computed<{ tone: NotifyTone; label: string; sub: string }>(() => {
   const s = me.value?.settings
   if (!s) return { tone: 'zinc', label: '通知未配置', sub: '前往配置 →' }
@@ -203,9 +203,9 @@ const notifyState = computed<{ tone: NotifyTone; label: string; sub: string }>((
   const wechatOn = !!s.serverChanEnabled && !!s.serverChanKeySet
   const emailConfigured = !!s.notifyEmail
   const wechatConfigured = !!s.serverChanKeySet
-  if (emailOn && wechatOn) return { tone: 'emerald', label: '通知已开启', sub: '微信 + 邮件' }
-  if (wechatOn) return { tone: 'emerald', label: '通知已开启', sub: '仅微信' }
-  if (emailOn) return { tone: 'emerald', label: '通知已开启', sub: '仅邮件' }
+  if (emailOn && wechatOn) return { tone: 'red', label: '通知已开启', sub: '微信 + 邮件' }
+  if (wechatOn) return { tone: 'red', label: '通知已开启', sub: '仅微信' }
+  if (emailOn) return { tone: 'red', label: '通知已开启', sub: '仅邮件' }
   if (emailConfigured || wechatConfigured) return { tone: 'amber', label: '通知已关闭', sub: '已配置但未启用' }
   return { tone: 'zinc', label: '通知未配置', sub: '前往配置 →' }
 })
@@ -262,8 +262,8 @@ async function signNow() {
 const recentRecords = computed(() => records.value.slice(0, 5))
 
 const recordMeta: Record<string, { label: string; color: string; dotBg: string }> = {
-  success: { label: '签到成功', color: 'text-emerald-400', dotBg: 'bg-emerald-500' },
-  already: { label: '今日已签', color: 'text-blue-400', dotBg: 'bg-blue-500' },
+  success: { label: '签到成功', color: 'text-red-400', dotBg: 'bg-red-500' },
+  already: { label: '今日已签', color: 'text-blue-400', dotBg: 'bg-sky-500' },
   exempt: { label: '免签', color: 'text-zinc-500 dark:text-zinc-400', dotBg: 'bg-zinc-500' },
   failed: { label: '签到失败', color: 'text-red-400', dotBg: 'bg-red-500' },
   skipped: { label: '跳过', color: 'text-amber-400', dotBg: 'bg-amber-500' },
@@ -274,7 +274,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
   <div v-if="me" class="space-y-3">
     <!-- Hero -->
     <section
-      class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-zinc-100/40 dark:from-zinc-900 dark:to-zinc-900/40 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5 ambient-glow"
+      class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-zinc-100/40 dark:from-[#161b22] dark:to-[#161b22]/40 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5 ambient-glow"
     >
       <div class="relative flex items-center gap-4">
         <Avatar
@@ -304,7 +304,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
             to="/settings"
             class="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 transition-colors text-xs"
             :class="me.settings.dormName
-              ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300 hover:bg-emerald-500/15'
+              ? 'bg-red-500/10 ring-red-500/25 text-red-300 hover:bg-red-500/15'
               : 'bg-amber-500/10 ring-amber-500/25 text-amber-300 hover:bg-amber-500/15'"
           >
             <MapPin class="w-3.5 h-3.5" />
@@ -320,18 +320,18 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
           <RouterLink
             to="/settings"
             class="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 transition-colors text-xs"
-            :class="notifyState.tone === 'emerald'
-              ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300 hover:bg-emerald-500/15'
+            :class="notifyState.tone === 'red'
+              ? 'bg-red-500/10 ring-red-500/25 text-red-300 hover:bg-red-500/15'
               : notifyState.tone === 'amber'
                 ? 'bg-amber-500/10 ring-amber-500/25 text-amber-300 hover:bg-amber-500/15'
                 : 'bg-zinc-500/10 ring-zinc-500/25 text-zinc-500 hover:bg-zinc-500/15'"
-            :title="notifyState.tone === 'emerald'
+            :title="notifyState.tone === 'red'
               ? '签到结果 + Token 即将过期都会推到这些通道'
               : notifyState.tone === 'amber'
                 ? '已配置但开关都关着，不会收到提醒'
                 : '没有任何通知通道；签到出错你不会知道'"
           >
-            <Bell v-if="notifyState.tone === 'emerald'" class="w-3.5 h-3.5" />
+            <Bell v-if="notifyState.tone === 'red'" class="w-3.5 h-3.5" />
             <BellOff v-else class="w-3.5 h-3.5" />
             <div class="leading-tight">
               <div class="text-[10px] opacity-70 tracking-wide uppercase">
@@ -350,7 +350,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
           to="/settings"
           class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg ring-1 text-[11px] min-w-0"
           :class="me.settings.dormName
-            ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300'
+            ? 'bg-red-500/10 ring-red-500/25 text-red-300'
             : 'bg-amber-500/10 ring-amber-500/25 text-amber-300'"
         >
           <MapPin class="w-3.5 h-3.5 shrink-0" />
@@ -361,13 +361,13 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         <RouterLink
           to="/settings"
           class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg ring-1 text-[11px] min-w-0"
-          :class="notifyState.tone === 'emerald'
-            ? 'bg-emerald-500/10 ring-emerald-500/25 text-emerald-300'
+          :class="notifyState.tone === 'red'
+            ? 'bg-red-500/10 ring-red-500/25 text-red-300'
             : notifyState.tone === 'amber'
               ? 'bg-amber-500/10 ring-amber-500/25 text-amber-300'
               : 'bg-zinc-500/10 ring-zinc-500/25 text-zinc-500'"
         >
-          <Bell v-if="notifyState.tone === 'emerald'" class="w-3.5 h-3.5 shrink-0" />
+          <Bell v-if="notifyState.tone === 'red'" class="w-3.5 h-3.5 shrink-0" />
           <BellOff v-else class="w-3.5 h-3.5 shrink-0" />
           <span class="font-medium truncate">{{ notifyState.sub }}</span>
         </RouterLink>
@@ -385,22 +385,22 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         :class="streakTone === 'fire'
           ? 'bg-gradient-to-br from-amber-500/15 to-red-500/10 ring-amber-500/30'
           : streakTone === 'good'
-            ? 'bg-emerald-500/10 ring-emerald-500/25'
+            ? 'bg-red-500/10 ring-red-500/25'
             : streakTone === 'mild'
-              ? 'bg-blue-500/10 ring-blue-500/25'
-              : 'bg-white/85 dark:bg-zinc-900/60 ring-black/[0.08] dark:ring-white/[0.06]'"
+              ? 'bg-sky-500/10 ring-sky-500/25'
+              : 'bg-white/85 dark:bg-[#161b22]/60 ring-black/[0.08] dark:ring-white/[0.06]'"
       >
         <div class="flex items-center gap-1.5 mb-1">
           <Flame
             class="w-3.5 h-3.5"
-            :class="streakTone === 'fire' ? 'text-amber-400' : streakTone === 'good' ? 'text-emerald-400' : streakTone === 'mild' ? 'text-blue-400' : 'text-zinc-500'"
+            :class="streakTone === 'fire' ? 'text-amber-400' : streakTone === 'good' ? 'text-red-400' : streakTone === 'mild' ? 'text-blue-400' : 'text-zinc-500'"
           />
           <span class="text-[10px] uppercase tracking-wide text-zinc-500">连签</span>
         </div>
         <div class="flex items-baseline gap-1">
           <span
             class="text-2xl font-bold tabular-nums"
-            :class="streakTone === 'fire' ? 'text-amber-400' : streakTone === 'good' ? 'text-emerald-400' : streakTone === 'mild' ? 'text-blue-400' : 'text-zinc-500'"
+            :class="streakTone === 'fire' ? 'text-amber-400' : streakTone === 'good' ? 'text-red-400' : streakTone === 'mild' ? 'text-blue-400' : 'text-zinc-500'"
           >
             {{ stats.currentStreak }}
           </span>
@@ -412,7 +412,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
       </div>
 
       <!-- Month progress -->
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
         <div class="flex items-center gap-1.5 mb-1">
           <CalendarCheck class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[10px] uppercase tracking-wide text-zinc-500">本月</span>
@@ -423,7 +423,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         </div>
         <div class="mt-1.5 h-1 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
           <div
-            class="h-full bg-emerald-500 transition-[width] duration-500"
+            class="h-full bg-red-500 transition-[width] duration-500"
             :style="`width: ${monthPct}%`"
           />
         </div>
@@ -431,7 +431,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
       </div>
 
       <!-- Lifetime total -->
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
         <div class="flex items-center gap-1.5 mb-1">
           <TrendingUp class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[10px] uppercase tracking-wide text-zinc-500">总签到</span>
@@ -450,7 +450,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
       </div>
 
       <!-- Best ever -->
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3">
         <div class="flex items-center gap-1.5 mb-1">
           <Trophy class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[10px] uppercase tracking-wide text-zinc-500">最佳记录</span>
@@ -481,7 +481,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         system fires at 22:0X, the record arrives, records auto-poll picks
         it up within 30s, and this card flips to "已完成" on its own.
       -->
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
         <div class="flex items-center gap-1.5 mb-2">
           <CheckCircle2 class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[11px] text-zinc-500 tracking-wide uppercase">今日签到</span>
@@ -495,8 +495,8 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         </template>
         <template v-else-if="todayState === 'done'">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgb(16_185_129_/_0.8)]" />
-            <span class="text-emerald-400 font-semibold text-base">已完成</span>
+            <span class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgb(16_185_129_/_0.8)]" />
+            <span class="text-red-400 font-semibold text-base">已完成</span>
           </div>
           <p class="text-xs text-zinc-500 mt-1.5">
             {{ todayRecord?.status === 'already' ? '今日已签到 ✓' : '签到成功 ✓' }}
@@ -507,7 +507,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         </template>
         <template v-else-if="todayState === 'exempt'">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-blue-500" />
+            <span class="w-2 h-2 rounded-full bg-sky-500" />
             <span class="text-blue-400 font-semibold text-base">今日免签</span>
           </div>
           <p class="text-xs text-zinc-500 mt-1.5 truncate">
@@ -561,13 +561,13 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         occurrence. Keeps semantics distinct from the Today card so the
         two never tell the same story.
       -->
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
         <div class="flex items-center gap-1.5 mb-2">
           <Clock class="w-3.5 h-3.5 text-zinc-500" />
           <span class="text-[11px] text-zinc-500 tracking-wide uppercase">我的签到时刻</span>
         </div>
         <div class="flex items-baseline gap-1.5">
-          <span class="text-3xl font-bold tabular-nums leading-none text-emerald-400">
+          <span class="text-3xl font-bold tabular-nums leading-none text-red-400">
             {{ mySignTimeStr }}
           </span>
           <span class="text-[10px] text-zinc-500">±60秒</span>
@@ -586,7 +586,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
       <!-- Token -->
       <RouterLink
         to="/account"
-        class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4 hover:ring-black/[0.12] dark:hover:ring-white/[0.12] transition-all block"
+        class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4 hover:ring-black/[0.12] dark:hover:ring-white/[0.12] transition-all block"
       >
         <div class="flex items-center gap-1.5 mb-2">
           <KeyRound class="w-3.5 h-3.5 text-zinc-500" />
@@ -611,14 +611,14 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
       <button
         @click="signNow"
         :disabled="signing"
-        class="group rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 ring-1 ring-emerald-500/30 hover:ring-emerald-500/50 p-4 text-left transition-all disabled:opacity-50"
+        class="group rounded-xl bg-red-500/10 hover:bg-red-500/15 ring-1 ring-red-500/30 hover:ring-red-500/50 p-4 text-left transition-all disabled:opacity-50"
       >
         <div class="flex items-start justify-between mb-2">
-          <Zap class="w-5 h-5 text-emerald-400" :class="signing ? 'wangui-spin' : ''" />
-          <ArrowRight class="w-4 h-4 text-emerald-400/60 group-hover:translate-x-0.5 transition-transform" />
+          <Zap class="w-5 h-5 text-red-400" :class="signing ? 'wangui-spin' : ''" />
+          <ArrowRight class="w-4 h-4 text-red-400/60 group-hover:translate-x-0.5 transition-transform" />
         </div>
-        <p class="font-semibold text-emerald-200 text-base">立即签到</p>
-        <p class="text-xs text-emerald-400/70 mt-0.5">在窗口期内手动触发一次</p>
+        <p class="font-semibold text-red-200 text-base">立即签到</p>
+        <p class="text-xs text-red-400/70 mt-0.5">在窗口期内手动触发一次</p>
       </button>
 
       <!-- Z 今晚跳过 / 恢复 -->
@@ -628,7 +628,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         class="group rounded-xl ring-1 p-4 text-left transition-all disabled:opacity-50"
         :class="isSkippedToday
           ? 'bg-amber-500/10 hover:bg-amber-500/15 ring-amber-500/30 hover:ring-amber-500/50'
-          : 'bg-white/85 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-900 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-amber-500/30'"
+          : 'bg-white/85 dark:bg-[#161b22]/60 hover:bg-zinc-100 dark:hover:bg-[#161b22] ring-black/[0.08] dark:ring-white/[0.06] hover:ring-amber-500/30'"
         :title="isSkippedToday ? '点击恢复今晚自动签' : '今晚不在校时点这里，wangui 会跳过签到，避免谎报位置'"
       >
         <div class="flex items-start justify-between mb-2">
@@ -651,7 +651,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
       <!-- 配置 -->
       <RouterLink
         to="/settings"
-        class="group rounded-xl bg-white/85 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-900 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-4 text-left transition-all block"
+        class="group rounded-xl bg-white/85 dark:bg-[#161b22]/60 hover:bg-zinc-100 dark:hover:bg-[#161b22] ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-4 text-left transition-all block"
       >
         <div class="flex items-start justify-between mb-2">
           <MapPin class="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
@@ -668,7 +668,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         href="https://xhbcs.henau.edu.cn"
         target="_blank"
         rel="noopener noreferrer"
-        class="group rounded-xl bg-white/85 dark:bg-zinc-900/60 hover:bg-blue-500/[0.08] ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-blue-500/40 p-4 text-left transition-all block"
+        class="group rounded-xl bg-white/85 dark:bg-[#161b22]/60 hover:bg-sky-500/[0.08] ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-sky-500/40 p-4 text-left transition-all block"
         title="跳学校晚归 H5（应急 / 手动签到通道）"
       >
         <div class="flex items-start justify-between mb-2">
@@ -681,13 +681,13 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
     </div>
 
     <!-- Recent records preview -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
           <ScrollText class="w-4 h-4 text-zinc-500" />
-          <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">最近签到</h3>
+          <h3 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">最近签到</h3>
         </div>
-        <RouterLink to="/records" class="text-xs text-zinc-500 hover:text-emerald-400 transition-colors flex items-center gap-1">
+        <RouterLink to="/records" class="text-xs text-zinc-500 hover:text-red-400 transition-colors flex items-center gap-1">
           查看全部
           <ArrowRight class="w-3 h-3" />
         </RouterLink>
@@ -702,7 +702,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         <div class="absolute left-[7px] top-1.5 bottom-1.5 w-px bg-gradient-to-b from-transparent via-black/[0.06] dark:via-white/[0.06] to-transparent" />
         <li v-for="r in recentRecords" :key="r.id" class="relative pl-7 pb-3 last:pb-0">
           <span
-            class="absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ring-white dark:ring-zinc-900"
+            class="absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ring-white dark:ring-[#161b22]"
             :class="(recordMeta[r.status] || recordMeta.failed).dotBg"
           />
           <div class="flex items-start justify-between gap-3">

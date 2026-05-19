@@ -75,7 +75,7 @@
 ### 管理员侧
 
 - **概览**：用户数 / 邀请码 / 今日签到 / Token 24h 内过期告警 + **学校签到规则面板**（每日 18:00 自动从学校 API 抓取，规则变化自动推送）
-- **监控看板**（`/rosekhlifa/monitor`）：
+- **监控看板**（`/airvel/monitor`）：
   - **全员可见**，6 类 chip 自动分类：今晚要签 / 临时·今晚 / 周次跳过 / 自动签关 / 已禁用 / 临时·非今天
   - 顶部 filter 按钮组 + 数量徽章
   - **SSE 实时事件流**：连接成功后表头变绿，相关行收到事件 4 秒绿色闪烁
@@ -190,7 +190,7 @@ backup armed next=...
 
 完整步骤（含 1Panel 反代 / 子域名 / 备份策略 / 升级 / 故障排查）见 [`ubuntu.md`](./ubuntu.md)。
 
-> 如果反代用 nginx，**记得 `proxy_buffering off;` 给 `/api/v1/rosekhlifa/events`**，否则 SSE 事件会卡在 nginx 缓冲。1Panel 默认 OK。
+> 如果反代用 nginx，**记得 `proxy_buffering off;` 给 `/api/v1/airvel/events`**，否则 SSE 事件会卡在 nginx 缓冲。1Panel 默认 OK。
 
 ### 3.2 朋友使用流程（主路径：扫码）
 
@@ -393,7 +393,7 @@ docker compose start
 | Admin Server 酱 SendKey | 同上加密 |
 | 用户 PIN | bcrypt cost 12 |
 | Session | 64-byte 随机 ID，HttpOnly + SameSite=Lax，DB 存 expires_at |
-| Admin 路径 | 混淆为 `/rosekhlifa`（不是 `/admin`），防扫描 |
+| Admin 路径 | 混淆为 `/airvel`（不是 `/admin`），防扫描 |
 | 邀请码 | 一码绑一学号；释放后可重激活 |
 | 限流 | login / activate / precheck 共享 5/min IP 桶 |
 | **两步激活** | step 1 通过 (precheck 邀请码) 才显示 step 2 的 OAuth UI；路人无邀请码看不到 OAuth 流程 |

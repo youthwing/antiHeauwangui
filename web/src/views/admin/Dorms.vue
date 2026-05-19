@@ -164,7 +164,7 @@ async function remove(d: AdminDorm) {
       </div>
       <button
         @click="openCreate"
-        class="self-start inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        class="self-start inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-400 text-[#0d1117] text-sm font-medium px-4 py-2 rounded-lg transition-colors"
       >
         <Plus class="w-4 h-4" />
         添加宿舍楼
@@ -177,19 +177,19 @@ async function remove(d: AdminDorm) {
         <input
           v-model="search"
           placeholder="搜索名称 / 地址 / 备注"
-          class="w-full pl-9 pr-3 py-2 bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+          class="w-full pl-9 pr-3 py-2 bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
         />
       </div>
       <button @click="load" :disabled="loading"
-        class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1">
+        class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1">
         <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'wangui-spin' : ''" />
       </button>
     </div>
 
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead class="bg-white/50 dark:bg-zinc-950/50 border-b border-black/[0.08] dark:border-white/[0.06]">
+          <thead class="bg-white/50 dark:bg-[#0d1117]/50 border-b border-black/[0.08] dark:border-white/[0.06]">
             <tr class="text-left text-[10px] text-zinc-500 uppercase tracking-wide">
               <th class="px-4 py-3 font-medium">名称</th>
               <th class="px-4 py-3 font-medium">坐标 (WGS84)</th>
@@ -203,7 +203,7 @@ async function remove(d: AdminDorm) {
           <tbody class="divide-y divide-black/[0.05] dark:divide-white/[0.04]">
             <tr v-if="loading && filtered.length === 0">
               <td colspan="7" class="px-4 py-10 text-center">
-                <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin mx-auto" />
+                <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin mx-auto" />
               </td>
             </tr>
             <tr v-else-if="filtered.length === 0">
@@ -215,7 +215,7 @@ async function remove(d: AdminDorm) {
               class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
               <td class="px-4 py-3 font-medium">
                 <div class="flex items-center gap-2">
-                  <Building2 class="w-3.5 h-3.5 text-emerald-400" />
+                  <Building2 class="w-3.5 h-3.5 text-red-400" />
                   {{ d.name }}
                 </div>
                 <div v-if="d.note" class="text-[10px] text-zinc-500 mt-0.5 ml-5">{{ d.note }}</div>
@@ -229,7 +229,7 @@ async function remove(d: AdminDorm) {
               <td class="px-4 py-3">
                 <span
                   v-if="d.sendAddressFields"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-sky-500/15 text-blue-300 ring-1 ring-sky-500/30"
                   title="签到时一并发送 locationAddress/city/road/poi"
                 >
                   <Eye class="w-3 h-3" />
@@ -248,7 +248,7 @@ async function remove(d: AdminDorm) {
                 <button
                   v-if="d.users > 0"
                   @click.stop="openDormUsers(d)"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/25 transition-colors cursor-pointer"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30 hover:bg-red-500/25 transition-colors cursor-pointer"
                   title="点击查看绑定用户"
                 >
                   <UsersIcon class="w-3 h-3" />
@@ -267,7 +267,7 @@ async function remove(d: AdminDorm) {
               <td class="px-4 py-3 text-right">
                 <div class="inline-flex gap-0.5">
                   <button @click="openEdit(d)" title="编辑"
-                    class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-emerald-400 transition-colors">
+                    class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-red-400 transition-colors">
                     <Pencil class="w-3.5 h-3.5" />
                   </button>
                   <button @click="remove(d)" :disabled="d.users > 0"
@@ -285,16 +285,16 @@ async function remove(d: AdminDorm) {
 
     <!-- Add / Edit modal -->
     <Transition name="modal">
-      <div v-if="showModal" class="fixed inset-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
+      <div v-if="showModal" class="fixed inset-0 z-50 bg-white/80 dark:bg-[#0d1117]/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
         @click.self="showModal = false">
-        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
+        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <h2 class="text-base font-bold flex items-center gap-2">
-              <Building2 class="w-4 h-4 text-emerald-400" />
+              <Building2 class="w-4 h-4 text-red-400" />
               {{ editing ? '编辑宿舍楼' : '添加宿舍楼' }}
             </h2>
             <button @click="showModal = false"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -303,25 +303,25 @@ async function remove(d: AdminDorm) {
             <div>
               <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">宿舍楼名称 *</label>
               <input v-model="form.name" placeholder='例如「东区 12 号楼」'
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
             </div>
 
             <!-- WGS84 coordinates — manual entry. We used to have a Leaflet
                  MapPicker here but the page's CSP killed every external tile
                  host. We just give the admin a labelled form + how-to. -->
-            <div class="rounded-lg bg-blue-500/[0.05] ring-1 ring-blue-500/20 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-2">
+            <div class="rounded-lg bg-sky-500/[0.05] ring-1 ring-sky-500/20 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-2">
               <p>
                 <strong class="text-blue-300">怎么填经纬度</strong>：必须是 <strong>WGS84</strong>（GPS 通用格式），6 位小数 ≈ 米级精度。形如
                 <code class="bg-zinc-200/70 dark:bg-zinc-800/70 px-1 rounded font-mono-token">34.137970, 113.802790</code>。
               </p>
               <p>
-                <strong class="text-emerald-300">推荐取法</strong>（按好用程度排序）：
+                <strong class="text-red-300">推荐取法</strong>（按好用程度排序）：
               </p>
               <ol class="list-decimal list-inside space-y-1.5 pl-2">
                 <li>
                   <strong>Bing 地图（首推 · 卫星图 + WGS84 + 国内可用）</strong><br/>
                   <a href="https://www.bing.com/maps" target="_blank" rel="noopener noreferrer"
-                    class="text-emerald-400 hover:underline">bing.com/maps</a>
+                    class="text-red-400 hover:underline">bing.com/maps</a>
                   → 右上角图层切「鸟瞰」(卫星) → 缩到能看清屋顶 → <strong>右键</strong>想要的位置 → 弹出气泡显示 6 位经纬度
                 </li>
                 <li>
@@ -331,7 +331,7 @@ async function remove(d: AdminDorm) {
                 <li>
                   <strong>Apple Maps 网页版</strong><br/>
                   <a href="https://beta.maps.apple.com" target="_blank" rel="noopener noreferrer"
-                    class="text-emerald-400 hover:underline">beta.maps.apple.com</a>
+                    class="text-red-400 hover:underline">beta.maps.apple.com</a>
                   → 切卫星 → 右键位置 → 显示坐标
                 </li>
                 <li>
@@ -351,43 +351,43 @@ async function remove(d: AdminDorm) {
               <div>
                 <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">纬度 (latitude) *</label>
                 <input v-model.number="form.latitude" type="number" step="0.000001" placeholder="34.137970"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
                 <p class="text-[10px] text-zinc-500 mt-1">南北方向，中国大陆 ~18 到 53</p>
               </div>
               <div>
                 <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">经度 (longitude) *</label>
                 <input v-model.number="form.longitude" type="number" step="0.000001" placeholder="113.802790"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
                 <p class="text-[10px] text-zinc-500 mt-1">东西方向，中国大陆 ~73 到 135</p>
               </div>
               <div class="col-span-2">
                 <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">详细地址（可选）</label>
                 <input v-model="form.address" placeholder="如「许昌市建设路 12 号河南农业大学许昌校区」"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
               </div>
               <div>
                 <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">城市（可选）</label>
                 <input v-model="form.city" placeholder="如「许昌」"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
               </div>
               <div>
                 <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">街道（可选）</label>
                 <input v-model="form.road" placeholder="如「建设路」"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
               </div>
               <div class="col-span-2">
                 <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">POI 名称（可选）</label>
                 <input v-model="form.poi" placeholder="如「东区 12 号楼」"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
               </div>
               <div class="col-span-2">
                 <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">备注 (仅管理员可见)</label>
                 <input v-model="form.note" placeholder='例如「主要给软件学院 23 级用」'
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
               </div>
 
               <!-- Payload mode toggle -->
-              <div class="col-span-2 mt-2 rounded-lg bg-white/50 dark:bg-zinc-950/50 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+              <div class="col-span-2 mt-2 rounded-lg bg-white/50 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
                 <div class="flex items-center justify-between gap-3 mb-2">
                   <div class="flex items-center gap-1.5 min-w-0">
                     <Info class="w-3.5 h-3.5 text-zinc-500 shrink-0" />
@@ -396,7 +396,7 @@ async function remove(d: AdminDorm) {
                   <button
                     type="button"
                     @click="form.sendAddressFields = !form.sendAddressFields"
-                    :class="form.sendAddressFields ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+                    :class="form.sendAddressFields ? 'bg-sky-500' : 'bg-zinc-300 dark:bg-zinc-700'"
                     class="relative w-10 h-5 rounded-full transition-colors shrink-0"
                   >
                     <span
@@ -423,11 +423,11 @@ async function remove(d: AdminDorm) {
 
           <div class="px-5 pb-5 flex justify-end gap-2">
             <button @click="showModal = false"
-              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               取消
             </button>
             <button @click="save" :disabled="saving"
-              class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              class="bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors">
               {{ saving ? '保存中…' : (editing ? '保存修改' : '添加') }}
             </button>
           </div>
@@ -437,13 +437,13 @@ async function remove(d: AdminDorm) {
 
     <!-- Bound-users modal -->
     <Transition name="modal">
-      <div v-if="usersDorm" class="fixed inset-0 z-[60] bg-white/85 dark:bg-zinc-950/85 backdrop-blur flex items-center justify-center p-4"
+      <div v-if="usersDorm" class="fixed inset-0 z-[60] bg-white/85 dark:bg-[#0d1117]/85 backdrop-blur flex items-center justify-center p-4"
         @click.self="usersDorm = null">
-        <div class="w-full max-w-md bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl">
+        <div class="w-full max-w-md bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-9 h-9 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30 flex items-center justify-center shrink-0">
-                <Building2 class="w-4 h-4 text-emerald-400" />
+              <div class="w-9 h-9 rounded-xl bg-red-500/15 ring-1 ring-red-500/30 flex items-center justify-center shrink-0">
+                <Building2 class="w-4 h-4 text-red-400" />
               </div>
               <div class="min-w-0">
                 <h2 class="text-base font-bold truncate">{{ usersDorm.name }}</h2>
@@ -451,21 +451,21 @@ async function remove(d: AdminDorm) {
               </div>
             </div>
             <button @click="usersDorm = null"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               <X class="w-4 h-4" />
             </button>
           </div>
 
           <div class="p-5 max-h-[60vh] overflow-y-auto">
             <div v-if="loadingDormUsers" class="flex justify-center py-8">
-              <div class="h-5 w-5 rounded-full border-2 border-zinc-300 dark:border-zinc-800 border-t-emerald-400 wangui-spin" />
+              <div class="h-5 w-5 rounded-full border-2 border-zinc-300 dark:border-zinc-800 border-t-red-400 wangui-spin" />
             </div>
             <p v-else-if="dormUsers.length === 0" class="text-sm text-zinc-500 text-center py-6">
               暂无用户
             </p>
             <ul v-else class="space-y-1.5">
               <li v-for="u in dormUsers" :key="u.userId"
-                class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white dark:bg-zinc-950 ring-1 ring-black/[0.04] dark:ring-white/[0.04]">
+                class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.04] dark:ring-white/[0.04]">
                 <div class="min-w-0 flex-1">
                   <p class="text-sm font-medium truncate">{{ u.userName }}</p>
                   <p class="text-[11px] text-zinc-500 mt-0.5 truncate">
@@ -481,7 +481,7 @@ async function remove(d: AdminDorm) {
                   已禁用
                 </span>
                 <span v-else-if="u.autoSign"
-                  class="inline-flex px-2 py-0.5 rounded-md text-[10px] bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30 shrink-0">
+                  class="inline-flex px-2 py-0.5 rounded-md text-[10px] bg-red-500/15 text-red-400 ring-1 ring-red-500/30 shrink-0">
                   自动
                 </span>
                 <span v-else

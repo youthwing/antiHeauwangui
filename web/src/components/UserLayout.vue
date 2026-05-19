@@ -80,10 +80,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative flex flex-col md:flex-row mx-auto max-w-[1700px] bg-white dark:bg-zinc-950 min-h-screen">
+  <div class="relative flex flex-col md:flex-row mx-auto max-w-[1700px] bg-white dark:bg-[#0d1117] min-h-screen">
     <!-- Sidebar (desktop, sticky below the global banner) -->
     <aside
-      class="hidden md:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-black/[0.06] dark:border-white/[0.05] bg-white/60 dark:bg-zinc-950/60 backdrop-blur-xl overflow-y-auto"
+      class="hidden md:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-black/[0.06] dark:border-white/[0.05] bg-white/60 dark:bg-[#0d1117]/60 backdrop-blur-xl overflow-y-auto"
     >
       <div class="px-5 py-5 border-b border-black/[0.05] dark:border-white/[0.04]">
         <Logo :size="34" text="勿外传" />
@@ -92,12 +92,12 @@ onUnmounted(() => {
              impact. Hidden until the first count loads to avoid a 0 flash. -->
         <div
           v-if="totalSigns !== null && totalSigns > 0"
-          class="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-gradient-to-r from-emerald-500/10 to-amber-500/10 ring-1 ring-emerald-500/20 text-zinc-700 dark:text-zinc-300"
+          class="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-gradient-to-r from-red-500/10 to-amber-500/10 ring-1 ring-red-500/20 text-zinc-700 dark:text-zinc-300"
           :title="`从开服至今，wangui 已成功为大家签到 ${totalSigns.toLocaleString()} 次`"
         >
           <Sparkles class="w-3 h-3 text-amber-400" />
           <span>已为大家签到</span>
-          <span class="font-mono-token tabular-nums font-semibold text-emerald-600 dark:text-emerald-300">
+          <span class="font-mono-token tabular-nums font-semibold text-red-600 dark:text-red-300">
             {{ totalSigns.toLocaleString() }}
           </span>
           <span>次</span>
@@ -143,14 +143,14 @@ onUnmounted(() => {
             rounded="lg"
           />
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-200 truncate">{{ auth.state.me.userName }}</p>
+            <p class="text-sm font-medium text-[#161b22] dark:text-zinc-200 truncate">{{ auth.state.me.userName }}</p>
             <p class="text-[11px] text-zinc-500 font-mono-token truncate">{{ auth.state.me.userNumber }}</p>
           </div>
           <ThemeToggle />
         </div>
         <button
           @click="logout"
-          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           <LogOut class="w-4 h-4 text-zinc-500" />
           <span>退出</span>
@@ -159,13 +159,13 @@ onUnmounted(() => {
     </aside>
 
     <!-- Mobile top bar (sits below the global banner) -->
-    <header class="md:hidden sticky top-0 z-30 bg-white/85 dark:bg-zinc-950/85 backdrop-blur-xl border-b border-black/[0.08] dark:border-white/[0.06] h-12 flex items-center justify-between px-4">
+    <header class="md:hidden sticky top-0 z-30 bg-white/85 dark:bg-[#0d1117]/85 backdrop-blur-xl border-b border-black/[0.08] dark:border-white/[0.06] h-12 flex items-center justify-between px-4">
       <Logo :size="26" text="勿外传" />
       <div class="flex items-center gap-1">
         <ThemeToggle />
         <button
           @click="logout"
-          class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+          class="text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
         >
           <LogOut class="w-4 h-4" />
         </button>
@@ -197,7 +197,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Mobile bottom nav -->
-      <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl border-t border-black/[0.08] dark:border-white/[0.06] flex justify-around py-2">
+      <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/90 dark:bg-[#0d1117]/90 backdrop-blur-xl border-t border-black/[0.08] dark:border-white/[0.06] flex justify-around py-2">
         <RouterLink
           v-for="item in items"
           :key="item.to"
@@ -209,7 +209,7 @@ onUnmounted(() => {
             :href="item.to"
             @click.prevent="$router.push(item.to)"
             class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg"
-            :class="isExactActive ? 'text-emerald-400' : 'text-zinc-500'"
+            :class="isExactActive ? 'text-red-400' : 'text-zinc-500'"
           >
             <component :is="item.icon" class="w-5 h-5" />
             <span class="text-[10px]">{{ item.label }}</span>

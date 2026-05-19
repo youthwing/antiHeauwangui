@@ -123,15 +123,15 @@ onMounted(async () => {
     </header>
 
     <!-- SMTP 邮件通知 -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-4 gap-3">
         <div class="flex items-center gap-2">
           <Mail class="w-4 h-4 text-zinc-500" />
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">邮件通知 (SMTP)</h2>
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">邮件通知 (SMTP)</h2>
         </div>
         <button
           @click="smtp.enabled = !smtp.enabled"
-          :class="smtp.enabled ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+          :class="smtp.enabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
           class="relative w-11 h-6 rounded-full transition-colors shrink-0"
         >
           <span
@@ -152,7 +152,7 @@ onMounted(async () => {
           <input
             v-model="smtp.host"
             placeholder="smtp.gmail.com"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 font-mono-token"
           />
         </div>
         <div>
@@ -161,7 +161,7 @@ onMounted(async () => {
             v-model.number="smtp.port"
             type="number"
             placeholder="587"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 font-mono-token"
           />
         </div>
         <div class="sm:col-span-2">
@@ -170,13 +170,13 @@ onMounted(async () => {
             v-model="smtp.username"
             type="email"
             placeholder="you@gmail.com"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 font-mono-token"
           />
         </div>
         <div class="sm:col-span-2">
           <label class="flex items-center justify-between text-[10px] text-zinc-500 tracking-wide uppercase mb-1">
             <span>应用专用密码 (App Password)</span>
-            <span v-if="passwordSet && !smtp.password" class="text-emerald-600 dark:text-emerald-400 normal-case tracking-normal">
+            <span v-if="passwordSet && !smtp.password" class="text-red-600 dark:text-red-400 normal-case tracking-normal">
               ✓ 已设置，留空保持不变
             </span>
           </label>
@@ -185,12 +185,12 @@ onMounted(async () => {
               v-model="smtp.password"
               :type="showPassword ? 'text' : 'password'"
               :placeholder="passwordSet ? '保持不变（输入新值才覆盖）' : '16 位 Gmail app password'"
-              class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 pr-10 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token"
+              class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 pr-10 text-sm focus-ring text-[#161b22] dark:text-zinc-200 font-mono-token"
             />
             <button
               @click="showPassword = !showPassword"
               type="button"
-              class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-100"
             >
               <component :is="showPassword ? EyeOff : Eye" class="w-3.5 h-3.5" />
             </button>
@@ -203,7 +203,7 @@ onMounted(async () => {
           <input
             v-model="smtp.from"
             placeholder='例如 勿外传 &lt;you@gmail.com&gt;'
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200"
           />
         </div>
         <div class="sm:col-span-2">
@@ -214,7 +214,7 @@ onMounted(async () => {
             v-model="smtp.adminBcc"
             type="email"
             placeholder="admin@example.com (留空则只发给用户自己)"
-            class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 font-mono-token"
           />
           <p class="text-[11px] text-zinc-500 mt-1.5 leading-relaxed">
             如果用户没开通知，但你配了这个邮箱 → 你仍然会收到所有签到结果（用作管理员日志）。
@@ -226,7 +226,7 @@ onMounted(async () => {
         <button
           @click="testSend"
           :disabled="testingSmtp || !passwordSet"
-          class="inline-flex items-center gap-1.5 bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-blue-500/30 text-blue-700 dark:text-blue-300 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          class="inline-flex items-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           :title="passwordSet ? '' : '请先保存配置（含密码）'"
         >
           <Send class="w-3.5 h-3.5" :class="testingSmtp ? 'wangui-spin' : ''" />
@@ -235,7 +235,7 @@ onMounted(async () => {
         <button
           @click="saveSmtp"
           :disabled="savingSmtp"
-          class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+          class="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors"
         >
           <Save class="w-3.5 h-3.5" />
           {{ savingSmtp ? '保存中…' : '保存配置' }}
@@ -244,15 +244,15 @@ onMounted(async () => {
     </section>
 
     <!-- Server 酱 微信推送 (admin) -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-3 gap-3">
         <div class="flex items-center gap-2">
           <Bell class="w-4 h-4 text-zinc-500" />
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">Server 酱 (管理员推送)</h2>
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">Server 酱 (管理员推送)</h2>
         </div>
         <button
           @click="smtp.adminServerChanEnabled = !smtp.adminServerChanEnabled"
-          :class="smtp.adminServerChanEnabled ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+          :class="smtp.adminServerChanEnabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
           class="relative w-11 h-6 rounded-full transition-colors shrink-0"
         >
           <span
@@ -268,7 +268,7 @@ onMounted(async () => {
       <button
         type="button"
         @click="showServerChanFaq = !showServerChanFaq"
-        class="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors mb-2"
+        class="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors mb-2"
       >
         <HelpCircle class="w-3.5 h-3.5" />
         {{ showServerChanFaq ? '收起说明' : '什么是 Server 酱 / SendKey 在哪拿？' }}
@@ -276,15 +276,15 @@ onMounted(async () => {
       <Transition name="expand">
         <div
           v-if="showServerChanFaq"
-          class="rounded-lg bg-zinc-100 dark:bg-zinc-950/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-3 mb-3 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-2"
+          class="rounded-lg bg-zinc-100 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-3 mb-3 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-2"
         >
           <p>
-            <strong class="text-zinc-900 dark:text-zinc-200">Server 酱（方糖）</strong> 是个免费的「程序 → 微信」推送服务。配置后，wangui
+            <strong class="text-[#161b22] dark:text-zinc-200">Server 酱（方糖）</strong> 是个免费的「程序 → 微信」推送服务。配置后，wangui
             会在签到 / Token 即将过期时调它的接口，你的微信马上收到。
           </p>
           <ol class="list-decimal pl-5 space-y-1">
-            <li>访问 <code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">sct.ftqq.com</code>，微信扫码登录</li>
-            <li>在「SendKey」页面看到形如 <code class="bg-white/70 dark:bg-zinc-900/70 px-1 rounded font-mono-token">SCT123...AbCdEf</code> 的字符串</li>
+            <li>访问 <code class="bg-white/70 dark:bg-[#161b22]/70 px-1 rounded font-mono-token">sct.ftqq.com</code>，微信扫码登录</li>
+            <li>在「SendKey」页面看到形如 <code class="bg-white/70 dark:bg-[#161b22]/70 px-1 rounded font-mono-token">SCT123...AbCdEf</code> 的字符串</li>
             <li>粘下面 → 打开开关 → 保存配置 → 点「发测试推送」</li>
             <li>免费版每天 5 条；不够用上 Server 酱³ 或自建</li>
           </ol>
@@ -293,7 +293,7 @@ onMounted(async () => {
             管理员这里配的，推送<strong>所有用户</strong>的所有事件（包括临时朋友的）。
           </p>
           <p>
-            <strong class="text-zinc-900 dark:text-zinc-200">隐私</strong>：SendKey 等同于「允许给微信发消息」的凭证。
+            <strong class="text-[#161b22] dark:text-zinc-200">隐私</strong>：SendKey 等同于「允许给微信发消息」的凭证。
             wangui <strong>用 AES-256-GCM 加密存储</strong>，从不在网页上回显，只在发送时取出使用。
           </p>
         </div>
@@ -301,7 +301,7 @@ onMounted(async () => {
 
       <label class="flex items-center justify-between text-[10px] text-zinc-500 tracking-wide uppercase mb-1">
         <span>Admin SendKey</span>
-        <span v-if="adminServerChanKeySet && !smtp.adminServerChanKey" class="text-emerald-600 dark:text-emerald-400 normal-case tracking-normal">
+        <span v-if="adminServerChanKeySet && !smtp.adminServerChanKey" class="text-red-600 dark:text-red-400 normal-case tracking-normal">
           ✓ 已设置，留空保持不变
         </span>
       </label>
@@ -311,12 +311,12 @@ onMounted(async () => {
           :type="showAdminServerChanKey ? 'text' : 'password'"
           :placeholder="adminServerChanKeySet ? '保持不变（输入新值才覆盖）' : 'SCT... 或 sctp...'"
           autocomplete="off"
-          class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 pr-10 text-sm focus-ring text-zinc-900 dark:text-zinc-200 font-mono-token"
+          class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 pr-10 text-sm focus-ring text-[#161b22] dark:text-zinc-200 font-mono-token"
         />
         <button
           @click="showAdminServerChanKey = !showAdminServerChanKey"
           type="button"
-          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-100"
         >
           <component :is="showAdminServerChanKey ? EyeOff : Eye" class="w-3.5 h-3.5" />
         </button>
@@ -330,7 +330,7 @@ onMounted(async () => {
           @click="testServerChan"
           :disabled="testingServerChan || !adminServerChanKeySet"
           :title="adminServerChanKeySet ? '使用已保存的 SendKey 发一条' : '请先保存 SendKey'"
-          class="inline-flex items-center gap-1.5 bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-blue-500/30 text-blue-700 dark:text-blue-300 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          class="inline-flex items-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Send class="w-3.5 h-3.5" :class="testingServerChan ? 'wangui-spin' : ''" />
           {{ testingServerChan ? '推送中…' : '发测试推送' }}
@@ -338,7 +338,7 @@ onMounted(async () => {
         <button
           @click="saveSmtp"
           :disabled="savingSmtp"
-          class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+          class="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors"
         >
           <Save class="w-3.5 h-3.5" />
           {{ savingSmtp ? '保存中…' : '保存配置' }}
@@ -347,10 +347,10 @@ onMounted(async () => {
     </section>
 
     <!-- Server info -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <Info class="w-4 h-4 text-zinc-500" />
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">系统状态</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">系统状态</h2>
       </div>
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <div class="flex items-center justify-between">
@@ -373,10 +373,10 @@ onMounted(async () => {
     </section>
 
     <!-- Default schedule (read-only) -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <Clock class="w-4 h-4 text-zinc-500" />
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">默认调度策略</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">默认调度策略</h2>
       </div>
       <p class="text-xs text-zinc-500 mb-4">新激活的用户会继承这些默认值。要修改请直接编辑后端 schema 默认值。</p>
       <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm font-mono-token tabular-nums">
@@ -400,21 +400,21 @@ onMounted(async () => {
     </section>
 
     <!-- Security -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <ShieldCheck class="w-4 h-4 text-zinc-500" />
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">安全</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">安全</h2>
       </div>
       <ul class="text-sm text-zinc-700 dark:text-zinc-300 space-y-3">
         <li class="flex items-start gap-2.5">
-          <Lock class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <Lock class="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
           <div>
             <p class="font-medium">Token / SMTP 密码 加密</p>
             <p class="text-xs text-zinc-500 mt-0.5">AES-256-GCM，主密钥从 <code class="text-zinc-700 dark:text-zinc-300 font-mono-token">WANGUI_MASTER_KEY</code> 环境变量读取。</p>
           </div>
         </li>
         <li class="flex items-start gap-2.5">
-          <Cog class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <Cog class="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
           <div>
             <p class="font-medium">管理员密码</p>
             <p class="text-xs text-zinc-500 mt-0.5">通过 <code class="text-zinc-700 dark:text-zinc-300 font-mono-token">WANGUI_ADMIN_PASS</code> 环境变量配置。重启服务后立即生效。</p>

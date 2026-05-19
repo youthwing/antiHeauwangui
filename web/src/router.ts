@@ -10,7 +10,7 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: 'none' },
   },
   {
-    path: '/rosekhlifa/login',
+    path: '/airvel/login',
     name: 'admin-login',
     component: () => import('./views/admin/Login.vue'),
     meta: { layout: 'none' },
@@ -31,7 +31,7 @@ const routes: RouteRecordRaw[] = [
 
   // Admin area
   {
-    path: '/rosekhlifa',
+    path: '/airvel',
     component: () => import('./components/AdminLayout.vue'),
     meta: { requiresAdmin: true },
     children: [
@@ -39,7 +39,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'monitor', name: 'admin-monitor', component: () => import('./views/admin/Monitor.vue') },
       { path: 'announcements', name: 'admin-announcements', component: () => import('./views/admin/Announcements.vue') },
       // Backward compat: /tonight kept as a redirect so any bookmarks still work.
-      { path: 'tonight', redirect: '/rosekhlifa/monitor' },
+      { path: 'tonight', redirect: '/airvel/monitor' },
       { path: 'codes', name: 'admin-codes', component: () => import('./views/admin/Codes.vue') },
       { path: 'dorms', name: 'admin-dorms', component: () => import('./views/admin/Dorms.vue') },
       { path: 'users', name: 'admin-users', component: () => import('./views/admin/Users.vue') },

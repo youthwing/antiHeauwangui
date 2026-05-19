@@ -60,7 +60,7 @@ const adminState = reactive<AdminAuthState>({
 export function useAdminAuth() {
   async function init() {
     try {
-      const r = await fetch('/api/v1/rosekhlifa/me', { credentials: 'include' })
+      const r = await fetch('/api/v1/airvel/me', { credentials: 'include' })
       adminState.isAdmin = r.ok
     } catch {
       adminState.isAdmin = false

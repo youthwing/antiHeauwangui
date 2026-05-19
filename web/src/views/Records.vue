@@ -53,8 +53,8 @@ const meta: Record<
   SignStatus,
   { label: string; icon: any; color: string; dotBg: string; bg: string }
 > = {
-  success: { label: '签到成功', icon: Check, color: 'text-emerald-400', dotBg: 'bg-emerald-500', bg: 'bg-emerald-500/10 ring-emerald-500/25' },
-  already: { label: '今日已签', icon: CircleDot, color: 'text-blue-400', dotBg: 'bg-blue-500', bg: 'bg-blue-500/10 ring-blue-500/25' },
+  success: { label: '签到成功', icon: Check, color: 'text-red-400', dotBg: 'bg-red-500', bg: 'bg-red-500/10 ring-red-500/25' },
+  already: { label: '今日已签', icon: CircleDot, color: 'text-blue-400', dotBg: 'bg-sky-500', bg: 'bg-sky-500/10 ring-sky-500/25' },
   exempt: { label: '免签', icon: CircleDot, color: 'text-zinc-500 dark:text-zinc-400', dotBg: 'bg-zinc-500', bg: 'bg-zinc-500/10 ring-zinc-500/25' },
   failed: { label: '签到失败', icon: X, color: 'text-red-400', dotBg: 'bg-red-500', bg: 'bg-red-500/10 ring-red-500/25' },
   skipped: { label: '跳过', icon: AlertCircle, color: 'text-amber-400', dotBg: 'bg-amber-500', bg: 'bg-amber-500/10 ring-amber-500/25' },
@@ -115,7 +115,7 @@ function cellColor(s: SignStatus | null): string {
       <button
         @click="load"
         :disabled="loading"
-        class="shrink-0 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 px-3 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5"
+        class="shrink-0 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 px-3 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5"
       >
         <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'wangui-spin' : ''" />
         刷新
@@ -124,30 +124,30 @@ function cellColor(s: SignStatus | null): string {
 
     <!-- Stats row -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
         <p class="text-[10px] text-zinc-500 tracking-wide uppercase">总计</p>
         <p class="text-2xl font-bold tabular-nums mt-1">{{ records.length }}</p>
       </div>
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
         <p class="text-[10px] text-zinc-500 tracking-wide uppercase">成功率</p>
-        <p class="text-2xl font-bold tabular-nums mt-1 text-emerald-400">{{ successRate }}<span class="text-sm text-zinc-500">%</span></p>
+        <p class="text-2xl font-bold tabular-nums mt-1 text-red-400">{{ successRate }}<span class="text-sm text-zinc-500">%</span></p>
       </div>
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
         <p class="text-[10px] text-zinc-500 tracking-wide uppercase">成功 / 已签</p>
         <p class="text-2xl font-bold tabular-nums mt-1 text-blue-300">{{ (stats.success || 0) + (stats.already || 0) }}</p>
       </div>
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
         <p class="text-[10px] text-zinc-500 tracking-wide uppercase">失败</p>
         <p class="text-2xl font-bold tabular-nums mt-1 text-red-300">{{ stats.failed || 0 }}</p>
       </div>
     </div>
 
     <!-- Last 30 days calendar -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">最近 30 天</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">最近 30 天</h2>
         <div class="flex items-center gap-2 text-[10px] text-zinc-500">
-          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-500"></span>成功</span>
+          <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-500"></span>成功</span>
           <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-500"></span>失败</span>
           <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-zinc-200 dark:bg-zinc-800/50 ring-1 ring-zinc-300 dark:ring-zinc-700/50"></span>无</span>
         </div>
@@ -160,7 +160,7 @@ function cellColor(s: SignStatus | null): string {
           :class="cellColor(cell.status)"
           :title="`${cell.date.toLocaleDateString('zh-CN')} ${cell.status || '无记录'}`"
         >
-          <span class="absolute -top-1 -translate-y-full left-1/2 -translate-x-1/2 hidden group-hover:block z-10 px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 text-[10px] whitespace-nowrap pointer-events-none">
+          <span class="absolute -top-1 -translate-y-full left-1/2 -translate-x-1/2 hidden group-hover:block z-10 px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 text-[#161b22] dark:text-zinc-200 text-[10px] whitespace-nowrap pointer-events-none">
             {{ `${cell.date.getMonth() + 1}/${cell.date.getDate()}` }} · {{ cell.status || '无' }}
           </span>
         </div>
@@ -175,8 +175,8 @@ function cellColor(s: SignStatus | null): string {
         :key="opt.key"
         @click="filter = opt.key"
         :class="filter === opt.key
-          ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30'
-          : 'bg-white/85 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'"
+          ? 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30'
+          : 'bg-white/85 dark:bg-[#161b22]/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-[#161b22] dark:hover:text-zinc-200'"
         class="text-xs px-3 py-1 rounded-full transition-colors"
       >
         {{ opt.label }}
@@ -187,9 +187,9 @@ function cellColor(s: SignStatus | null): string {
     </div>
 
     <!-- Full list -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div v-if="loading" class="flex items-center justify-center py-10">
-        <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin" />
+        <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin" />
       </div>
       <div v-else-if="filtered.length === 0" class="flex flex-col items-center py-12 text-center">
         <div class="w-12 h-12 rounded-2xl bg-zinc-200/60 dark:bg-zinc-800/60 ring-1 ring-black/[0.06] dark:ring-white/[0.05] flex items-center justify-center mb-3">
@@ -202,7 +202,7 @@ function cellColor(s: SignStatus | null): string {
         <div class="absolute left-[7px] top-1.5 bottom-1.5 w-px bg-gradient-to-b from-transparent via-black/[0.06] dark:via-white/[0.06] to-transparent" />
         <li v-for="r in filtered" :key="r.id" class="relative pl-7 pb-4 last:pb-0">
           <span
-            class="absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ring-white dark:ring-zinc-900"
+            class="absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ring-white dark:ring-[#161b22]"
             :class="info(r.status).dotBg"
           />
           <div class="flex items-start justify-between gap-3">

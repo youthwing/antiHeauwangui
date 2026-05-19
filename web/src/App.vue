@@ -1,20 +1,37 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useToast } from './lib/toast'
+import { useAuth } from './stores/auth'
 
 const { state: toastState } = useToast()
+const auth = useAuth()
+
+const watermarkText = computed(() => {
+  const name = auth.state.me?.userName?.trim()
+  return name || 'AIRVEL'
+})
+const watermarkItems = Array.from({ length: 96 }, (_, i) => i)
 </script>
 
 <template>
-  <div class="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 antialiased">
-    <!-- "勿外传" watermark drifting diagonally (fills behind centered layout, visible in side margins) -->
-    <div class="pointer-events-none fixed inset-0 overflow-hidden">
-      <div class="absolute -inset-[25%] watermark-bg" />
+  <div class="min-h-screen bg-white dark:bg-[#0d1117] text-[#161b22] dark:text-[#f0f6fc] antialiased">
+    <!-- User-bound watermark: switches to the logged-in user's name. -->
+    <div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+      <div class="absolute -inset-[25%] watermark-layer">
+        <span
+          v-for="i in watermarkItems"
+          :key="i"
+          class="watermark-word"
+        >
+          {{ watermarkText }}
+        </span>
+      </div>
     </div>
 
-    <!-- Ambient background blobs (on top of cross) -->
+    <!-- Brand wash: Netflix red on Apple-white / GitHub-dark surfaces. -->
     <div class="pointer-events-none fixed inset-0 overflow-hidden">
-      <div class="absolute top-[-8%] left-[18%] w-[460px] h-[460px] rounded-full bg-emerald-500/[0.04] blur-3xl" />
-      <div class="absolute top-[55%] right-[-8%] w-[400px] h-[400px] rounded-full bg-blue-500/[0.03] blur-3xl" />
+      <div class="absolute top-[-16%] left-[10%] w-[520px] h-[520px] rounded-full bg-[#e50914]/[0.07] dark:bg-[#e50914]/[0.13] blur-3xl" />
+      <div class="absolute bottom-[-20%] right-[-10%] w-[460px] h-[460px] rounded-full bg-[#8b0008]/[0.04] dark:bg-[#30363d]/[0.28] blur-3xl" />
     </div>
 
     <RouterView />
@@ -25,8 +42,8 @@ const { state: toastState } = useToast()
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-sm font-medium shadow-2xl ring-1 max-w-md text-center"
         :class="
           toastState.current.kind === 'ok'
-            ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30 backdrop-blur'
-            : 'bg-red-500/15 text-red-300 ring-red-500/30 backdrop-blur'
+            ? 'bg-[#e50914] text-white ring-[#e50914]/30 backdrop-blur'
+            : 'bg-[#e50914] text-white ring-[#e50914]/30 backdrop-blur'
         "
       >
         {{ toastState.current.text }}

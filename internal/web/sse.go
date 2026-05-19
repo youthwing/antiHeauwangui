@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-// GET /api/v1/rosekhlifa/events — Server-Sent Events stream of admin events.
+// GET /api/v1/airvel/events — Server-Sent Events stream of admin events.
 //
 // Clients use the browser's EventSource API to subscribe:
 //
-//	const es = new EventSource('/api/v1/rosekhlifa/events', { withCredentials: true })
+//	const es = new EventSource('/api/v1/airvel/events', { withCredentials: true })
 //	es.addEventListener('message', e => { ... })
 //	es.addEventListener('sign.result', e => { ... }) // typed
 //

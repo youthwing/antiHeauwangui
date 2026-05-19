@@ -38,7 +38,7 @@ func (h *handlers) listAnnouncements(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// GET /api/v1/rosekhlifa/announcements — admin view, includes expired too.
+// GET /api/v1/airvel/announcements — admin view, includes expired too.
 func (h *handlers) adminListAnnouncements(w http.ResponseWriter, r *http.Request) {
 	list, err := h.store.ListAllAnnouncements(r.Context())
 	if err != nil {

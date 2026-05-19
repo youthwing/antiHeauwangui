@@ -312,7 +312,7 @@ function daysLeftClass(expiresAt: number | null): string {
   if (expiresAt < cur) return 'text-red-400'
   const days = Math.ceil((expiresAt - cur) / 86400)
   if (days <= 1) return 'text-amber-400'
-  return 'text-emerald-400'
+  return 'text-red-400'
 }
 
 function summarizeDates(dates: string[]): string {
@@ -368,7 +368,7 @@ function statusDotClass(status: string): string {
     case 'success':
     case 'already':
     case 'exempt':
-      return 'bg-emerald-400'
+      return 'bg-red-400'
     case 'failed':
       return 'bg-red-400'
     case 'skipped':
@@ -411,7 +411,7 @@ watch(showCreate, v => {
       </div>
       <button
         @click="openCreate"
-        class="self-start inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        class="self-start inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-400 text-[#0d1117] text-sm font-medium px-4 py-2 rounded-lg transition-colors"
       >
         <Plus class="w-4 h-4" />
         新增临时朋友
@@ -423,12 +423,12 @@ watch(showCreate, v => {
       v-if="loading && guests.length === 0"
       class="py-20 flex items-center justify-center"
     >
-      <div class="h-6 w-6 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin" />
+      <div class="h-6 w-6 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin" />
     </div>
 
     <div
       v-else-if="guests.length === 0"
-      class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] py-16 text-center"
+      class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] py-16 text-center"
     >
       <UserPlus class="w-8 h-8 mx-auto text-zinc-400 dark:text-zinc-600 mb-3" />
       <p class="text-sm text-zinc-500">还没有临时朋友</p>
@@ -443,7 +443,7 @@ watch(showCreate, v => {
       <article
         v-for="g in guests"
         :key="g.userId"
-        class="flex flex-col rounded-2xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
+        class="flex flex-col rounded-2xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden"
       >
         <!-- Header: avatar + identity + delete -->
         <header class="p-4 flex items-start gap-3 border-b border-black/[0.05] dark:border-white/[0.04]">
@@ -455,7 +455,7 @@ watch(showCreate, v => {
           />
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
-              <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+              <h3 class="text-base font-semibold text-[#161b22] dark:text-zinc-100 truncate">
                 {{ g.userName }}
               </h3>
               <span
@@ -486,7 +486,7 @@ watch(showCreate, v => {
         <!-- Label -->
         <div class="px-4 pt-3 text-xs">
           <span class="text-zinc-500">备注名：</span>
-          <span class="text-zinc-900 dark:text-zinc-200 font-medium">{{ g.label || '—' }}</span>
+          <span class="text-[#161b22] dark:text-zinc-200 font-medium">{{ g.label || '—' }}</span>
         </div>
 
         <!-- Body fields -->
@@ -499,7 +499,7 @@ watch(showCreate, v => {
               :value="g.dormId ?? 0"
               :disabled="bindingDorm[g.userId]"
               @change="(e) => changeDorm(g, +((e.target as HTMLSelectElement).value))"
-              class="flex-1 bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1 text-xs focus-ring text-zinc-900 dark:text-zinc-200 disabled:opacity-50"
+              class="flex-1 bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1 text-xs focus-ring text-[#161b22] dark:text-zinc-200 disabled:opacity-50"
             >
               <option :value="0">— 未绑定 —</option>
               <option v-for="d in dorms" :key="d.id" :value="d.id">{{ d.name }}</option>
@@ -514,7 +514,7 @@ watch(showCreate, v => {
               type="button"
               :disabled="togglingAuto[g.userId]"
               @click="toggleAuto(g)"
-              :class="g.autoSign ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+              :class="g.autoSign ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
               class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50"
             >
               <span
@@ -522,7 +522,7 @@ watch(showCreate, v => {
                 class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
               />
             </button>
-            <span class="text-[11px]" :class="g.autoSign ? 'text-emerald-500 dark:text-emerald-300' : 'text-zinc-500'">
+            <span class="text-[11px]" :class="g.autoSign ? 'text-red-500 dark:text-red-300' : 'text-zinc-500'">
               {{ g.autoSign ? '已开启' : '已关闭' }}
             </span>
           </div>
@@ -536,7 +536,7 @@ watch(showCreate, v => {
               <span class="text-[10px] text-amber-400/70">执行中</span>
             </template>
             <template v-else-if="todayState(g) === 'today'">
-              <span class="text-emerald-400 font-semibold tabular-nums">{{ signTimeStr(g) }}</span>
+              <span class="text-red-400 font-semibold tabular-nums">{{ signTimeStr(g) }}</span>
               <span class="text-[10px] text-zinc-500">±{{ g.jitterSec }}s · 今天</span>
             </template>
             <template v-else-if="todayState(g) === 'expired'">
@@ -553,7 +553,7 @@ watch(showCreate, v => {
             <Calendar class="w-3.5 h-3.5 text-zinc-500 shrink-0 mt-0.5" />
             <span class="text-zinc-500 shrink-0 w-14">签到日期</span>
             <div class="min-w-0 flex-1">
-              <p class="text-zinc-900 dark:text-zinc-200 font-mono-token truncate">
+              <p class="text-[#161b22] dark:text-zinc-200 font-mono-token truncate">
                 {{ summarizeDates(g.signDates) }}
               </p>
               <p class="text-[10px] mt-0.5 font-medium" :class="daysLeftClass(g.expiresAt)">
@@ -572,11 +572,11 @@ watch(showCreate, v => {
                 ? 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'
                 : tokenUrgency(g) === 'soon'
                   ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
-                  : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25'"
+                  : 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'"
             >
               <span
                 class="w-1 h-1 rounded-full"
-                :class="tokenUrgency(g) === 'expired' ? 'bg-red-400' : tokenUrgency(g) === 'soon' ? 'bg-amber-400' : 'bg-emerald-400'"
+                :class="tokenUrgency(g) === 'expired' ? 'bg-red-400' : tokenUrgency(g) === 'soon' ? 'bg-amber-400' : 'bg-red-400'"
               />
               {{ tokenUrgency(g) === 'expired' ? '已失效' : tokenUrgency(g) === 'soon' ? '快过期' : '有效' }}
             </span>
@@ -588,8 +588,8 @@ watch(showCreate, v => {
               :class="tokenUrgency(g) === 'expired'
                 ? 'bg-red-500 hover:bg-red-400 text-white'
                 : tokenUrgency(g) === 'soon'
-                  ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950'
-                  : 'bg-white/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-emerald-500/40'"
+                  ? 'bg-amber-500 hover:bg-amber-400 text-[#0d1117]'
+                  : 'bg-white/80 dark:bg-[#161b22]/80 text-zinc-700 dark:text-zinc-300 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-red-500/40'"
               class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors shrink-0"
               :title="tokenUrgency(g) === 'expired' ? '立即刷新（已失效）' : '让朋友重新扫码以刷新 Token'"
             >
@@ -637,7 +637,7 @@ watch(showCreate, v => {
           <button
             @click="signNow(g)"
             :disabled="signing[g.userId]"
-            class="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+            class="flex-1 inline-flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
             title="代签到（应急 / 测试）"
           >
             <PlayCircle class="w-3.5 h-3.5" />
@@ -645,7 +645,7 @@ watch(showCreate, v => {
           </button>
           <button
             @click="openEdit(g)"
-            class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-emerald-500/40 transition-colors"
+            class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-red-500/40 transition-colors"
             title="编辑日期 / 续期"
           >
             <Pencil class="w-3.5 h-3.5" />
@@ -657,16 +657,16 @@ watch(showCreate, v => {
 
     <!-- Create modal -->
     <Transition name="modal">
-      <div v-if="showCreate" class="fixed inset-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
+      <div v-if="showCreate" class="fixed inset-0 z-50 bg-white/80 dark:bg-[#0d1117]/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
         @click.self="showCreate = false">
-        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
+        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <h2 class="text-base font-bold flex items-center gap-2">
-              <UserPlus class="w-4 h-4 text-emerald-400" />
+              <UserPlus class="w-4 h-4 text-red-400" />
               新增临时朋友
             </h2>
             <button @click="showCreate = false"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -677,7 +677,7 @@ watch(showCreate, v => {
               <div>
                 <label class="block text-xs text-zinc-500 mb-1.5">备注名 *</label>
                 <input v-model="cLabel" placeholder="如「张三 5/20」"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
               </div>
               <div>
                 <label class="block text-xs text-zinc-500 mb-1.5 inline-flex items-center gap-1">
@@ -685,7 +685,7 @@ watch(showCreate, v => {
                   宿舍楼
                 </label>
                 <select v-model="cDormId"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200">
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200">
                   <option :value="0">不绑定</option>
                   <option v-for="d in dorms" :key="d.id" :value="d.id">{{ d.name }}</option>
                 </select>
@@ -701,14 +701,14 @@ watch(showCreate, v => {
               <div class="space-y-1.5">
                 <div v-for="(_, i) in cDates" :key="i" class="flex items-center gap-2">
                   <input type="date" v-model="cDates[i]"
-                    class="flex-1 bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-1.5 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200" />
+                    class="flex-1 bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-1.5 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200" />
                   <button type="button" @click="removeCreateDate(i)" :disabled="cDates.length === 1"
                     class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors">
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <button type="button" @click="addCreateDate"
-                  class="text-[11px] text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1">
+                  class="text-[11px] text-red-400 hover:text-red-300 inline-flex items-center gap-1">
                   <Plus class="w-3 h-3" />
                   再加一天
                 </button>
@@ -716,7 +716,7 @@ watch(showCreate, v => {
             </div>
 
             <!-- QR -->
-            <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+            <div class="rounded-xl bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
               <div class="flex items-center gap-2 mb-2">
                 <QrCodeIcon class="w-3.5 h-3.5 text-zinc-500" />
                 <span class="text-xs text-zinc-500">把这个二维码截图发给朋友</span>
@@ -736,7 +736,7 @@ watch(showCreate, v => {
                     <li>朋友把链接发回给你，你粘到下面 ↓</li>
                   </ol>
                   <button type="button" @click="refreshQr"
-                    class="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors">
+                    class="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-red-500/40 transition-colors">
                     <RefreshCw class="w-3 h-3" />
                     刷新二维码
                   </button>
@@ -749,14 +749,14 @@ watch(showCreate, v => {
               <label class="block text-xs text-zinc-500 mb-1.5">把朋友给的回调链接粘到这里 *</label>
               <textarea v-model="cCallback"
                 placeholder="https://xhbcs.henau.edu.cn/?code=...&state=..."
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-emerald-500/30 focus:!ring-emerald-500/60 rounded-lg px-3 py-2 h-20 resize-none text-sm font-mono-token text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring" />
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-red-500/30 focus:!ring-red-500/60 rounded-lg px-3 py-2 h-20 resize-none text-sm font-mono-token text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring" />
               <div v-if="cCallbackDetect.kind === 'callback-url'"
-                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-emerald-400 bg-emerald-500/10">
+                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-red-400 bg-red-500/10">
                 <Check class="w-3 h-3" />
                 已识别回调链接
               </div>
               <div v-else-if="cCallbackDetect.kind === 'code'"
-                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-emerald-400 bg-emerald-500/10">
+                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-red-400 bg-red-500/10">
                 <Check class="w-3 h-3" />
                 已识别 code
               </div>
@@ -770,11 +770,11 @@ watch(showCreate, v => {
 
           <div class="px-5 pb-5 flex justify-end gap-2">
             <button @click="showCreate = false"
-              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               取消
             </button>
             <button @click="submitCreate" :disabled="!cCanSubmit"
-              class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              class="bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors">
               {{ creating ? '创建中…' : '创建临时朋友' }}
             </button>
           </div>
@@ -784,13 +784,13 @@ watch(showCreate, v => {
 
     <!-- Edit modal -->
     <Transition name="modal">
-      <div v-if="editTarget" class="fixed inset-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur flex items-center justify-center p-4"
+      <div v-if="editTarget" class="fixed inset-0 z-50 bg-white/80 dark:bg-[#0d1117]/80 backdrop-blur flex items-center justify-center p-4"
         @click.self="editTarget = null">
-        <div class="w-full max-w-md bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl">
+        <div class="w-full max-w-md bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <h2 class="text-base font-bold">编辑临时朋友</h2>
             <button @click="editTarget = null"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -805,7 +805,7 @@ watch(showCreate, v => {
             <div>
               <label class="block text-xs text-zinc-500 mb-1.5">备注名</label>
               <input v-model="eLabel"
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200" />
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200" />
             </div>
             <div>
               <label class="text-xs text-zinc-500 inline-flex items-center gap-1 mb-2">
@@ -815,14 +815,14 @@ watch(showCreate, v => {
               <div class="space-y-1.5">
                 <div v-for="(_, i) in eDates" :key="i" class="flex items-center gap-2">
                   <input type="date" v-model="eDates[i]"
-                    class="flex-1 bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-1.5 text-sm font-mono-token focus-ring text-zinc-900 dark:text-zinc-200" />
+                    class="flex-1 bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-1.5 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200" />
                   <button type="button" @click="removeEditDate(i)" :disabled="eDates.length === 1"
                     class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 hover:text-red-400 disabled:opacity-30 transition-colors">
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <button type="button" @click="addEditDate"
-                  class="text-[11px] text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1">
+                  class="text-[11px] text-red-400 hover:text-red-300 inline-flex items-center gap-1">
                   <Plus class="w-3 h-3" />
                   再加一天（续期）
                 </button>
@@ -831,11 +831,11 @@ watch(showCreate, v => {
           </div>
           <div class="px-5 pb-5 flex justify-end gap-2">
             <button @click="editTarget = null"
-              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               取消
             </button>
             <button @click="submitEdit" :disabled="updating"
-              class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              class="bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors">
               {{ updating ? '保存中…' : '保存' }}
             </button>
           </div>
@@ -845,16 +845,16 @@ watch(showCreate, v => {
 
     <!-- Refresh-token modal -->
     <Transition name="modal">
-      <div v-if="refreshTarget" class="fixed inset-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
+      <div v-if="refreshTarget" class="fixed inset-0 z-50 bg-white/80 dark:bg-[#0d1117]/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto"
         @click.self="refreshTarget = null">
-        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
+        <div class="w-full max-w-2xl bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl my-8">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <h2 class="text-base font-bold flex items-center gap-2">
               <KeyRound class="w-4 h-4 text-amber-400" />
               刷新 Token — {{ refreshTarget.label }}
             </h2>
             <button @click="refreshTarget = null"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -869,7 +869,7 @@ watch(showCreate, v => {
             <div class="text-xs text-zinc-500 flex items-center gap-3">
               <Avatar :src="refreshTarget.userAvatarUrl" :name="refreshTarget.userName" :size="32" rounded="lg" />
               <div class="min-w-0 flex-1">
-                <p class="text-sm text-zinc-900 dark:text-zinc-200 truncate">{{ refreshTarget.userName }}</p>
+                <p class="text-sm text-[#161b22] dark:text-zinc-200 truncate">{{ refreshTarget.userName }}</p>
                 <p class="text-[11px] font-mono-token truncate">{{ refreshTarget.userNumber }}</p>
               </div>
               <div class="text-right shrink-0">
@@ -879,7 +879,7 @@ watch(showCreate, v => {
             </div>
 
             <!-- QR -->
-            <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+            <div class="rounded-xl bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
               <div class="flex items-center gap-2 mb-2">
                 <QrCodeIcon class="w-3.5 h-3.5 text-zinc-500" />
                 <span class="text-xs text-zinc-500">截图发给朋友</span>
@@ -899,7 +899,7 @@ watch(showCreate, v => {
                     <li>粘到下面 ↓</li>
                   </ol>
                   <button type="button" @click="rebuildRefreshQr"
-                    class="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors">
+                    class="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-red-500/40 transition-colors">
                     <RefreshCw class="w-3 h-3" />
                     刷新二维码
                   </button>
@@ -912,14 +912,14 @@ watch(showCreate, v => {
               <label class="block text-xs text-zinc-500 mb-1.5">把朋友给的回调链接粘到这里 *</label>
               <textarea v-model="rCallback"
                 placeholder="https://xhbcs.henau.edu.cn/?code=...&state=..."
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-emerald-500/30 focus:!ring-emerald-500/60 rounded-lg px-3 py-2 h-20 resize-none text-sm font-mono-token text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring" />
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-red-500/30 focus:!ring-red-500/60 rounded-lg px-3 py-2 h-20 resize-none text-sm font-mono-token text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring" />
               <div v-if="rCallbackDetect.kind === 'callback-url'"
-                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-emerald-400 bg-emerald-500/10">
+                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-red-400 bg-red-500/10">
                 <Check class="w-3 h-3" />
                 已识别回调链接
               </div>
               <div v-else-if="rCallbackDetect.kind === 'code'"
-                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-emerald-400 bg-emerald-500/10">
+                class="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-red-400 bg-red-500/10">
                 <Check class="w-3 h-3" />
                 已识别 code
               </div>
@@ -933,11 +933,11 @@ watch(showCreate, v => {
 
           <div class="px-5 pb-5 flex justify-end gap-2">
             <button @click="refreshTarget = null"
-              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               取消
             </button>
             <button @click="submitRefresh" :disabled="!rCallbackOk || refreshing"
-              class="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              class="bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-sm font-medium px-5 py-2 rounded-lg transition-colors">
               {{ refreshing ? '刷新中…' : '刷新 Token' }}
             </button>
           </div>

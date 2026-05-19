@@ -49,16 +49,16 @@ onMounted(loadAll)
 const todayBreakdown = computed(() => {
   const t = stats.value?.today || {}
   return [
-    { key: 'success', label: '成功', value: t.success || 0, color: 'text-emerald-400', dot: 'bg-emerald-500' },
-    { key: 'already', label: '已签', value: t.already || 0, color: 'text-blue-400', dot: 'bg-blue-500' },
+    { key: 'success', label: '成功', value: t.success || 0, color: 'text-red-400', dot: 'bg-red-500' },
+    { key: 'already', label: '已签', value: t.already || 0, color: 'text-blue-400', dot: 'bg-sky-500' },
     { key: 'exempt', label: '免签', value: t.exempt || 0, color: 'text-zinc-500 dark:text-zinc-400', dot: 'bg-zinc-500' },
     { key: 'failed', label: '失败', value: t.failed || 0, color: 'text-red-400', dot: 'bg-red-500' },
   ]
 })
 
 const logMeta: Record<string, { label: string; color: string; dotBg: string }> = {
-  success: { label: '成功', color: 'text-emerald-400', dotBg: 'bg-emerald-500' },
-  already: { label: '已签', color: 'text-blue-400', dotBg: 'bg-blue-500' },
+  success: { label: '成功', color: 'text-red-400', dotBg: 'bg-red-500' },
+  already: { label: '已签', color: 'text-blue-400', dotBg: 'bg-sky-500' },
   exempt: { label: '免签', color: 'text-zinc-500 dark:text-zinc-400', dotBg: 'bg-zinc-500' },
   failed: { label: '失败', color: 'text-red-400', dotBg: 'bg-red-500' },
   skipped: { label: '跳过', color: 'text-amber-400', dotBg: 'bg-amber-500' },
@@ -75,8 +75,8 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
 
     <!-- KPI cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <RouterLink to="/rosekhlifa/users" class="block">
-        <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-3.5 transition-all">
+      <RouterLink to="/airvel/users" class="block">
+        <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-3.5 transition-all">
           <div class="flex items-center gap-2 mb-3">
             <Users class="w-4 h-4 text-zinc-500" />
             <span class="text-[10px] text-zinc-500 tracking-wide uppercase">用户</span>
@@ -84,7 +84,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
           <p class="text-3xl font-bold tabular-nums">
             {{ stats?.users.total ?? '—' }}
             <span v-if="stats?.users.guests" class="text-base font-medium text-zinc-500 dark:text-zinc-400 ml-1">
-              + <span class="text-emerald-400">{{ stats.users.guests }}</span> 临时
+              + <span class="text-red-400">{{ stats.users.guests }}</span> 临时
             </span>
           </p>
           <p class="text-xs text-zinc-500 mt-2 tabular-nums">
@@ -94,21 +94,21 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
         </div>
       </RouterLink>
 
-      <RouterLink to="/rosekhlifa/codes" class="block">
-        <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-3.5 transition-all">
+      <RouterLink to="/airvel/codes" class="block">
+        <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-3.5 transition-all">
           <div class="flex items-center gap-2 mb-3">
             <Ticket class="w-4 h-4 text-zinc-500" />
             <span class="text-[10px] text-zinc-500 tracking-wide uppercase">邀请码</span>
           </div>
           <p class="text-3xl font-bold tabular-nums">{{ stats?.codes.total ?? '—' }}</p>
           <p class="text-xs text-zinc-500 mt-2 tabular-nums">
-            <span class="text-emerald-400">{{ stats?.codes.used ?? 0 }}</span> 已用 ·
+            <span class="text-red-400">{{ stats?.codes.used ?? 0 }}</span> 已用 ·
             <span class="text-zinc-700 dark:text-zinc-300">{{ stats?.codes.unused ?? 0 }}</span> 未用
           </p>
         </div>
       </RouterLink>
 
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
         <div class="flex items-center gap-2 mb-3">
           <Activity class="w-4 h-4 text-zinc-500" />
           <span class="text-[10px] text-zinc-500 tracking-wide uppercase">今日签到</span>
@@ -121,7 +121,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
         </p>
       </div>
 
-      <div class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
         <div class="flex items-center gap-2 mb-3">
           <AlertTriangle class="w-4 h-4 text-zinc-500" />
           <span class="text-[10px] text-zinc-500 tracking-wide uppercase">告警</span>
@@ -134,10 +134,10 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
     </div>
 
     <!-- Today breakdown -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center gap-2 mb-4">
         <TrendingUp class="w-4 h-4 text-zinc-500" />
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">今日活动</h2>
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">今日活动</h2>
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div v-for="b in todayBreakdown" :key="b.key">
@@ -152,11 +152,11 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
 
     <!-- School rules snapshot — refreshed daily at 18:00 by the scheduler;
          admin gets emailed if it changes between two probes. -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-3 gap-2">
         <div class="flex items-center gap-2 min-w-0">
           <ScrollText class="w-4 h-4 text-zinc-500" />
-          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">学校签到规则</h2>
+          <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">学校签到规则</h2>
         </div>
         <span v-if="schoolRulesUpdatedAt > 0" class="text-[11px] text-zinc-500 font-mono-token shrink-0">
           {{ formatDateTime(schoolRulesUpdatedAt) }}
@@ -169,11 +169,11 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
         <li
           v-for="r in schoolRules"
           :key="r.ruleId"
-          class="rounded-lg bg-white/70 dark:bg-zinc-950/40 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
+          class="rounded-lg bg-white/70 dark:bg-[#0d1117]/40 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-200">
+              <p class="text-sm font-medium text-[#161b22] dark:text-zinc-200">
                 <span class="text-[10px] font-mono-token text-zinc-500 mr-1.5">#{{ r.ruleId }}</span>
                 {{ r.ruleName || '(无名)' }}
               </p>
@@ -181,7 +181,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
                 {{ r.description }}
               </p>
             </div>
-            <span class="shrink-0 text-xs text-emerald-400 font-mono-token tabular-nums whitespace-nowrap">
+            <span class="shrink-0 text-xs text-red-400 font-mono-token tabular-nums whitespace-nowrap">
               {{ r.startTime }} – {{ r.endTime }}
             </span>
           </div>
@@ -190,17 +190,17 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
     </section>
 
     <!-- Recent activity -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-200">最近活动</h2>
-        <RouterLink to="/rosekhlifa/logs" class="text-xs text-zinc-500 hover:text-emerald-400 inline-flex items-center gap-1">
+        <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">最近活动</h2>
+        <RouterLink to="/airvel/logs" class="text-xs text-zinc-500 hover:text-red-400 inline-flex items-center gap-1">
           查看全部
           <ArrowRight class="w-3 h-3" />
         </RouterLink>
       </div>
 
       <div v-if="loading" class="flex items-center justify-center py-8">
-        <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin" />
+        <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin" />
       </div>
       <div v-else-if="recentLogs.length === 0" class="text-center py-8 text-sm text-zinc-500">
         无活动
@@ -208,7 +208,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
       <ol v-else class="relative">
         <div class="absolute left-[7px] top-1.5 bottom-1.5 w-px bg-gradient-to-b from-transparent via-black/[0.06] dark:via-white/[0.06] to-transparent" />
         <li v-for="r in recentLogs" :key="r.id" class="relative pl-7 pb-3 last:pb-0">
-          <span class="absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ring-white dark:ring-zinc-900" :class="info(r.status).dotBg" />
+          <span class="absolute left-0 top-1 w-3.5 h-3.5 rounded-full ring-4 ring-white dark:ring-[#161b22]" :class="info(r.status).dotBg" />
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5 flex-wrap">

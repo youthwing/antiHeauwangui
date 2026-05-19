@@ -26,7 +26,7 @@ async function submit() {
     await adminApi.login(password.value.trim())
     admin.setAdmin(true)
     showToast('ok', '欢迎，管理员')
-    const redirect = (route.query.redirect as string) || '/rosekhlifa'
+    const redirect = (route.query.redirect as string) || '/airvel'
     router.push(redirect)
   } catch (e: any) {
     error.value = e.message || '登录失败'
@@ -37,7 +37,7 @@ async function submit() {
 
 onMounted(async () => {
   await admin.init()
-  if (admin.state.isAdmin) router.replace('/rosekhlifa')
+  if (admin.state.isAdmin) router.replace('/airvel')
 })
 </script>
 
@@ -56,20 +56,20 @@ onMounted(async () => {
         <p class="text-sm text-zinc-500 mt-1.5">仅供运维人员</p>
       </div>
 
-      <div class="bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-2xl p-6 backdrop-blur-sm">
+      <div class="bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-2xl p-6 backdrop-blur-sm">
         <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">密码</label>
         <input
           v-model="password"
           type="password"
           placeholder="WANGUI_ADMIN_PASS"
           @keyup.enter="submit"
-          class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token"
+          class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 font-mono-token"
         />
 
         <button
           @click="submit"
           :disabled="submitting || !password.trim()"
-          class="mt-4 w-full inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
+          class="mt-4 w-full inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
         >
           <span>{{ submitting ? '校验中…' : '登录' }}</span>
           <ArrowRight v-if="!submitting" class="w-4 h-4" />

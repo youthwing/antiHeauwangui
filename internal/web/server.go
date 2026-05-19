@@ -53,7 +53,7 @@ func (s *Server) Run(ctx context.Context) error {
 		r.Post("/login", h.login)
 		r.Post("/activate", h.activate)
 		r.Post("/activate/precheck", h.activatePrecheck)
-		r.Post("/rosekhlifa/login", h.adminLogin)
+		r.Post("/airvel/login", h.adminLogin)
 		// User-facing announcements are public-ish: any logged-in user reads
 		// them through /me-scoped sessions, but we don't need auth on the
 		// list itself — the data is non-sensitive (admin-authored notices).
@@ -80,8 +80,8 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Delete("/me", h.deleteMe)
 		})
 
-		// Admin endpoints (path is obfuscated: /rosekhlifa)
-		r.Route("/rosekhlifa", func(r chi.Router) {
+		// Admin endpoints (path is obfuscated: /airvel)
+		r.Route("/airvel", func(r chi.Router) {
 			r.Use(h.adminAuth)
 			r.Get("/me", h.adminMe)
 			r.Post("/logout", h.adminLogout)

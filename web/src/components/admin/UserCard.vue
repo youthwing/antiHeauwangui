@@ -120,11 +120,11 @@ const statusInfo = computed<{ tone: string; label: string; hint: string }>(() =>
 function chipClass(tone: string): string {
   switch (tone) {
     case 'ok':
-      return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25'
+      return 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'
     case 'amber':
       return 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
     case 'blue':
-      return 'bg-blue-500/10 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+      return 'bg-sky-500/10 text-blue-700 dark:text-blue-300 ring-1 ring-sky-500/30'
     case 'red':
       return 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/30'
     case 'zinc':
@@ -141,7 +141,7 @@ function recordDotClass(status: string): string {
     case 'success':
     case 'already':
     case 'exempt':
-      return 'bg-emerald-400'
+      return 'bg-red-400'
     case 'failed':
       return 'bg-red-400'
     case 'skipped':
@@ -176,7 +176,7 @@ const u = computed(() => props.user)
     class="flex flex-col overflow-hidden"
     :class="drawer
       ? ''
-      : 'rounded-2xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06]'"
+      : 'rounded-2xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06]'"
     :style="u.isDisabled && !drawer ? 'opacity: 0.6' : ''"
   >
     <!-- Header -->
@@ -184,7 +184,7 @@ const u = computed(() => props.user)
       <Avatar :src="u.userAvatarUrl" :name="u.userName" :size="44" rounded="lg" />
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5 flex-wrap">
-          <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+          <h3 class="text-base font-semibold text-[#161b22] dark:text-zinc-100 truncate">
             {{ u.userName }}
           </h3>
           <span
@@ -245,7 +245,7 @@ const u = computed(() => props.user)
         </span>
         <button
           @click="emit('refresh-status')"
-          class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           title="重拉学校状态"
         >
           <RefreshCw class="w-3 h-3" />
@@ -269,7 +269,7 @@ const u = computed(() => props.user)
           :value="u.dormId ?? 0"
           :disabled="busy.dorm"
           @change="(e) => emit('change-dorm', +((e.target as HTMLSelectElement).value))"
-          class="flex-1 min-w-0 bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1 text-xs focus-ring text-zinc-900 dark:text-zinc-200 disabled:opacity-50"
+          class="flex-1 min-w-0 bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1 text-xs focus-ring text-[#161b22] dark:text-zinc-200 disabled:opacity-50"
         >
           <option :value="0">— 未绑定 —</option>
           <option v-for="d in dorms" :key="d.id" :value="d.id">{{ d.name }}</option>
@@ -284,7 +284,7 @@ const u = computed(() => props.user)
           type="button"
           :disabled="busy.auto"
           @click="emit('toggle-auto')"
-          :class="u.autoSign ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+          :class="u.autoSign ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
           class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50"
         >
           <span
@@ -292,7 +292,7 @@ const u = computed(() => props.user)
             class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
           />
         </button>
-        <span class="text-[11px]" :class="u.autoSign ? 'text-emerald-500 dark:text-emerald-300' : 'text-zinc-500'">
+        <span class="text-[11px]" :class="u.autoSign ? 'text-red-500 dark:text-red-300' : 'text-zinc-500'">
           {{ u.autoSign ? '已开启' : '已关闭' }}
         </span>
       </div>
@@ -311,8 +311,8 @@ const u = computed(() => props.user)
             :title="(u.signDays & (1 << i)) ? '点击关闭周' + label : '点击开启周' + label"
             :class="(u.signDays & (1 << i))
               ? (todayBit === i
-                ? 'bg-emerald-500 text-zinc-950 ring-2 ring-emerald-400/40'
-                : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30')
+                ? 'bg-red-500 text-[#0d1117] ring-2 ring-red-400/40'
+                : 'bg-red-500/20 text-red-700 dark:text-red-300 ring-1 ring-red-500/30')
               : (todayBit === i
                 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/40'
                 : 'bg-zinc-200 dark:bg-zinc-800/70 text-zinc-500 dark:text-zinc-500 ring-1 ring-black/[0.06] dark:ring-white/[0.05]')"
@@ -335,7 +335,7 @@ const u = computed(() => props.user)
         <span class="text-zinc-500 shrink-0 w-14">签到时刻</span>
         <span
           class="font-semibold tabular-nums"
-          :class="signsToday ? 'text-emerald-500 dark:text-emerald-300' : 'text-zinc-500'"
+          :class="signsToday ? 'text-red-500 dark:text-red-300' : 'text-zinc-500'"
         >
           {{ signTimeStr }}
         </span>
@@ -352,11 +352,11 @@ const u = computed(() => props.user)
             ? 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'
             : tokenUrgency === 'soon'
               ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30'
-              : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/25'"
+              : 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'"
         >
           <span
             class="w-1 h-1 rounded-full"
-            :class="tokenUrgency === 'expired' ? 'bg-red-400' : tokenUrgency === 'soon' ? 'bg-amber-400' : 'bg-emerald-400'"
+            :class="tokenUrgency === 'expired' ? 'bg-red-400' : tokenUrgency === 'soon' ? 'bg-amber-400' : 'bg-red-400'"
           />
           {{ tokenUrgency === 'expired' ? '已失效' : tokenUrgency === 'soon' ? '快过期' : '有效' }}
         </span>
@@ -368,8 +368,8 @@ const u = computed(() => props.user)
           :class="tokenUrgency === 'expired'
             ? 'bg-red-500 hover:bg-red-400 text-white'
             : tokenUrgency === 'soon'
-              ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950'
-              : 'bg-white/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-emerald-500/40'"
+              ? 'bg-amber-500 hover:bg-amber-400 text-[#0d1117]'
+              : 'bg-white/80 dark:bg-[#161b22]/80 text-zinc-700 dark:text-zinc-300 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-red-500/40'"
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors shrink-0"
           title="让朋友重新扫码以刷新 Token"
         >
@@ -413,7 +413,7 @@ const u = computed(() => props.user)
       <button
         @click="emit('sign')"
         :disabled="busy.sign"
-        class="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+        class="flex-1 inline-flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
         title="代签到（应急 / 测试）"
       >
         <PlayCircle class="w-3.5 h-3.5" />
@@ -422,7 +422,7 @@ const u = computed(() => props.user)
       <button
         @click="emit('reset-pin')"
         :disabled="busy.resetting"
-        class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-emerald-500/40 transition-colors"
+        class="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-red-500/40 transition-colors"
         title="重置 PIN"
       >
         <KeyRound class="w-3.5 h-3.5" />

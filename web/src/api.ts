@@ -122,13 +122,13 @@ export const api = {
 
 export const adminApi = {
   login: (password: string) =>
-    request<{ ok: boolean }>('/rosekhlifa/login', {
+    request<{ ok: boolean }>('/airvel/login', {
       method: 'POST',
       body: JSON.stringify({ password }),
     }),
-  logout: () => request<{ ok: boolean }>('/rosekhlifa/logout', { method: 'POST' }),
-  me: () => request<{ isAdmin: boolean }>('/rosekhlifa/me'),
-  stats: () => request<AdminStats>('/rosekhlifa/stats'),
+  logout: () => request<{ ok: boolean }>('/airvel/logout', { method: 'POST' }),
+  me: () => request<{ isAdmin: boolean }>('/airvel/me'),
+  stats: () => request<AdminStats>('/airvel/stats'),
 
   listCodes: (params: {
     status?: 'used' | 'unused'
@@ -141,20 +141,20 @@ export const adminApi = {
       if (v !== undefined && v !== '') q.set(k, String(v))
     }
     const qs = q.toString()
-    return request<InviteCode[]>('/rosekhlifa/codes' + (qs ? '?' + qs : ''))
+    return request<InviteCode[]>('/airvel/codes' + (qs ? '?' + qs : ''))
   },
   createCodes: (count: number, note: string) =>
-    request<InviteCode[]>('/rosekhlifa/codes', {
+    request<InviteCode[]>('/airvel/codes', {
       method: 'POST',
       body: JSON.stringify({ count, note }),
     }),
   updateCode: (code: string, patch: { note?: string; disabled?: boolean }) =>
-    request<InviteCode>('/rosekhlifa/codes/' + encodeURIComponent(code), {
+    request<InviteCode>('/airvel/codes/' + encodeURIComponent(code), {
       method: 'PUT',
       body: JSON.stringify(patch),
     }),
   deleteCode: (code: string) =>
-    request<{ ok: boolean }>('/rosekhlifa/codes/' + encodeURIComponent(code), {
+    request<{ ok: boolean }>('/airvel/codes/' + encodeURIComponent(code), {
       method: 'DELETE',
     }),
 
@@ -162,9 +162,9 @@ export const adminApi = {
     const q = new URLSearchParams()
     if (search) q.set('search', search)
     q.set('limit', String(limit))
-    return request<AdminUser[]>('/rosekhlifa/users?' + q.toString())
+    return request<AdminUser[]>('/airvel/users?' + q.toString())
   },
-  getUser: (id: string) => request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id)),
+  getUser: (id: string) => request<AdminUser>('/airvel/users/' + encodeURIComponent(id)),
   updateUser: (
     id: string,
     patch: {
@@ -174,17 +174,17 @@ export const adminApi = {
       signDays?: number
     },
   ) =>
-    request<AdminUser>('/rosekhlifa/users/' + encodeURIComponent(id), {
+    request<AdminUser>('/airvel/users/' + encodeURIComponent(id), {
       method: 'PUT',
       body: JSON.stringify(patch),
     }),
   deleteUser: (id: string) =>
-    request<{ ok: boolean }>('/rosekhlifa/users/' + encodeURIComponent(id), {
+    request<{ ok: boolean }>('/airvel/users/' + encodeURIComponent(id), {
       method: 'DELETE',
     }),
   resetUserPin: (id: string, newPin?: string) =>
     request<{ ok: boolean; newPin: string }>(
-      '/rosekhlifa/users/' + encodeURIComponent(id) + '/pin',
+      '/airvel/users/' + encodeURIComponent(id) + '/pin',
       {
         method: 'POST',
         body: JSON.stringify({ newPin: newPin || '' }),
@@ -192,87 +192,87 @@ export const adminApi = {
     ),
   signNowFor: (id: string) =>
     request<{ status: string; message: string }>(
-      '/rosekhlifa/users/' + encodeURIComponent(id) + '/sign-now',
+      '/airvel/users/' + encodeURIComponent(id) + '/sign-now',
       { method: 'POST' },
     ),
   checkinStatusFor: (id: string) =>
     request<SchoolCheckinStatus>(
-      '/rosekhlifa/users/' + encodeURIComponent(id) + '/checkin-status',
+      '/airvel/users/' + encodeURIComponent(id) + '/checkin-status',
     ),
   refreshUserToken: (id: string, auth: SchoolAuthPayload) =>
     request<{ ok: boolean; expiresAt: number }>(
-      '/rosekhlifa/users/' + encodeURIComponent(id) + '/token',
+      '/airvel/users/' + encodeURIComponent(id) + '/token',
       {
         method: 'POST',
         body: JSON.stringify(auth),
       },
     ),
 
-  logs: (limit = 100) => request<AdminLog[]>('/rosekhlifa/logs?limit=' + limit),
+  logs: (limit = 100) => request<AdminLog[]>('/airvel/logs?limit=' + limit),
 
-  listDorms: () => request<AdminDorm[]>('/rosekhlifa/dorms'),
+  listDorms: () => request<AdminDorm[]>('/airvel/dorms'),
   createDorm: (d: Partial<AdminDorm>) =>
-    request<AdminDorm>('/rosekhlifa/dorms', {
+    request<AdminDorm>('/airvel/dorms', {
       method: 'POST',
       body: JSON.stringify(d),
     }),
   updateDorm: (id: number, d: Partial<AdminDorm>) =>
-    request<AdminDorm>('/rosekhlifa/dorms/' + id, {
+    request<AdminDorm>('/airvel/dorms/' + id, {
       method: 'PUT',
       body: JSON.stringify(d),
     }),
   deleteDorm: (id: number) =>
-    request<{ ok: boolean }>('/rosekhlifa/dorms/' + id, { method: 'DELETE' }),
+    request<{ ok: boolean }>('/airvel/dorms/' + id, { method: 'DELETE' }),
   dormUsers: (id: number) =>
-    request<DormUserBrief[]>('/rosekhlifa/dorms/' + id + '/users'),
+    request<DormUserBrief[]>('/airvel/dorms/' + id + '/users'),
 
-  listGuests: () => request<AdminGuest[]>('/rosekhlifa/guests'),
+  listGuests: () => request<AdminGuest[]>('/airvel/guests'),
   createGuest: (req: GuestCreateReq) =>
-    request<AdminGuest>('/rosekhlifa/guests', {
+    request<AdminGuest>('/airvel/guests', {
       method: 'POST',
       body: JSON.stringify(req),
     }),
   updateGuest: (userId: string, req: GuestUpdateReq) =>
-    request<AdminGuest>('/rosekhlifa/guests/' + userId, {
+    request<AdminGuest>('/airvel/guests/' + userId, {
       method: 'PUT',
       body: JSON.stringify(req),
     }),
   deleteGuest: (userId: string) =>
-    request<{ ok: boolean }>('/rosekhlifa/guests/' + userId, { method: 'DELETE' }),
+    request<{ ok: boolean }>('/airvel/guests/' + userId, { method: 'DELETE' }),
 
-  getSmtp: () => request<SmtpConfig>('/rosekhlifa/smtp'),
+  getSmtp: () => request<SmtpConfig>('/airvel/smtp'),
   updateSmtp: (cfg: SmtpUpdate) =>
-    request<SmtpConfig & { ok: boolean }>('/rosekhlifa/smtp', {
+    request<SmtpConfig & { ok: boolean }>('/airvel/smtp', {
       method: 'PUT',
       body: JSON.stringify(cfg),
     }),
   testSmtp: () =>
-    request<{ ok: boolean; sentTo: string }>('/rosekhlifa/smtp/test', {
+    request<{ ok: boolean; sentTo: string }>('/airvel/smtp/test', {
       method: 'POST',
     }),
   testServerChan: () =>
-    request<{ ok: boolean }>('/rosekhlifa/serverchan/test', {
+    request<{ ok: boolean }>('/airvel/serverchan/test', {
       method: 'POST',
     }),
 
   schoolRules: () =>
-    request<{ rules: unknown; updatedAt: number }>('/rosekhlifa/school-rules'),
+    request<{ rules: unknown; updatedAt: number }>('/airvel/school-rules'),
 
   // --- Announcements ---
   listAnnouncements: () =>
-    request<Announcement[]>('/rosekhlifa/announcements'),
+    request<Announcement[]>('/airvel/announcements'),
   createAnnouncement: (req: AnnouncementUpsertReq) =>
-    request<Announcement>('/rosekhlifa/announcements', {
+    request<Announcement>('/airvel/announcements', {
       method: 'POST',
       body: JSON.stringify(req),
     }),
   updateAnnouncement: (id: number, req: Partial<AnnouncementUpsertReq>) =>
-    request<Announcement>('/rosekhlifa/announcements/' + id, {
+    request<Announcement>('/airvel/announcements/' + id, {
       method: 'PUT',
       body: JSON.stringify(req),
     }),
   deleteAnnouncement: (id: number) =>
-    request<{ ok: boolean }>('/rosekhlifa/announcements/' + id, {
+    request<{ ok: boolean }>('/airvel/announcements/' + id, {
       method: 'DELETE',
     }),
 }

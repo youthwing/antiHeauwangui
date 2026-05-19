@@ -287,25 +287,25 @@ onMounted(async () => {
         <p class="text-sm text-zinc-500 mt-2">内部工具</p>
       </div>
 
-      <div class="bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-2xl backdrop-blur-sm overflow-hidden">
+      <div class="bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-2xl backdrop-blur-sm overflow-hidden">
         <!-- Tabs -->
         <div class="flex relative border-b border-black/[0.08] dark:border-white/[0.06]">
           <button
             @click="switchTo('login')"
-            :class="mode === 'login' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-500 dark:hover:text-zinc-400 dark:text-zinc-300'"
+            :class="mode === 'login' ? 'text-[#161b22] dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-500 dark:hover:text-zinc-400 dark:text-zinc-300'"
             class="flex-1 py-3.5 text-sm font-medium transition-colors relative"
           >
             登录
           </button>
           <button
             @click="switchTo('activate')"
-            :class="mode === 'activate' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-500 dark:hover:text-zinc-400 dark:text-zinc-300'"
+            :class="mode === 'activate' ? 'text-[#161b22] dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-500 dark:hover:text-zinc-400 dark:text-zinc-300'"
             class="flex-1 py-3.5 text-sm font-medium transition-colors relative"
           >
             激活
           </button>
           <div
-            class="absolute bottom-0 h-[2px] bg-emerald-400 transition-all duration-300 ease-out"
+            class="absolute bottom-0 h-[2px] bg-red-400 transition-all duration-300 ease-out"
             :style="{ left: mode === 'login' ? '0%' : '50%', width: '50%' }"
           />
         </div>
@@ -325,7 +325,7 @@ onMounted(async () => {
                 placeholder="2521241111"
                 inputmode="numeric"
                 autocomplete="username"
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-wider text-base"
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-wider text-base"
               />
             </div>
             <div>
@@ -341,7 +341,7 @@ onMounted(async () => {
                 inputmode="numeric"
                 autocomplete="current-password"
                 maxlength="6"
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center text-base"
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center text-base"
                 @keyup.enter="submit"
               />
             </div>
@@ -350,7 +350,7 @@ onMounted(async () => {
           <button
             @click="submit"
             :disabled="!canSubmit"
-            class="mt-5 w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
+            class="mt-5 w-full inline-flex items-center justify-center gap-2 bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
           >
             <span>{{ submitting ? '登录中…' : '登录' }}</span>
             <ArrowRight v-if="!submitting" class="w-4 h-4" />
@@ -366,7 +366,7 @@ onMounted(async () => {
 
           <button
             @click="switchTo('activate')"
-            class="mt-5 w-full text-xs text-zinc-500 hover:text-emerald-400 transition-colors"
+            class="mt-5 w-full text-xs text-zinc-500 hover:text-red-400 transition-colors"
           >
             首次使用？前往激活 →
           </button>
@@ -384,13 +384,13 @@ onMounted(async () => {
               <span
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors"
                 :class="activateStep === 'credentials'
-                  ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                  ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/30'
                   : 'text-zinc-500 dark:text-zinc-600'"
               >
                 <span
                   class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
                   :class="activateStep === 'credentials'
-                    ? 'bg-emerald-500 text-zinc-950'
+                    ? 'bg-red-500 text-[#0d1117]'
                     : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
                 >1</span>
                 <span>凭证</span>
@@ -399,13 +399,13 @@ onMounted(async () => {
               <span
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors"
                 :class="activateStep === 'token'
-                  ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
+                  ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/30'
                   : 'text-zinc-500 dark:text-zinc-600'"
               >
                 <span
                   class="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
                   :class="activateStep === 'token'
-                    ? 'bg-emerald-500 text-zinc-950'
+                    ? 'bg-red-500 text-[#0d1117]'
                     : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
                 >2</span>
                 <span>学校 Token</span>
@@ -424,7 +424,7 @@ onMounted(async () => {
                   placeholder="ABC-DEF-XYZ9"
                   autocomplete="off"
                   autocapitalize="characters"
-                  class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring tracking-wider text-center text-base"
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring tracking-wider text-center text-base"
                 />
               </div>
 
@@ -453,7 +453,7 @@ onMounted(async () => {
                     inputmode="numeric"
                     autocomplete="new-password"
                     maxlength="6"
-                    class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
+                    class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
                   />
                 </div>
                 <div>
@@ -468,7 +468,7 @@ onMounted(async () => {
                     type="password"
                     inputmode="numeric"
                     maxlength="6"
-                    class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
+                    class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring font-mono-token tracking-[0.4em] text-center"
                   />
                 </div>
               </div>
@@ -481,11 +481,11 @@ onMounted(async () => {
               </p>
 
               <!-- Disclaimer inline -->
-              <div class="rounded-lg bg-white/50 dark:bg-zinc-950/50 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+              <div class="rounded-lg bg-white/50 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
                 <button
                   type="button"
                   @click="toggleDisclaimer"
-                  class="w-full flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+                  class="w-full flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors"
                 >
                   <span class="inline-flex items-center gap-1.5">
                     <AlertCircle class="w-3.5 h-3.5 text-amber-400" />
@@ -513,8 +513,8 @@ onMounted(async () => {
                     :disabled="!canCheckAgreement"
                     class="sr-only peer"
                   />
-                  <div class="w-4 h-4 rounded border-2 border-zinc-600 peer-checked:border-emerald-500 peer-checked:bg-emerald-500 transition-colors flex items-center justify-center shrink-0">
-                    <Check v-if="agreed" class="w-2.5 h-2.5 text-zinc-950" :stroke-width="3" />
+                  <div class="w-4 h-4 rounded border-2 border-zinc-600 peer-checked:border-red-500 peer-checked:bg-red-500 transition-colors flex items-center justify-center shrink-0">
+                    <Check v-if="agreed" class="w-2.5 h-2.5 text-[#0d1117]" :stroke-width="3" />
                   </div>
                   <span class="text-xs text-zinc-700 dark:text-zinc-300">
                     <template v-if="canCheckAgreement">我已阅读并同意</template>
@@ -530,7 +530,7 @@ onMounted(async () => {
               <button
                 type="button"
                 @click="backToCredentials"
-                class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-emerald-400 transition-colors inline-flex items-center gap-1"
+                class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-red-400 transition-colors inline-flex items-center gap-1"
               >
                 ← 上一步：改邀请码 / PIN
               </button>
@@ -540,7 +540,7 @@ onMounted(async () => {
                   <QrCode class="w-3.5 h-3.5" />
                   微信扫码获取学校 Token
                 </label>
-                <div class="rounded-xl bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+                <div class="rounded-xl bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
                 <div class="flex flex-col sm:flex-row gap-4">
                   <div class="shrink-0 self-center sm:self-start">
                     <div class="w-36 h-36 rounded-xl bg-white ring-1 ring-black/[0.06] p-2 flex items-center justify-center overflow-hidden">
@@ -566,7 +566,7 @@ onMounted(async () => {
                       <button
                         type="button"
                         @click="refreshWechatQr"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-zinc-900/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-emerald-500/40 transition-colors"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] text-zinc-700 dark:text-zinc-300 bg-white/80 dark:bg-[#161b22]/80 ring-1 ring-black/[0.06] dark:ring-white/[0.05] hover:ring-red-500/40 transition-colors"
                       >
                         <RefreshCw class="w-3 h-3" />
                         刷新二维码
@@ -575,19 +575,19 @@ onMounted(async () => {
                   </div>
                 </div>
               </div>
-              <div class="mt-3 rounded-2xl bg-emerald-500/[0.08] ring-1 ring-emerald-500/30 p-4 shadow-[0_10px_30px_rgba(16,185,129,0.08)]">
+              <div class="mt-3 rounded-2xl bg-red-500/[0.08] ring-1 ring-red-500/30 p-4 shadow-[0_10px_30px_rgba(16,185,129,0.08)]">
                 <div class="flex items-start justify-between gap-3">
                   <div>
-                    <label class="flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      <KeyRound class="w-4 h-4 text-emerald-400" />
+                    <label class="flex items-center gap-1.5 text-sm font-semibold text-[#161b22] dark:text-zinc-100">
+                      <KeyRound class="w-4 h-4 text-red-400" />
                       把手机里的回调链接或 code 直接贴这里
                     </label>
                     <p class="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                      支持整段 <code class="bg-white/80 dark:bg-zinc-900/80 px-1 rounded text-zinc-700 dark:text-zinc-300">https://xhbcs.henau.edu.cn/?code=...</code>
+                      支持整段 <code class="bg-white/80 dark:bg-[#161b22]/80 px-1 rounded text-zinc-700 dark:text-zinc-300">https://xhbcs.henau.edu.cn/?code=...</code>
                       、只复制
-                      <code class="bg-white/80 dark:bg-zinc-900/80 px-1 rounded text-zinc-700 dark:text-zinc-300">?code=...</code>
+                      <code class="bg-white/80 dark:bg-[#161b22]/80 px-1 rounded text-zinc-700 dark:text-zinc-300">?code=...</code>
                       ，或直接贴纯
-                      <code class="bg-white/80 dark:bg-zinc-900/80 px-1 rounded text-zinc-700 dark:text-zinc-300">code</code>
+                      <code class="bg-white/80 dark:bg-[#161b22]/80 px-1 rounded text-zinc-700 dark:text-zinc-300">code</code>
                       。
                     </p>
                   </div>
@@ -595,18 +595,18 @@ onMounted(async () => {
                 <textarea
                   v-model="callbackUrl"
                   placeholder="示例：https://xhbcs.henau.edu.cn/?code=001B8Zfa1NMRHL0m65la1gbfBa3B8ZFy&state=STATE#/checkin"
-                  class="mt-3 w-full bg-white dark:bg-zinc-950 ring-2 ring-emerald-500/25 focus:!ring-emerald-500/55 rounded-xl px-3 py-3 h-32 resize-none text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring"
+                  class="mt-3 w-full bg-white dark:bg-[#0d1117] ring-2 ring-red-500/25 focus:!ring-red-500/55 rounded-xl px-3 py-3 h-32 resize-none text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus-ring"
                 />
                 <div
                   v-if="callbackDetection.kind === 'callback-url'"
-                  class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/12 px-2.5 py-1.5 text-[11px] text-emerald-500"
+                  class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-red-500/12 px-2.5 py-1.5 text-[11px] text-red-500"
                 >
                   <Check class="w-3.5 h-3.5" />
                   已识别整段回调链接，将自动提取 code：{{ callbackCodePreview }}
                 </div>
                 <div
                   v-else-if="callbackDetection.kind === 'code'"
-                  class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/12 px-2.5 py-1.5 text-[11px] text-emerald-500"
+                  class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-red-500/12 px-2.5 py-1.5 text-[11px] text-red-500"
                 >
                   <Check class="w-3.5 h-3.5" />
                   已识别为 code：{{ callbackCodePreview }}
@@ -623,20 +623,20 @@ onMounted(async () => {
               <button
                 @click="showLegacyToken = !showLegacyToken"
                 type="button"
-                class="mt-2 text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+                class="mt-2 text-[11px] text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors"
               >
                 {{ showLegacyToken ? '收起手动 JWT 兜底' : '高级选项：手动粘贴 JWT' }}
               </button>
               <Transition name="expand">
                 <div
                   v-if="showLegacyToken"
-                  class="mt-2 overflow-hidden rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
+                  class="mt-2 overflow-hidden rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
                 >
                   <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2">仅在扫码流程异常时使用，直接粘贴学校 JWT。</p>
                   <textarea
                     v-model="token"
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token h-24 resize-none text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring"
+                    class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2.5 font-mono-token h-24 resize-none text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-300 dark:placeholder:text-zinc-700 focus-ring"
                   />
                 </div>
               </Transition>
@@ -649,7 +649,7 @@ onMounted(async () => {
           <button
             @click="submit"
             :disabled="!canSubmit"
-            class="mt-5 w-full inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
+            class="mt-5 w-full inline-flex items-center justify-center gap-2 bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
           >
             <span v-if="submitting">激活中…</span>
             <span v-else-if="activateStep === 'credentials' && !precheckLoading">下一步：获取学校 Token</span>
@@ -668,7 +668,7 @@ onMounted(async () => {
 
           <button
             @click="switchTo('login')"
-            class="mt-5 w-full text-xs text-zinc-500 hover:text-emerald-400 transition-colors"
+            class="mt-5 w-full text-xs text-zinc-500 hover:text-red-400 transition-colors"
           >
             ← 已激活账号？返回登录
           </button>

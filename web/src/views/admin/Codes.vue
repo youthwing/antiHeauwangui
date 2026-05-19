@@ -116,7 +116,7 @@ function debouncedSaveNote(c: InviteCode, v: string) {
       </div>
       <button
         @click="showGen = true"
-        class="self-start inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        class="self-start inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-400 text-[#0d1117] text-sm font-medium px-4 py-2 rounded-lg transition-colors"
       >
         <Plus class="w-4 h-4" />
         生成邀请码
@@ -131,7 +131,7 @@ function debouncedSaveNote(c: InviteCode, v: string) {
           v-model="search"
           @keyup.enter="load"
           placeholder="搜索邀请码 / 备注"
-          class="w-full pl-9 pr-3 py-2 bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+          class="w-full pl-9 pr-3 py-2 bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
         />
       </div>
       <div class="flex gap-1">
@@ -140,25 +140,25 @@ function debouncedSaveNote(c: InviteCode, v: string) {
           :key="k"
           @click="filter = k as any; load()"
           :class="filter === k
-            ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30'
-            : 'bg-white/85 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'"
+            ? 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30'
+            : 'bg-white/85 dark:bg-[#161b22]/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-[#161b22] dark:hover:text-zinc-200'"
           class="text-xs px-3 py-1.5 rounded-md transition-colors"
         >{{ o }}</button>
       </div>
       <button
         @click="load"
         :disabled="loading"
-        class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1"
+        class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1"
       >
         <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'wangui-spin' : ''" />
       </button>
     </div>
 
     <!-- Table -->
-    <section class="rounded-xl bg-white/85 dark:bg-zinc-900/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden">
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead class="bg-white/50 dark:bg-zinc-950/50 border-b border-black/[0.08] dark:border-white/[0.06]">
+          <thead class="bg-white/50 dark:bg-[#0d1117]/50 border-b border-black/[0.08] dark:border-white/[0.06]">
             <tr class="text-left text-[10px] text-zinc-500 uppercase tracking-wide">
               <th class="px-4 py-3 font-medium">邀请码</th>
               <th class="px-4 py-3 font-medium">状态</th>
@@ -171,7 +171,7 @@ function debouncedSaveNote(c: InviteCode, v: string) {
           <tbody class="divide-y divide-black/[0.05] dark:divide-white/[0.04]">
             <tr v-if="loading && filtered.length === 0">
               <td colspan="6" class="px-4 py-10 text-center">
-                <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-emerald-400 wangui-spin mx-auto" />
+                <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin mx-auto" />
               </td>
             </tr>
             <tr v-else-if="filtered.length === 0">
@@ -180,24 +180,24 @@ function debouncedSaveNote(c: InviteCode, v: string) {
               </td>
             </tr>
             <tr v-for="c in filtered" :key="c.code" class="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors">
-              <td class="px-4 py-3 font-mono-token text-zinc-900 dark:text-zinc-200 tracking-wider">{{ c.code }}</td>
+              <td class="px-4 py-3 font-mono-token text-[#161b22] dark:text-zinc-200 tracking-wider">{{ c.code }}</td>
               <td class="px-4 py-3">
                 <span v-if="c.disabled"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-zinc-300/50 dark:bg-zinc-700/50 text-zinc-500 dark:text-zinc-400">
                   已禁用
                 </span>
                 <span v-else-if="c.used"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30">
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-red-500/15 text-red-400 ring-1 ring-red-500/30">
                   已用
                 </span>
                 <span v-else
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30">
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-sky-500/15 text-blue-400 ring-1 ring-sky-500/30">
                   待用
                 </span>
               </td>
               <td class="px-4 py-3 text-xs">
                 <template v-if="c.boundUserId">
-                  <span class="text-zinc-900 dark:text-zinc-200">{{ c.boundUserName || '—' }}</span>
+                  <span class="text-[#161b22] dark:text-zinc-200">{{ c.boundUserName || '—' }}</span>
                   <span class="ml-1.5 text-zinc-500 dark:text-zinc-600 font-mono-token">({{ c.boundUserId }})</span>
                 </template>
                 <span v-else class="text-zinc-500 dark:text-zinc-600">—</span>
@@ -207,7 +207,7 @@ function debouncedSaveNote(c: InviteCode, v: string) {
                   :value="c.note"
                   @input="(e: any) => debouncedSaveNote(c, e.target.value)"
                   placeholder="—"
-                  class="w-32 bg-transparent border-none px-1 py-0.5 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:bg-zinc-950 focus:ring-1 focus:ring-emerald-500/30 rounded text-xs"
+                  class="w-32 bg-transparent border-none px-1 py-0.5 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:bg-[#0d1117] focus:ring-1 focus:ring-red-500/30 rounded text-xs"
                 />
               </td>
               <td class="px-4 py-3 text-xs text-zinc-500 tabular-nums">
@@ -216,7 +216,7 @@ function debouncedSaveNote(c: InviteCode, v: string) {
               <td class="px-4 py-3 text-right">
                 <div class="inline-flex gap-0.5">
                   <button @click="copy(c.code)" title="复制"
-                    class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                    class="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 transition-colors">
                     <Copy class="w-3.5 h-3.5" />
                   </button>
                   <button @click="toggleDisabled(c)" :title="c.disabled ? '启用' : '禁用'"
@@ -237,15 +237,15 @@ function debouncedSaveNote(c: InviteCode, v: string) {
 
     <!-- Generate modal -->
     <Transition name="modal">
-      <div v-if="showGen" class="fixed inset-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur flex items-center justify-center p-4"
+      <div v-if="showGen" class="fixed inset-0 z-50 bg-white/80 dark:bg-[#0d1117]/80 backdrop-blur flex items-center justify-center p-4"
         @click.self="showGen = false; newlyGenerated = []">
-        <div class="w-full max-w-md bg-zinc-100 dark:bg-zinc-900 ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl">
+        <div class="w-full max-w-md bg-zinc-100 dark:bg-[#161b22] ring-1 ring-black/10 dark:ring-white/10 rounded-2xl shadow-2xl">
           <div class="p-5 border-b border-black/[0.08] dark:border-white/[0.06] flex items-center justify-between">
             <h2 class="text-base font-bold">
               {{ newlyGenerated.length ? '已生成' : '生成邀请码' }}
             </h2>
             <button @click="showGen = false; newlyGenerated = []"
-              class="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              class="text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-200 transition-colors">
               <X class="w-4 h-4" />
             </button>
           </div>
@@ -254,15 +254,15 @@ function debouncedSaveNote(c: InviteCode, v: string) {
             <div>
               <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">数量 (1–50)</label>
               <input v-model.number="genCount" type="number" min="1" max="50"
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200" />
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200" />
             </div>
             <div>
               <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">备注 (可选)</label>
               <input v-model="genNote" placeholder='例如"2026春批次给XX等"'
-                class="w-full bg-white dark:bg-zinc-950 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600" />
             </div>
             <button @click="generate" :disabled="generating || genCount < 1"
-              class="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-medium py-2.5 rounded-xl transition-colors">
+              class="w-full bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] font-medium py-2.5 rounded-xl transition-colors">
               {{ generating ? '生成中…' : `生成 ${genCount} 张` }}
             </button>
           </div>
@@ -272,13 +272,13 @@ function debouncedSaveNote(c: InviteCode, v: string) {
             <ul class="space-y-1.5 max-h-72 overflow-y-auto">
               <li v-for="c in newlyGenerated" :key="c.code">
                 <button @click="copy(c.code)"
-                  class="w-full text-left px-3 py-2 rounded-lg bg-white/70 dark:bg-zinc-950/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:ring-emerald-500/40 font-mono-token tracking-wider text-zinc-900 dark:text-zinc-200 transition-all">
+                  class="w-full text-left px-3 py-2 rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:ring-red-500/40 font-mono-token tracking-wider text-[#161b22] dark:text-zinc-200 transition-all">
                   {{ c.code }}
                 </button>
               </li>
             </ul>
             <button @click="copyAll"
-              class="mt-4 w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-medium py-2 rounded-xl transition-colors inline-flex items-center justify-center gap-2">
+              class="mt-4 w-full bg-red-500 hover:bg-red-400 text-[#0d1117] font-medium py-2 rounded-xl transition-colors inline-flex items-center justify-center gap-2">
               <Copy class="w-4 h-4" />
               复制全部
             </button>
