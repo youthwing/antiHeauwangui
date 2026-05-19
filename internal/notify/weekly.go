@@ -66,7 +66,7 @@ func (d *Dispatcher) dispatchWeeklyDigestSync(u *store.User, s WeeklyStats) {
 
 func renderWeeklyDigestEmail(u *store.User, s WeeklyStats) (subject, text, html string) {
 	span := s.From.Format("01/02") + " – " + s.To.Format("01/02")
-	subject = fmt.Sprintf("[勿外传] 本周战报 · %s · 签到 %d 天", u.UserName, s.DaysSigned)
+	subject = fmt.Sprintf("[antiWG] 本周战报 · %s · 签到 %d 天", u.UserName, s.DaysSigned)
 	text = fmt.Sprintf("本周战报 (%s)\n\n姓名：%s\n学号：%s\n\n签到天数：%d\n失败天数：%d\n跳过天数：%d\n",
 		span, u.UserName, u.UserNumber, s.DaysSigned, s.DaysFailed, s.DaysSkipped)
 	if s.BestDay != "" {
@@ -77,7 +77,7 @@ func renderWeeklyDigestEmail(u *store.User, s WeeklyStats) (subject, text, html 
 	html = fmt.Sprintf(`<!doctype html><html><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#fafafa;padding:24px;color:#18181b;">
 <div style="max-width:580px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
   <div style="padding:20px 24px;background:linear-gradient(135deg,#10b981 0%%,#3b82f6 100%%);color:#fff;">
-    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">勿外传 · 本周战报</div>
+    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">antiWG · 本周战报</div>
     <div style="font-size:22px;font-weight:700;margin-top:4px;">%s 的一周</div>
     <div style="font-size:12px;margin-top:4px;opacity:.85;">%s</div>
   </div>

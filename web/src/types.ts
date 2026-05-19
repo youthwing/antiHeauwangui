@@ -150,6 +150,12 @@ export interface InviteCode {
   used: boolean
 }
 
+export interface SiteGateCode {
+  code: string
+  createdAt: number
+  expiresAt: number
+}
+
 export interface AdminUser {
   userId: string
   userName: string

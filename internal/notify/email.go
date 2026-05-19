@@ -20,7 +20,7 @@ type EmailClient struct {
 	Port     int    // 587 for STARTTLS
 	Username string // authentication user (typically the From address for Gmail)
 	Password string // Gmail app password (16 chars, no spaces)
-	From     string // optional display: "勿外传 <noreply@x.com>"; falls back to Username
+	From     string // optional display: "antiWG <noreply@x.com>"; falls back to Username
 }
 
 // Message describes one outbound email.

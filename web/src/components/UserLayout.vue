@@ -86,14 +86,14 @@ onUnmounted(() => {
       class="hidden md:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-black/[0.06] dark:border-white/[0.05] bg-white/60 dark:bg-[#0d1117]/60 backdrop-blur-xl overflow-y-auto"
     >
       <div class="px-5 py-5 border-b border-black/[0.05] dark:border-white/[0.04]">
-        <Logo :size="34" text="勿外传" />
+        <Logo :size="34" text="antiWG" />
         <!-- Lifetime success-sign counter — small system-wide "brag" chip
              so users on every page can see the platform's accumulated
              impact. Hidden until the first count loads to avoid a 0 flash. -->
         <div
           v-if="totalSigns !== null && totalSigns > 0"
           class="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-gradient-to-r from-red-500/10 to-amber-500/10 ring-1 ring-red-500/20 text-zinc-700 dark:text-zinc-300"
-          :title="`从开服至今，wangui 已成功为大家签到 ${totalSigns.toLocaleString()} 次`"
+          :title="`从开服至今，antiWG 已成功为大家签到 ${totalSigns.toLocaleString()} 次`"
         >
           <Sparkles class="w-3 h-3 text-amber-400" />
           <span>已为大家签到</span>
@@ -160,7 +160,7 @@ onUnmounted(() => {
 
     <!-- Mobile top bar (sits below the global banner) -->
     <header class="md:hidden sticky top-0 z-30 bg-white/85 dark:bg-[#0d1117]/85 backdrop-blur-xl border-b border-black/[0.08] dark:border-white/[0.06] h-12 flex items-center justify-between px-4">
-      <Logo :size="26" text="勿外传" />
+      <Logo :size="26" text="antiWG" />
       <div class="flex items-center gap-1">
         <ThemeToggle />
         <button

@@ -13,6 +13,7 @@ import (
 const (
 	sessionCookie      = "wangui_session"
 	adminSessionCookie = "wangui_admin"
+	siteGateCookie     = "antiwg_gate"
 )
 
 type ctxKey int
@@ -81,6 +82,42 @@ func (h *handlers) adminAuth(next http.Handler) http.Handler {
 		}
 		ctx := context.WithValue(r.Context(), adminIDCtx, sess.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (h *handlers) hasSiteGateAccess(r *http.Request) (bool, error) {
+	if ck, err := r.Cookie(siteGateCookie); err == nil {
+		ok, err := h.store.HasSiteGatePass(r.Context(), ck.Value)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+	}
+	// Existing user sessions should keep working even if the gate cookie was
+	// cleared; the gate is for discovery control, not normal account access.
+	if ck, err := r.Cookie(sessionCookie); err == nil {
+		sess, err := h.store.GetSession(r.Context(), ck.Value)
+		if err == nil && !sess.IsAdmin {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (h *handlers) siteGateAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ok, err := h.hasSiteGateAccess(r)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "访问门禁校验失败")
+			return
+		}
+		if !ok {
+			writeErr(w, http.StatusForbidden, "需要访问码")
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

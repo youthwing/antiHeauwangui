@@ -66,7 +66,10 @@ func (s *Store) DeleteSessionsForUser(ctx context.Context, userID string) error 
 }
 
 func (s *Store) GCSessions(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx,
-		`DELETE FROM web_sessions WHERE expires_at < ?`, time.Now().Unix())
-	return err
+	if _, err := s.db.ExecContext(ctx,
+		`DELETE FROM web_sessions WHERE expires_at < ?`, time.Now().Unix(),
+	); err != nil {
+		return err
+	}
+	return s.GCSiteGatePasses(ctx)
 }

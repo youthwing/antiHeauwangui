@@ -108,6 +108,24 @@ CREATE TABLE IF NOT EXISTS web_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON web_sessions(user_id);
 
+CREATE TABLE IF NOT EXISTS site_access_codes (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  code_hash     TEXT NOT NULL UNIQUE,
+  created_by    TEXT NOT NULL DEFAULT 'admin',
+  created_at    INTEGER NOT NULL,
+  expires_at    INTEGER NOT NULL,
+  used_at       INTEGER,
+  used_by_ip    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_site_access_codes_expires ON site_access_codes(expires_at);
+
+CREATE TABLE IF NOT EXISTS site_gate_passes (
+  pass_id     TEXT PRIMARY KEY,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_site_gate_passes_expires ON site_gate_passes(expires_at);
+
 CREATE TABLE IF NOT EXISTS system_config (
   key        TEXT PRIMARY KEY,
   value      TEXT NOT NULL DEFAULT '',

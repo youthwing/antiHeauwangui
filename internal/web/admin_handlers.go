@@ -106,6 +106,20 @@ func (h *handlers) adminStats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// POST /api/v1/airvel/gate-codes — create a one-time site-entry code.
+func (h *handlers) adminCreateSiteAccessCode(w http.ResponseWriter, r *http.Request) {
+	code, err := h.store.CreateSiteAccessCode(r.Context(), adminIDOf(r), siteAccessCodeTTL)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "访问码生成失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"code":      code.Code,
+		"createdAt": code.CreatedAt.Unix(),
+		"expiresAt": code.ExpiresAt.Unix(),
+	})
+}
+
 // GET /api/v1/admin/codes
 func (h *handlers) adminListCodes(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
@@ -518,12 +532,12 @@ func (h *handlers) adminSignNowForUser(w http.ResponseWriter, r *http.Request) {
 	h.log.Info("admin sign-now", "target_user", id, "status", res.Status)
 	if h.bus != nil {
 		h.bus.PublishJSON(events.TypeSignResult, map[string]any{
-			"userId":   id,
-			"userName": u.UserName,
-			"status":   res.Status,
-			"message":  res.Message,
-			"attempt":  0,
-			"terminal": true,
+			"userId":         id,
+			"userName":       u.UserName,
+			"status":         res.Status,
+			"message":        res.Message,
+			"attempt":        0,
+			"terminal":       true,
 			"adminTriggered": true,
 		})
 	}
@@ -782,7 +796,7 @@ func (h *handlers) adminTestServerChan(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	client := notify.NewServerChan(cfg.AdminServerChanKey)
 	if err := client.Send(ctx,
-		"[勿外传] Server酱 测试推送",
+		"[antiWG] Server酱 测试推送",
 		"如果你的微信收到了这条消息，说明 admin Server酱 配置已生效。\n\n时间："+time.Now().Format("2006-01-02 15:04:05"),
 	); err != nil {
 		writeErr(w, http.StatusBadGateway, "推送失败: "+err.Error())
@@ -813,11 +827,11 @@ func (h *handlers) adminTestSMTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := client.Send(notify.Message{
 		To:      target,
-		Subject: "[勿外传] SMTP 测试邮件",
+		Subject: "[antiWG] SMTP 测试邮件",
 		Text:    "如果你收到了这封邮件，说明 SMTP 配置已生效。\n\n时间：" + time.Now().Format("2006-01-02 15:04:05"),
 		HTML: `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#fafafa;padding:24px;color:#18181b;">
 <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;">
-<div style="font-size:11px;color:#71717a;letter-spacing:.1em;text-transform:uppercase;">勿外传 · SMTP 测试</div>
+<div style="font-size:11px;color:#71717a;letter-spacing:.1em;text-transform:uppercase;">antiWG · SMTP 测试</div>
 <h2 style="font-size:18px;margin:6px 0 12px 0;">✅ 配置已生效</h2>
 <p style="font-size:14px;color:#3f3f46;line-height:1.6;">如果你收到了这封邮件，说明 SMTP 设置正确，签到通知将正常发出。</p>
 <p style="font-size:12px;color:#a1a1aa;margin-top:18px;">时间 ` + time.Now().Format("2006-01-02 15:04:05") + `</p>
@@ -836,7 +850,8 @@ func (h *handlers) adminTestSMTP(w http.ResponseWriter, r *http.Request) {
 // Defaults: from = first day of current month, to = today.
 //
 // Columns:
-//   id, occurred_at_iso, user_id, user_name, user_number, status, message, rule_id
+//
+//	id, occurred_at_iso, user_id, user_name, user_number, status, message, rule_id
 //
 // occurred_at is ISO 8601 in the server's local timezone (CST) for Excel
 // friendliness — raw unix timestamps confuse non-technical users.

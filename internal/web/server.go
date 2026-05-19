@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -50,17 +51,17 @@ func (s *Server) Run(ctx context.Context) error {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public (no auth)
-		r.Post("/login", h.login)
-		r.Post("/activate", h.activate)
-		r.Post("/activate/precheck", h.activatePrecheck)
+		r.Post("/gate", h.siteGate)
 		r.Post("/airvel/login", h.adminLogin)
-		// User-facing announcements are public-ish: any logged-in user reads
-		// them through /me-scoped sessions, but we don't need auth on the
-		// list itself — the data is non-sensitive (admin-authored notices).
-		r.Get("/announcements", h.listAnnouncements)
-		// Lifetime success-sign counter for the user sidebar's brag chip.
-		// Single number; no sensitive fields.
-		r.Get("/platform-stats", h.platformStats)
+
+		r.Group(func(r chi.Router) {
+			r.Use(h.siteGateAuth)
+			r.Post("/login", h.login)
+			r.Post("/activate", h.activate)
+			r.Post("/activate/precheck", h.activatePrecheck)
+			r.Get("/announcements", h.listAnnouncements)
+			r.Get("/platform-stats", h.platformStats)
+		})
 
 		// User endpoints
 		r.Group(func(r chi.Router) {
@@ -86,6 +87,7 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/me", h.adminMe)
 			r.Post("/logout", h.adminLogout)
 			r.Get("/stats", h.adminStats)
+			r.Post("/gate-codes", h.adminCreateSiteAccessCode)
 
 			r.Get("/codes", h.adminListCodes)
 			r.Post("/codes", h.adminCreateCodes)
@@ -130,7 +132,7 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 
 	if s.SPAFS != nil {
-		mountSPA(r, s.SPAFS)
+		mountSPA(r, s.SPAFS, h)
 	}
 
 	srv := &http.Server{
@@ -158,7 +160,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 }
 
-func mountSPA(r chi.Router, spa fs.FS) {
+func mountSPA(r chi.Router, spa fs.FS, h *handlers) {
 	fileServer := http.FileServer(http.FS(spa))
 	r.Get("/assets/*", fileServer.ServeHTTP)
 	r.Get("/favicon.ico", fileServer.ServeHTTP)
@@ -166,6 +168,21 @@ func mountSPA(r chi.Router, spa fs.FS) {
 		if strings.HasPrefix(req.URL.Path, "/api/") {
 			http.NotFound(w, req)
 			return
+		}
+		if !siteGateFreeSPAPath(req.URL.Path) {
+			ok, err := h.hasSiteGateAccess(req)
+			if err != nil {
+				http.Error(w, "site gate check failed", http.StatusInternalServerError)
+				return
+			}
+			if !ok {
+				target := "/gate"
+				if req.URL.RequestURI() != "" && req.URL.Path != "/" {
+					target += "?redirect=" + url.QueryEscape(req.URL.RequestURI())
+				}
+				http.Redirect(w, req, target, http.StatusSeeOther)
+				return
+			}
 		}
 		clean := strings.TrimPrefix(req.URL.Path, "/")
 		if clean == "" {
@@ -185,6 +202,16 @@ func mountSPA(r chi.Router, spa fs.FS) {
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(b)
 	})
+}
+
+func siteGateFreeSPAPath(path string) bool {
+	return path == "/gate" ||
+		path == "/favicon.ico" ||
+		path == "/logo.svg" ||
+		strings.HasPrefix(path, "/assets/") ||
+		strings.HasPrefix(path, "/fonts/") ||
+		path == "/airvel" ||
+		strings.HasPrefix(path, "/airvel/")
 }
 
 func slogRequestLogger(l *slog.Logger) func(http.Handler) http.Handler {

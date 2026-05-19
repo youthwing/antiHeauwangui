@@ -47,7 +47,7 @@ onMounted(async () => {
       <div class="flex flex-col items-center mb-8">
         <Logo :size="56" />
         <div class="flex items-center gap-2 mt-5">
-          <h1 class="text-2xl font-bold tracking-tight">晚归管理端</h1>
+          <h1 class="text-2xl font-bold tracking-tight">antiWG 管理端</h1>
           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30">
             <ShieldCheck class="w-2.5 h-2.5" />
             ADMIN

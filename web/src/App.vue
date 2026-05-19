@@ -8,7 +8,7 @@ const auth = useAuth()
 
 const watermarkText = computed(() => {
   const name = auth.state.me?.userName?.trim()
-  return name || 'AIRVEL'
+  return name || 'antiWG'
 })
 const watermarkItems = Array.from({ length: 96 }, (_, i) => i)
 </script>

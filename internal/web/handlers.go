@@ -25,6 +25,11 @@ var pinPattern = regexp.MustCompile(`^\d{4,6}$`)
 
 func validPin(s string) bool { return pinPattern.MatchString(s) }
 
+const (
+	siteAccessCodeTTL = 10 * time.Minute
+	siteGatePassTTL   = 24 * time.Hour
+)
+
 type handlers struct {
 	store     *store.Store
 	sched     *scheduler.Multi
@@ -41,6 +46,41 @@ type handlers struct {
 type loginReq struct {
 	UserNumber string `json:"userNumber"`
 	Pin        string `json:"pin"`
+}
+
+type siteGateReq struct {
+	Code string `json:"code"`
+}
+
+func (h *handlers) siteGate(w http.ResponseWriter, r *http.Request) {
+	if !h.loginLimiter.allow(clientIP(r)) {
+		writeErr(w, http.StatusTooManyRequests, "尝试过于频繁，请稍后再试")
+		return
+	}
+	var req siteGateReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if strings.TrimSpace(req.Code) == "" {
+		writeErr(w, http.StatusBadRequest, "访问码不能为空")
+		return
+	}
+	if err := h.store.ConsumeSiteAccessCode(r.Context(), req.Code, clientIP(r)); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeErr(w, http.StatusUnauthorized, "访问码无效、已过期或已使用")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "访问码校验失败")
+		return
+	}
+	passID, exp, err := h.store.CreateSiteGatePass(r.Context(), siteGatePassTTL)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "访问通行证创建失败")
+		return
+	}
+	setSessionCookie(w, siteGateCookie, passID, exp)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "expiresAt": exp.Unix()})
 }
 
 func (h *handlers) login(w http.ResponseWriter, r *http.Request) {
@@ -759,7 +799,7 @@ func (h *handlers) testServerChan(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	client := notify.NewServerChan(u.ServerChanKey)
 	if err := client.Send(ctx,
-		"[wangui] Server酱 测试推送",
+		"[antiWG] Server酱 测试推送",
 		fmt.Sprintf("如果你收到了这条消息，说明 Server酱 配置已生效。\n\n**姓名**：%s\n\n**学号**：`%s`\n\n**时间**：%s",
 			u.UserName, u.UserNumber, time.Now().Format("2006-01-02 15:04:05")),
 	); err != nil {

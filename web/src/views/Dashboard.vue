@@ -176,7 +176,7 @@ async function toggleSkipToday() {
   if (skippingToday.value) return
   const turningOn = !isSkippedToday.value
   if (turningOn && !confirm(
-    '确定今晚不在校吗？\n\n勾上后 wangui 不会替你签到 —— 防止「人不在校但脚本签到」=谎报位置=违纪。\n\n再点一次可以取消。',
+    '确定今晚不在校吗？\n\n勾上后 antiWG 不会替你签到 —— 防止「人不在校但脚本签到」=谎报位置=违纪。\n\n再点一次可以取消。',
   )) {
     return
   }
@@ -629,7 +629,7 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         :class="isSkippedToday
           ? 'bg-amber-500/10 hover:bg-amber-500/15 ring-amber-500/30 hover:ring-amber-500/50'
           : 'bg-white/85 dark:bg-[#161b22]/60 hover:bg-zinc-100 dark:hover:bg-[#161b22] ring-black/[0.08] dark:ring-white/[0.06] hover:ring-amber-500/30'"
-        :title="isSkippedToday ? '点击恢复今晚自动签' : '今晚不在校时点这里，wangui 会跳过签到，避免谎报位置'"
+        :title="isSkippedToday ? '点击恢复今晚自动签' : '今晚不在校时点这里，antiWG 会跳过签到，避免谎报位置'"
       >
         <div class="flex items-start justify-between mb-2">
           <component

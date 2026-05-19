@@ -282,9 +282,9 @@ onMounted(async () => {
       <div class="flex flex-col items-center mb-8">
         <Logo :size="56" />
         <h1 class="text-3xl font-bold tracking-tight mt-5 text-center">
-          勿外传
+          antiWG
         </h1>
-        <p class="text-sm text-zinc-500 mt-2">内部工具</p>
+        <p class="text-sm text-zinc-500 mt-2">入口受限</p>
       </div>
 
       <div class="bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-2xl backdrop-blur-sm overflow-hidden">
@@ -431,7 +431,7 @@ onMounted(async () => {
               <!-- PIN warning -->
               <div class="rounded-lg bg-amber-500/[0.07] ring-1 ring-amber-500/25 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
                 <p>
-                  <strong class="text-amber-300">⚠️ PIN 就是你以后登录 wangui 的密码</strong>，
+                  <strong class="text-amber-300">⚠️ PIN 就是你以后登录 antiWG 的密码</strong>，
                   4–6 位数字，自己定，<strong>记牢别忘</strong>。
                 </p>
                 <p class="text-zinc-500 dark:text-zinc-400 mt-1">

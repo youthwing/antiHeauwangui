@@ -570,7 +570,7 @@ const previewSchedule = computed(() => {
           class="rounded-lg bg-zinc-100 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-3 mb-3 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-2"
         >
           <p>
-            <strong class="text-[#161b22] dark:text-zinc-200">Server 酱（方糖）</strong> 是一个免费的「程序→微信」推送服务。配置后，wangui 在
+            <strong class="text-[#161b22] dark:text-zinc-200">Server 酱（方糖）</strong> 是一个免费的「程序→微信」推送服务。配置后，antiWG 在
             发生事件时（签到成功 / 失败 / Token 快过期）会调它的接口，你的微信就能立即收到通知。
           </p>
           <ol class="list-decimal pl-5 space-y-1">
@@ -585,7 +585,7 @@ const previewSchedule = computed(() => {
           </p>
           <p>
             <strong class="text-[#161b22] dark:text-zinc-200">隐私</strong>：SendKey 等同于「允许任何人给你的微信发消息」，
-            不要分享给别人。wangui 把它<strong>加密存储</strong>，从不在网页上回显，只在发送时取出使用。
+            不要分享给别人。antiWG 把它<strong>加密存储</strong>，从不在网页上回显，只在发送时取出使用。
           </p>
         </div>
       </Transition>

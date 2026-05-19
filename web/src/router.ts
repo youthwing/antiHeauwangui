@@ -4,6 +4,12 @@ import { useAuth, useAdminAuth } from './stores/auth'
 const routes: RouteRecordRaw[] = [
   // Public
   {
+    path: '/gate',
+    name: 'gate',
+    component: () => import('./views/Gate.vue'),
+    meta: { layout: 'none' },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('./views/Login.vue'),

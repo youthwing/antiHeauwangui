@@ -248,13 +248,13 @@ func (d *Dispatcher) dispatchRulesChangedSync(rules any, prevJSON, currentJSON s
 
 	// Build a short summary listing each rule's id/name/window.
 	summary := summarizeRules(rules)
-	subject := "[勿外传] 学校晚归规则有变化"
+	subject := "[antiWG] 学校晚归规则有变化"
 	text := fmt.Sprintf("学校 /checkin/available-rules 接口返回的规则与昨天不同。\n\n%s\n\n时间：%s\n",
 		summary, time.Now().Format("2006-01-02 15:04:05"))
 	html := fmt.Sprintf(`<!doctype html><html><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#fafafa;padding:24px;color:#18181b;">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
   <div style="padding:18px 22px;background:#3b82f6;color:#fff;">
-    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">勿外传 · 学校规则变化</div>
+    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">antiWG · 学校规则变化</div>
     <div style="font-size:20px;font-weight:700;margin-top:4px;">规则有变化</div>
   </div>
   <div style="padding:18px 22px;font-size:14px;line-height:1.7;color:#3f3f46;">
@@ -262,7 +262,7 @@ func (d *Dispatcher) dispatchRulesChangedSync(rules any, prevJSON, currentJSON s
     <pre style="background:#f4f4f5;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">%s</pre>
   </div>
   <div style="padding:12px 22px;font-size:11px;color:#a1a1aa;background:#fafafa;border-top:1px solid #e5e7eb;">
-    勿外传 · 仅内部使用 · 自动发送，请勿回复
+    antiWG · 仅内部使用 · 自动发送，请勿回复
   </div>
 </div></body></html>`, summary)
 
@@ -336,7 +336,7 @@ func (d *Dispatcher) dispatchCleanupSync(expired []store.ExpiredGuest) {
 	for _, g := range expired {
 		fmt.Fprintf(&b, "· %s (%s · %s)\n", g.Label, g.Name, g.UserID)
 	}
-	subject := fmt.Sprintf("[勿外传] 已自动清理 %d 个过期临时朋友", len(expired))
+	subject := fmt.Sprintf("[antiWG] 已自动清理 %d 个过期临时朋友", len(expired))
 	text := fmt.Sprintf("清理时间：%s\n\n%s", time.Now().Format("2006-01-02 15:04"), b.String())
 	if err := client.Send(Message{
 		To:      cfg.AdminBcc,
@@ -375,7 +375,7 @@ func renderSignEmail(u *store.User, res SignResult) (subject, text, html string)
 	when := time.Now().Format("2006-01-02 15:04:05")
 	tagline := taglineForSign(res.Status)
 
-	subject = fmt.Sprintf("[勿外传] %s · %s", label, u.UserName)
+	subject = fmt.Sprintf("[antiWG] %s · %s", label, u.UserName)
 	text = fmt.Sprintf("姓名：%s\n学号：%s\n结果：%s\n说明：%s\n时间：%s\n",
 		u.UserName, u.UserNumber, label, res.Message, when)
 	if tagline != "" {
@@ -393,7 +393,7 @@ func renderSignEmail(u *store.User, res SignResult) (subject, text, html string)
 	html = fmt.Sprintf(`<!doctype html><html><body style="font-family: -apple-system,Segoe UI,sans-serif; background:#fafafa; padding:24px; color:#18181b;">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
   <div style="padding:18px 22px;background:%s;color:#fff;">
-    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.8;">勿外传 · 签到结果</div>
+    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.8;">antiWG · 签到结果</div>
     <div style="font-size:22px;font-weight:700;margin-top:4px;">%s</div>
   </div>
   <div style="padding:18px 22px;font-size:14px;line-height:1.7;">
@@ -404,7 +404,7 @@ func renderSignEmail(u *store.User, res SignResult) (subject, text, html string)
     %s
   </div>
   <div style="padding:12px 22px;font-size:11px;color:#a1a1aa;background:#fafafa;border-top:1px solid #e5e7eb;">
-    勿外传 · 仅内部使用 · 自动发送，请勿回复
+    antiWG · 仅内部使用 · 自动发送，请勿回复
   </div>
 </div>
 </body></html>`,
@@ -444,15 +444,15 @@ func renderSignServerChan(u *store.User, res SignResult) (title, body string) {
 // renderTokenWarnEmail returns subject + text + html for a token-expiry alert.
 func renderTokenWarnEmail(u *store.User, hoursLeft int) (subject, text, html string) {
 	human := humanHours(hoursLeft)
-	subject = fmt.Sprintf("[勿外传] Token 即将过期 · %s · 剩 %s", u.UserName, human)
+	subject = fmt.Sprintf("[antiWG] Token 即将过期 · %s · 剩 %s", u.UserName, human)
 	text = fmt.Sprintf(
-		"姓名：%s\n学号：%s\n剩余：%s\n到期时间：%s\n\n请尽快打开 wangui 的「账号」页重新扫码刷新 Token。\n",
+		"姓名：%s\n学号：%s\n剩余：%s\n到期时间：%s\n\n请尽快打开 antiWG 的「账号」页重新扫码刷新 Token。\n",
 		u.UserName, u.UserNumber, human, u.TokenExp.Format("2006-01-02 15:04"),
 	)
 	html = fmt.Sprintf(`<!doctype html><html><body style="font-family:-apple-system,Segoe UI,sans-serif;background:#fafafa;padding:24px;color:#18181b;">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
   <div style="padding:18px 22px;background:#f59e0b;color:#fff;">
-    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">勿外传 · Token 提醒</div>
+    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;">antiWG · Token 提醒</div>
     <div style="font-size:22px;font-weight:700;margin-top:4px;">Token 即将过期</div>
   </div>
   <div style="padding:18px 22px;font-size:14px;line-height:1.7;">
@@ -461,11 +461,11 @@ func renderTokenWarnEmail(u *store.User, hoursLeft int) (subject, text, html str
     <div><strong style="color:#71717a;">剩余</strong>　<span style="color:#d97706;font-weight:600;">%s</span></div>
     <div><strong style="color:#71717a;">到期</strong>　%s</div>
     <div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;color:#92400e;">
-      请尽快打开 wangui 站点，进入「账号」页重新扫码刷新 Token，否则到期后将无法自动签到。
+      请尽快打开 antiWG 站点，进入「账号」页重新扫码刷新 Token，否则到期后将无法自动签到。
     </div>
   </div>
   <div style="padding:12px 22px;font-size:11px;color:#a1a1aa;background:#fafafa;border-top:1px solid #e5e7eb;">
-    勿外传 · 仅内部使用 · 自动发送，请勿回复
+    antiWG · 仅内部使用 · 自动发送，请勿回复
   </div>
 </div></body></html>`,
 		u.UserName, u.UserNumber, human, u.TokenExp.Format("2006-01-02 15:04"))
@@ -476,7 +476,7 @@ func renderTokenWarnServerChan(u *store.User, hoursLeft int) (title, body string
 	human := humanHours(hoursLeft)
 	title = fmt.Sprintf("⚠️ Token 即将过期 · %s · 剩 %s", u.UserName, human)
 	body = fmt.Sprintf(
-		"**姓名**：%s\n\n**学号**：`%s`\n\n**剩余**：%s\n\n**到期**：%s\n\n请尽快打开 wangui 「账号」页重新扫码刷新，否则将无法自动签到。",
+		"**姓名**：%s\n\n**学号**：`%s`\n\n**剩余**：%s\n\n**到期**：%s\n\n请尽快打开 antiWG 「账号」页重新扫码刷新，否则将无法自动签到。",
 		u.UserName, u.UserNumber, human, u.TokenExp.Format("2006-01-02 15:04"),
 	)
 	body = withTagline(body, taglineForTokenWarn())

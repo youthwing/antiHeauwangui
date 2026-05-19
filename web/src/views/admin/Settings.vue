@@ -202,7 +202,7 @@ onMounted(async () => {
           </label>
           <input
             v-model="smtp.from"
-            placeholder='例如 勿外传 &lt;you@gmail.com&gt;'
+            placeholder='例如 antiWG &lt;you@gmail.com&gt;'
             class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200"
           />
         </div>
@@ -279,7 +279,7 @@ onMounted(async () => {
           class="rounded-lg bg-zinc-100 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.06] dark:ring-white/[0.04] p-3 mb-3 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed space-y-2"
         >
           <p>
-            <strong class="text-[#161b22] dark:text-zinc-200">Server 酱（方糖）</strong> 是个免费的「程序 → 微信」推送服务。配置后，wangui
+            <strong class="text-[#161b22] dark:text-zinc-200">Server 酱（方糖）</strong> 是个免费的「程序 → 微信」推送服务。配置后，antiWG
             会在签到 / Token 即将过期时调它的接口，你的微信马上收到。
           </p>
           <ol class="list-decimal pl-5 space-y-1">
@@ -294,7 +294,7 @@ onMounted(async () => {
           </p>
           <p>
             <strong class="text-[#161b22] dark:text-zinc-200">隐私</strong>：SendKey 等同于「允许给微信发消息」的凭证。
-            wangui <strong>用 AES-256-GCM 加密存储</strong>，从不在网页上回显，只在发送时取出使用。
+            antiWG <strong>用 AES-256-GCM 加密存储</strong>，从不在网页上回显，只在发送时取出使用。
           </p>
         </div>
       </Transition>
