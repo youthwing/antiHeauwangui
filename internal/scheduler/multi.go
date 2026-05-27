@@ -137,7 +137,11 @@ func (m *Multi) runRulesWatchSweep(ctx context.Context) {
 		m.log.Warn("rules-watch: no healthy user to probe with")
 		return
 	}
-	c := api.New(probe.Token)
+	c, err := schoolAPIClientForUser(probe)
+	if err != nil {
+		m.log.Warn("rules-watch proxy config invalid", "user", probe.UserID, "err", err.Error())
+		return
+	}
 	probeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	rules, err := c.AvailableRules(probeCtx)
@@ -546,7 +550,10 @@ func (r SignResult) Terminal() bool {
 // SignOnce performs a single status + (optional) sign cycle for one user.
 // It never writes records — the caller decides whether to persist.
 func (m *Multi) SignOnce(ctx context.Context, u *store.User) SignResult {
-	c := api.New(u.Token)
+	c, err := schoolAPIClientForUser(u)
+	if err != nil {
+		return SignResult{Status: "failed", Message: "代理配置错误: " + err.Error()}
+	}
 	st, err := c.CheckinStatus(ctx, DefaultRuleID)
 	if err != nil {
 		if api.IsAuthExpired(err) {

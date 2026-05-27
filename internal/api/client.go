@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
 )
 
 const (
@@ -31,7 +30,7 @@ func New(token string) *Client {
 		BaseURL: BaseURL,
 		Token:   token,
 		UA:      DefaultUA,
-		HTTP:    &http.Client{Timeout: 15 * time.Second},
+		HTTP:    &http.Client{Timeout: defaultTimeout},
 	}
 }
 

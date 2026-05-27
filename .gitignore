@@ -7,6 +7,7 @@
 !.env.example
 /master.key
 **/master.key
+/mihomo/
 
 # --- Local runtime state ---
 /data/

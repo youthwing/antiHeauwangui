@@ -41,6 +41,13 @@ export interface Settings {
   serverChanKey?: string // write-only field; server never echoes it back
   serverChanKeySet?: boolean
   serverChanEnabled?: boolean
+  proxyEnabled?: boolean
+  proxyScheme?: 'socks5' | 'http' | 'https'
+  proxyHost?: string
+  proxyPort?: number
+  proxyUsername?: string
+  proxyPassword?: string // write-only field; server never echoes it back
+  proxyPasswordSet?: boolean
   // 7-bit bitmask of which weekdays to auto-sign on.
   // bit 0 = Mon, bit 1 = Tue, … bit 5 = Sat, bit 6 = Sun. 127 = every day.
   signDays: number
@@ -134,6 +141,34 @@ export interface UserStats {
   totalFailed: number
   totalSkipped: number
   firstSignAt: number     // unix sec of oldest record we found; 0 if none
+}
+
+export interface ProxyTestResult {
+  ok: boolean
+  enabled: boolean
+  outbound: string
+  elapsedMs: number
+  endpoint: string
+  schoolStatus: string
+  schoolMessage: string
+  rules?: number
+}
+
+export interface ProxyNode {
+  name: string
+  current: boolean
+  delayMs?: number
+}
+
+export interface ProxyNodesResult {
+  available: boolean
+  group: string
+  current?: string
+  picked?: string
+  message?: string
+  nodes: ProxyNode[]
+  tested?: ProxyNode[]
+  shared?: boolean
 }
 
 // ---- Admin types ----

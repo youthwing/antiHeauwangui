@@ -17,6 +17,8 @@ import type {
   SchoolCheckinStatus,
   SiteGateCode,
   UserStats,
+  ProxyTestResult,
+  ProxyNodesResult,
   Announcement,
   AnnouncementUpsertReq,
 } from './types'
@@ -124,6 +126,16 @@ export const api = {
   // Returns 502 with upstream error if the SendKey is invalid.
   testServerChan: () =>
     request<{ ok: boolean }>('/notify/test-serverchan', { method: 'POST' }),
+  testProxy: () =>
+    request<ProxyTestResult>('/proxy/test', { method: 'POST' }),
+  proxyNodes: () => request<ProxyNodesResult>('/proxy/nodes'),
+  selectProxyNode: (name: string) =>
+    request<ProxyNodesResult>('/proxy/nodes/select', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  autoSelectProxyNode: () =>
+    request<ProxyNodesResult>('/proxy/nodes/autoselect', { method: 'POST' }),
   logout: () => request<{ ok: boolean }>('/logout', { method: 'POST' }),
   deleteMe: () => request<{ ok: boolean }>('/me', { method: 'DELETE' }),
 }

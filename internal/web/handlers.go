@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	apiclient "wangui/internal/api"
 	"wangui/internal/events"
 	"wangui/internal/notify"
 	"wangui/internal/scheduler"
@@ -391,6 +392,12 @@ func settingsDTO(u *store.User) map[string]any {
 		"signDays":          u.SignDays,
 		"serverChanKeySet":  u.ServerChanKey != "",
 		"serverChanEnabled": u.ServerChanEnabled,
+		"proxyEnabled":      u.ProxyEnabled,
+		"proxyScheme":       defaultStr(u.ProxyScheme, "socks5"),
+		"proxyHost":         u.ProxyHost,
+		"proxyPort":         u.ProxyPort,
+		"proxyUsername":     u.ProxyUsername,
+		"proxyPasswordSet":  u.ProxyPassword != "",
 		"skipDates":         skipDates,
 	}
 }
@@ -550,6 +557,12 @@ type updateSettingsReq struct {
 	ServerChanKey     *string `json:"serverChanKey"`
 	ServerChanEnabled *bool   `json:"serverChanEnabled"`
 	SignDays          *int    `json:"signDays"`
+	ProxyEnabled      *bool   `json:"proxyEnabled"`
+	ProxyScheme       *string `json:"proxyScheme"`
+	ProxyHost         *string `json:"proxyHost"`
+	ProxyPort         *int    `json:"proxyPort"`
+	ProxyUsername     *string `json:"proxyUsername"`
+	ProxyPassword     *string `json:"proxyPassword"`
 	// Legacy raw-coord fields, accepted for backwards compat / admin override.
 	Latitude       *float64         `json:"latitude"`
 	Longitude      *float64         `json:"longitude"`
@@ -643,6 +656,28 @@ func (h *handlers) updateSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		u.SignDays = *req.SignDays
 	}
+	if req.ProxyEnabled != nil {
+		u.ProxyEnabled = *req.ProxyEnabled
+	}
+	if req.ProxyScheme != nil {
+		u.ProxyScheme = strings.TrimSpace(*req.ProxyScheme)
+	}
+	if req.ProxyHost != nil {
+		u.ProxyHost = strings.TrimSpace(*req.ProxyHost)
+	}
+	if req.ProxyPort != nil {
+		u.ProxyPort = *req.ProxyPort
+	}
+	if req.ProxyUsername != nil {
+		u.ProxyUsername = strings.TrimSpace(*req.ProxyUsername)
+	}
+	if req.ProxyPassword != nil {
+		u.ProxyPassword = *req.ProxyPassword
+	}
+	if _, err := apiclient.NormalizeProxyConfig(proxyConfigForUser(u)); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if req.TriggerMinute != nil {
 		if *req.TriggerMinute < 0 || *req.TriggerMinute > 29 {
 			writeErr(w, http.StatusBadRequest, "triggerMinute 必须在 0–29 之间")
@@ -686,6 +721,26 @@ func (h *handlers) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, settingsDTO(u))
+}
+
+// ---------- POST /api/v1/proxy/test ----------
+
+func (h *handlers) testProxy(w http.ResponseWriter, r *http.Request) {
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	c, err := schoolAPIClientForUser(u)
+	if err != nil {
+		writeJSON(w, http.StatusOK, proxyTestDTO(u, 0, 0, err))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	start := time.Now()
+	rules, err := c.AvailableRules(ctx)
+	writeJSON(w, http.StatusOK, proxyTestDTO(u, time.Since(start), len(rules), err))
 }
 
 // ---------- GET /api/v1/records ----------

@@ -460,7 +460,14 @@ func (h *handlers) adminCheckinStatusForUser(w http.ResponseWriter, r *http.Requ
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	c := apiclient.New(u.Token)
+	c, err := schoolAPIClientForUser(u)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{
+			"state":   "error",
+			"message": "代理配置错误: " + err.Error(),
+		})
+		return
+	}
 	st, err := c.CheckinStatus(ctx, scheduler.DefaultRuleID)
 	if err != nil {
 		if apiclient.IsAuthExpired(err) {

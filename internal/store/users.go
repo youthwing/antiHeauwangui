@@ -72,6 +72,15 @@ type User struct {
 	ServerChanKey     string
 	ServerChanEnabled bool
 
+	// Per-user outbound proxy for school API calls. Password is encrypted at
+	// rest in proxy_password_enc; plaintext exists only in memory after GetUser.
+	ProxyEnabled  bool
+	ProxyScheme   string
+	ProxyHost     string
+	ProxyPort     int
+	ProxyUsername string
+	ProxyPassword string
+
 	// TokenWarnedAt is the unix timestamp of the last token-expiry warning
 	// we sent for the *current* token. Reset to 0 on UpdateToken so a fresh
 	// token starts the warning cycle over.
@@ -96,7 +105,9 @@ const userColumns = `user_id, user_name, user_number, user_section, user_class,
   pin_hash, dorm_id, send_address_fields, user_avatar_url,
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
-  server_chan_key, server_chan_enabled, token_warned_at,
+  server_chan_key, server_chan_enabled,
+  proxy_enabled, proxy_scheme, proxy_host, proxy_port, proxy_username, proxy_password_enc,
+  token_warned_at,
   skip_dates,
   created_at, updated_at`
 
@@ -137,6 +148,16 @@ func (s *Store) UpsertUser(ctx context.Context, u *User) error {
 	if u.SkipDates == "" {
 		u.SkipDates = "[]"
 	}
+	if u.ProxyScheme == "" {
+		u.ProxyScheme = "socks5"
+	}
+	var proxyPasswordEnc []byte
+	if u.ProxyPassword != "" {
+		proxyPasswordEnc, err = s.c.Encrypt([]byte(u.ProxyPassword))
+		if err != nil {
+			return err
+		}
+	}
 	var expiresAt any
 	if u.ExpiresAt != nil {
 		expiresAt = u.ExpiresAt.Unix()
@@ -150,10 +171,12 @@ INSERT INTO users (
   pin_hash, dorm_id, send_address_fields, user_avatar_url,
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
-  server_chan_key, server_chan_enabled, token_warned_at,
+  server_chan_key, server_chan_enabled,
+  proxy_enabled, proxy_scheme, proxy_host, proxy_port, proxy_username, proxy_password_enc,
+  token_warned_at,
   skip_dates,
   created_at, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(user_id) DO UPDATE SET
   user_name        = excluded.user_name,
   user_number      = excluded.user_number,
@@ -174,7 +197,9 @@ ON CONFLICT(user_id) DO UPDATE SET
 		u.PinHash, u.DormID, boolInt(u.SendAddressFields), u.UserAvatarURL,
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
 		boolInt(u.IsGuest), u.GuestLabel, u.SignDates, expiresAt,
-		u.ServerChanKey, boolInt(u.ServerChanEnabled), u.TokenWarnedAt,
+		u.ServerChanKey, boolInt(u.ServerChanEnabled),
+		boolInt(u.ProxyEnabled), u.ProxyScheme, u.ProxyHost, u.ProxyPort, u.ProxyUsername, proxyPasswordEnc,
+		u.TokenWarnedAt,
 		u.SkipDates,
 		u.CreatedAt.Unix(), u.UpdatedAt.Unix())
 	return err
@@ -199,7 +224,8 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 	var inviteCode sql.NullString
 	var pinHash []byte
 	var dormID sql.NullInt64
-	var sendFields, notifyEnabled, isGuest, serverChanEnabled int
+	var sendFields, notifyEnabled, isGuest, serverChanEnabled, proxyEnabled int
+	var proxyPasswordEnc []byte
 	var expiresAt sql.NullInt64
 	err := r.Scan(
 		&u.UserID, &u.UserName, &u.UserNumber, &u.UserSection, &u.UserClass,
@@ -210,7 +236,9 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 		&pinHash, &dormID, &sendFields, &u.UserAvatarURL,
 		&u.NotifyEmail, &notifyEnabled, &u.SignDays,
 		&isGuest, &u.GuestLabel, &u.SignDates, &expiresAt,
-		&u.ServerChanKey, &serverChanEnabled, &u.TokenWarnedAt,
+		&u.ServerChanKey, &serverChanEnabled,
+		&proxyEnabled, &u.ProxyScheme, &u.ProxyHost, &u.ProxyPort, &u.ProxyUsername, &proxyPasswordEnc,
+		&u.TokenWarnedAt,
 		&u.SkipDates,
 		&createdAt, &updatedAt,
 	)
@@ -240,6 +268,17 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 	u.NotifyEnabled = notifyEnabled != 0
 	u.IsGuest = isGuest != 0
 	u.ServerChanEnabled = serverChanEnabled != 0
+	u.ProxyEnabled = proxyEnabled != 0
+	if u.ProxyScheme == "" {
+		u.ProxyScheme = "socks5"
+	}
+	if len(proxyPasswordEnc) > 0 {
+		pw, err := s.c.Decrypt(proxyPasswordEnc)
+		if err != nil {
+			return nil, err
+		}
+		u.ProxyPassword = string(pw)
+	}
 	if expiresAt.Valid {
 		t := time.Unix(expiresAt.Int64, 0)
 		u.ExpiresAt = &t
@@ -293,10 +332,19 @@ func (s *Store) SetPinHash(ctx context.Context, userID string, hash []byte) erro
 	return err
 }
 
-// UpdateSettings persists auto_sign + device + schedule + notify. Location is
-// managed separately via SetUserDorm (or directly via UPDATE for legacy compat).
+// UpdateSettings persists auto_sign + device + schedule + notify + proxy.
+// Location is managed separately via SetUserDorm (or directly via UPDATE for
+// legacy compat).
 func (s *Store) UpdateSettings(ctx context.Context, u *User) error {
-	_, err := s.db.ExecContext(ctx, `
+	var proxyPasswordEnc []byte
+	var err error
+	if u.ProxyPassword != "" {
+		proxyPasswordEnc, err = s.c.Encrypt([]byte(u.ProxyPassword))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = s.db.ExecContext(ctx, `
 UPDATE users SET
   auto_sign           = ?,
   lat                 = ?,
@@ -317,6 +365,12 @@ UPDATE users SET
   sign_days           = ?,
   server_chan_key     = ?,
   server_chan_enabled = ?,
+  proxy_enabled       = ?,
+  proxy_scheme        = ?,
+  proxy_host          = ?,
+  proxy_port          = ?,
+  proxy_username      = ?,
+  proxy_password_enc  = ?,
   updated_at          = ?
 WHERE user_id = ?
 `,
@@ -325,6 +379,7 @@ WHERE user_id = ?
 		u.TriggerMinute, u.JitterSec, u.RetryCount, u.RetryGapMin, u.SavedLocations,
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
 		u.ServerChanKey, boolInt(u.ServerChanEnabled),
+		boolInt(u.ProxyEnabled), defaultStr(u.ProxyScheme, "socks5"), u.ProxyHost, u.ProxyPort, u.ProxyUsername, proxyPasswordEnc,
 		time.Now().Unix(), u.UserID)
 	return err
 }
@@ -607,6 +662,13 @@ func boolInt(b bool) int {
 func nullStr(s string) any {
 	if s == "" {
 		return nil
+	}
+	return s
+}
+
+func defaultStr(s, fallback string) string {
+	if s == "" {
+		return fallback
 	}
 	return s
 }
