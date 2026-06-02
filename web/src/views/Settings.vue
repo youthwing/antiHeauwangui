@@ -19,7 +19,7 @@ import {
   Activity,
   Shuffle,
 } from 'lucide-vue-next'
-import type { Settings, Dorm, ProxyTestResult, ProxyNodesResult } from '../types'
+import type { Settings, Dorm, ProxyTestResult, ProxyIPResult, ProxyNodesResult } from '../types'
 import { useAuth } from '../stores/auth'
 import { api } from '../api'
 import { showToast } from '../lib/toast'
@@ -58,7 +58,7 @@ const testingServerChan = ref(false)
 const showServerChanFaq = ref(false)
 
 const proxyEnabled = ref(false)
-const proxyScheme = ref<'socks5' | 'http' | 'https'>('socks5')
+const proxyScheme = ref<'socks5' | 'http' | 'https'>('http')
 const proxyHost = ref('')
 const proxyPort = ref<number | null>(null)
 const proxyUsername = ref('')
@@ -66,11 +66,56 @@ const proxyPassword = ref('')
 const proxyPasswordSet = ref(false)
 const showProxyPassword = ref(false)
 const testingProxy = ref(false)
+const loadingProxyIP = ref(false)
+const applyingBuiltinProxy = ref(false)
+const disablingProxy = ref(false)
 const proxyTestResult = ref<ProxyTestResult | null>(null)
+const proxyIPResult = ref<ProxyIPResult | null>(null)
 const proxyNodes = ref<ProxyNodesResult | null>(null)
 const loadingProxyNodes = ref(false)
 const switchingProxyNode = ref(false)
 const selectedProxyNode = ref('')
+
+const BUILTIN_PROXY = {
+  scheme: 'http',
+  host: 'mihomo',
+  port: 7893,
+} as const
+
+const isMihomoProxy = computed(() => proxyHost.value.trim().toLowerCase() === BUILTIN_PROXY.host)
+const isBuiltinProxy = computed(() =>
+  proxyEnabled.value &&
+  proxyScheme.value === BUILTIN_PROXY.scheme &&
+  isMihomoProxy.value &&
+  Number(proxyPort.value) === BUILTIN_PROXY.port,
+)
+const proxySummary = computed(() => {
+  if (!proxyHost.value.trim() || !proxyPort.value) return '尚未配置出口地址'
+  return `${proxyScheme.value}://${proxyHost.value.trim()}:${proxyPort.value}`
+})
+
+function setBuiltinProxyFields() {
+  proxyEnabled.value = true
+  proxyScheme.value = BUILTIN_PROXY.scheme
+  proxyHost.value = BUILTIN_PROXY.host
+  proxyPort.value = BUILTIN_PROXY.port
+  proxyUsername.value = ''
+  proxyPassword.value = ''
+  proxyTestResult.value = null
+  proxyIPResult.value = null
+}
+
+function proxySettingsPayload(): Partial<Settings> {
+  const payload: Partial<Settings> = {
+    proxyEnabled: proxyEnabled.value,
+    proxyScheme: proxyScheme.value,
+    proxyHost: proxyHost.value.trim(),
+    proxyPort: proxyPort.value || 0,
+    proxyUsername: proxyUsername.value.trim(),
+  }
+  if (proxyPassword.value) payload.proxyPassword = proxyPassword.value
+  return payload
+}
 
 // signDays bitmask helpers. bit 0 = Mon … bit 6 = Sun.
 const PRESETS = {
@@ -153,6 +198,7 @@ onMounted(async () => {
   if (auth.state.me) hydrate(auth.state.me.settings)
   await loadDorms()
   await loadProxyNodes()
+  if (isBuiltinProxy.value) await refreshProxyIP(true)
 })
 
 watch(
@@ -177,11 +223,7 @@ async function saveAll() {
       notifyEmail: form.notifyEmail.trim(),
       notifyEnabled: form.notifyEnabled,
       serverChanEnabled: serverChanEnabled.value,
-      proxyEnabled: proxyEnabled.value,
-      proxyScheme: proxyScheme.value,
-      proxyHost: proxyHost.value.trim(),
-      proxyPort: proxyPort.value || 0,
-      proxyUsername: proxyUsername.value.trim(),
+      ...proxySettingsPayload(),
       signDays: form.signDays & 0x7f,
     }
     // Only send the SendKey if the user typed something fresh — empty means
@@ -189,7 +231,6 @@ async function saveAll() {
     const sck = serverChanKey.value.trim()
     if (sck) payload.serverChanKey = sck
     const proxyPw = proxyPassword.value
-    if (proxyPw) payload.proxyPassword = proxyPw
     await api.updateSettings(payload)
     showToast('ok', '配置已保存')
     if (sck) {
@@ -210,17 +251,13 @@ async function saveAll() {
 
 async function testProxy() {
   if (testingProxy.value) return
+  if (proxyEnabled.value && !proxyHost.value.trim() && !proxyPort.value) {
+    setBuiltinProxyFields()
+  }
   testingProxy.value = true
   proxyTestResult.value = null
   try {
-    const saved = await api.updateSettings({
-      proxyEnabled: proxyEnabled.value,
-      proxyScheme: proxyScheme.value,
-      proxyHost: proxyHost.value.trim(),
-      proxyPort: proxyPort.value || 0,
-      proxyUsername: proxyUsername.value.trim(),
-      ...(proxyPassword.value ? { proxyPassword: proxyPassword.value } : {}),
-    })
+    const saved = await api.updateSettings(proxySettingsPayload())
     hydrate(saved)
     const result = await api.testProxy()
     proxyTestResult.value = result
@@ -235,6 +272,86 @@ async function testProxy() {
   } finally {
     testingProxy.value = false
   }
+}
+
+async function refreshProxyIP(silent = false) {
+  if (loadingProxyIP.value) return
+  if (proxyEnabled.value && !proxyHost.value.trim() && !proxyPort.value) {
+    setBuiltinProxyFields()
+  }
+  loadingProxyIP.value = true
+  proxyIPResult.value = null
+  try {
+    const saved = await api.updateSettings(proxySettingsPayload())
+    hydrate(saved)
+    const result = await api.proxyIP()
+    proxyIPResult.value = result
+    if (!silent) {
+      if (result.ok) {
+        showToast('ok', `当前出口 IP：${result.ip}`)
+      } else {
+        showToast('err', result.message || 'IP 探测失败')
+      }
+    }
+  } catch (e: any) {
+    if (!silent) showToast('err', e.message || 'IP 探测失败')
+  } finally {
+    loadingProxyIP.value = false
+  }
+}
+
+async function enableBuiltinProxy() {
+  if (applyingBuiltinProxy.value) return
+  applyingBuiltinProxy.value = true
+  try {
+    setBuiltinProxyFields()
+    const saved = await api.updateSettings({
+      proxyEnabled: true,
+      proxyScheme: BUILTIN_PROXY.scheme,
+      proxyHost: BUILTIN_PROXY.host,
+      proxyPort: BUILTIN_PROXY.port,
+      proxyUsername: '',
+    })
+    hydrate(saved)
+    await loadProxyNodes()
+    await refreshProxyIP(true)
+    showToast('ok', '已启用内置 Mihomo 代理')
+  } catch (e: any) {
+    showToast('err', e.message || '启用失败')
+  } finally {
+    applyingBuiltinProxy.value = false
+  }
+}
+
+async function disableProxy() {
+  if (disablingProxy.value) return
+  disablingProxy.value = true
+  try {
+    const saved = await api.updateSettings({ proxyEnabled: false })
+    hydrate(saved)
+    proxyTestResult.value = null
+    proxyIPResult.value = null
+    showToast('ok', '代理已关闭')
+  } catch (e: any) {
+    showToast('err', e.message || '关闭失败')
+  } finally {
+    disablingProxy.value = false
+  }
+}
+
+function toggleProxy() {
+  if (proxyEnabled.value) {
+    proxyEnabled.value = false
+    proxyTestResult.value = null
+    proxyIPResult.value = null
+    return
+  }
+  if (!proxyHost.value.trim() && !proxyPort.value) {
+    setBuiltinProxyFields()
+    loadProxyNodes()
+    return
+  }
+  proxyEnabled.value = true
 }
 
 async function loadProxyNodes() {
@@ -263,6 +380,7 @@ async function selectProxyNode() {
     const res = await api.selectProxyNode(selectedProxyNode.value)
     proxyNodes.value = res
     selectedProxyNode.value = res.current || selectedProxyNode.value
+    if (isBuiltinProxy.value) await refreshProxyIP(true)
     showToast('ok', `已切换到 ${selectedProxyNode.value}`)
   } catch (e: any) {
     showToast('err', e.message || '切换节点失败')
@@ -278,6 +396,7 @@ async function autoSelectProxyNode() {
     const res = await api.autoSelectProxyNode()
     proxyNodes.value = res
     selectedProxyNode.value = res.current || ''
+    if (isBuiltinProxy.value) await refreshProxyIP(true)
     showToast('ok', res.picked ? `已选择 ${res.picked}` : '已自动选择节点')
   } catch (e: any) {
     showToast('err', e.message || '自动选择失败')
@@ -757,7 +876,7 @@ const previewSchedule = computed(() => {
           <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">请求代理</h2>
         </div>
         <button
-          @click="proxyEnabled = !proxyEnabled"
+          @click="toggleProxy"
           :class="proxyEnabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
           class="relative w-11 h-6 rounded-full transition-colors shrink-0"
         >
@@ -780,21 +899,60 @@ const previewSchedule = computed(() => {
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div class="min-w-0">
             <p class="text-sm font-medium" :class="proxyEnabled ? 'text-red-700 dark:text-red-200' : 'text-zinc-600 dark:text-zinc-400'">
-              {{ proxyEnabled ? '代理已启用' : '代理未启用' }}
+              {{ proxyEnabled ? (isBuiltinProxy ? '内置 Mihomo 已启用' : '代理已启用') : '代理未启用' }}
             </p>
             <p class="text-[11px] text-zinc-500 mt-1 break-all">
-              {{ proxyHost && proxyPort ? `${proxyScheme}://${proxyHost}:${proxyPort}` : '尚未配置出口地址' }}
+              {{ proxySummary }}
+            </p>
+            <p v-if="loadingProxyIP || proxyIPResult" class="text-[11px] text-zinc-500 mt-1 break-all">
+              出口 IP：
+              <span
+                class="font-mono-token"
+                :class="proxyIPResult?.ok ? 'text-red-700 dark:text-red-200' : 'text-amber-700 dark:text-amber-300'"
+              >
+                {{ loadingProxyIP ? '探测中...' : (proxyIPResult?.ip || proxyIPResult?.message || '未知') }}
+              </span>
             </p>
           </div>
-          <button
-            type="button"
-            @click="testProxy"
-            :disabled="testingProxy"
-            class="inline-flex items-center justify-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-50 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
-          >
-            <Activity class="w-3.5 h-3.5" :class="testingProxy ? 'wangui-spin' : ''" />
-            {{ testingProxy ? '测试中…' : '一键测试' }}
-          </button>
+          <div class="flex flex-wrap justify-start sm:justify-end gap-2">
+            <button
+              type="button"
+              @click="enableBuiltinProxy"
+              :disabled="applyingBuiltinProxy"
+              class="inline-flex items-center justify-center gap-1.5 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 ring-1 ring-red-500/25 text-red-700 dark:text-red-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+            >
+              <Network class="w-3.5 h-3.5" :class="applyingBuiltinProxy ? 'wangui-spin' : ''" />
+              {{ isBuiltinProxy ? '刷新内置代理' : '使用内置 Mihomo' }}
+            </button>
+            <button
+              v-if="proxyEnabled"
+              type="button"
+              @click="disableProxy"
+              :disabled="disablingProxy"
+              class="inline-flex items-center justify-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
+            >
+              <Power class="w-3.5 h-3.5" :class="disablingProxy ? 'wangui-spin' : ''" />
+              关闭代理
+            </button>
+            <button
+              type="button"
+              @click="refreshProxyIP()"
+              :disabled="loadingProxyIP || !proxyEnabled"
+              class="inline-flex items-center justify-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
+            >
+              <Activity class="w-3.5 h-3.5" :class="loadingProxyIP ? 'wangui-spin' : ''" />
+              {{ loadingProxyIP ? '探测中...' : '刷新 IP' }}
+            </button>
+            <button
+              type="button"
+              @click="testProxy"
+              :disabled="testingProxy"
+              class="inline-flex items-center justify-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-50 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+            >
+              <Activity class="w-3.5 h-3.5" :class="testingProxy ? 'wangui-spin' : ''" />
+              {{ testingProxy ? '测试中...' : '一键测试' }}
+            </button>
+          </div>
         </div>
 
         <div
@@ -833,7 +991,7 @@ const previewSchedule = computed(() => {
       </div>
 
       <div
-        v-if="proxyHost.trim() === 'mihomo'"
+        v-if="isMihomoProxy"
         class="mb-4 rounded-lg bg-white/70 dark:bg-[#0d1117]/60 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
       >
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
@@ -923,7 +1081,7 @@ const previewSchedule = computed(() => {
             type="number"
             min="1"
             max="65535"
-            placeholder="19037"
+            placeholder="7893"
             :disabled="!proxyEnabled"
             class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
           />
@@ -933,7 +1091,7 @@ const previewSchedule = computed(() => {
           <input
             v-model="proxyHost"
             type="text"
-            placeholder="127.0.0.1 或 proxy.example.com"
+            placeholder="mihomo 或 proxy.example.com"
             :disabled="!proxyEnabled"
             autocomplete="off"
             class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"

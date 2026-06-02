@@ -743,6 +743,31 @@ func (h *handlers) testProxy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, proxyTestDTO(u, time.Since(start), len(rules), err))
 }
 
+// ---------- GET /api/v1/proxy/ip ----------
+
+func (h *handlers) proxyIP(w http.ResponseWriter, r *http.Request) {
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	cfg := proxyConfigForUser(u)
+	if !cfg.Enabled {
+		writeJSON(w, http.StatusOK, proxyIPDTO(u, 0, "", "", fmt.Errorf("代理未启用")))
+		return
+	}
+	client, err := apiclient.HTTPClientForProxy(cfg)
+	if err != nil {
+		writeJSON(w, http.StatusOK, proxyIPDTO(u, 0, "", "", err))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	defer cancel()
+	start := time.Now()
+	ip, endpoint, err := detectOutboundIP(ctx, client)
+	writeJSON(w, http.StatusOK, proxyIPDTO(u, time.Since(start), ip, endpoint, err))
+}
+
 // ---------- GET /api/v1/records ----------
 
 func (h *handlers) records(w http.ResponseWriter, r *http.Request) {

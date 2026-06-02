@@ -154,6 +154,16 @@ export interface ProxyTestResult {
   rules?: number
 }
 
+export interface ProxyIPResult {
+  ok: boolean
+  enabled: boolean
+  outbound: string
+  elapsedMs: number
+  ip: string
+  endpoint: string
+  message: string
+}
+
 export interface ProxyNode {
   name: string
   current: boolean

@@ -18,6 +18,7 @@ import type {
   SiteGateCode,
   UserStats,
   ProxyTestResult,
+  ProxyIPResult,
   ProxyNodesResult,
   Announcement,
   AnnouncementUpsertReq,
@@ -128,6 +129,7 @@ export const api = {
     request<{ ok: boolean }>('/notify/test-serverchan', { method: 'POST' }),
   testProxy: () =>
     request<ProxyTestResult>('/proxy/test', { method: 'POST' }),
+  proxyIP: () => request<ProxyIPResult>('/proxy/ip'),
   proxyNodes: () => request<ProxyNodesResult>('/proxy/nodes'),
   selectProxyNode: (name: string) =>
     request<ProxyNodesResult>('/proxy/nodes/select', {

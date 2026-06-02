@@ -76,6 +76,7 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/dorms", h.listDorms)
 			r.Post("/sign-now", h.signNow)
 			r.Post("/proxy/test", h.testProxy)
+			r.Get("/proxy/ip", h.proxyIP)
 			r.Get("/proxy/nodes", h.proxyNodes)
 			r.Post("/proxy/nodes/select", h.selectProxyNode)
 			r.Post("/proxy/nodes/autoselect", h.autoSelectProxyNode)
