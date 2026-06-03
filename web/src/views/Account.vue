@@ -16,6 +16,7 @@ import {
   QrCode,
   RefreshCw,
 } from 'lucide-vue-next'
+import TokenGrabGuide from '../components/TokenGrabGuide.vue'
 import { useAuth } from '../stores/auth'
 import { api } from '../api'
 import { formatDateTime, formatRemaining, tokenProgressPercent, tokenProgressColor } from '../lib/format'
@@ -299,6 +300,9 @@ async function logout() {
               </div>
             </div>
           </div>
+        </div>
+        <div class="mt-3">
+          <TokenGrabGuide handoff-text="回到账号页粘贴；如果工具自动打开本站，会跳到账号页并直接填好。" />
         </div>
         <label class="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5 mt-3">
           <QrCode class="w-3.5 h-3.5" />
