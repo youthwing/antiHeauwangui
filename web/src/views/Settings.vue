@@ -890,6 +890,41 @@ const previewSchedule = computed(() => {
         开启后，该账号的学校接口请求会从这里配置的代理出口发出；未开启时继续使用服务器默认出口。
       </p>
 
+      <div class="mb-4 rounded-xl bg-white/70 dark:bg-[#0d1117]/60 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-4">
+        <div class="flex items-center gap-1.5 mb-3">
+          <HelpCircle class="w-3.5 h-3.5 text-zinc-500" />
+          <p class="text-sm font-semibold text-[#161b22] dark:text-zinc-200">代理怎么配置</p>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="rounded-lg bg-red-500/[0.06] ring-1 ring-red-500/20 p-3">
+            <p class="text-xs font-semibold text-red-700 dark:text-red-200">推荐：使用内置 Mihomo</p>
+            <ol class="mt-2 space-y-1.5 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed list-decimal list-inside">
+              <li>服务器上确保 <span class="font-mono-token">docker compose ps</span> 里有 <span class="font-mono-token">mihomo</span>。</li>
+              <li>点下面的“使用内置 Mihomo”，系统会自动填 <span class="font-mono-token">http://mihomo:7893</span>。</li>
+              <li>点“刷新 IP”查看当前出口 IP。</li>
+              <li>点“一键测试”，学校接口成功响应就说明配置可用。</li>
+              <li>需要换节点时，在“Mihomo 节点”里选节点或点“自动选最快”。</li>
+            </ol>
+          </div>
+          <div class="rounded-lg bg-zinc-100/80 dark:bg-[#161b22]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+            <p class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">外部代理：手动填写</p>
+            <dl class="mt-2 grid grid-cols-[72px_1fr] gap-x-3 gap-y-1.5 text-[12px] leading-relaxed">
+              <dt class="text-zinc-500">协议</dt>
+              <dd class="text-zinc-600 dark:text-zinc-400">按服务商给的填：<span class="font-mono-token">socks5</span> / <span class="font-mono-token">http</span> / <span class="font-mono-token">https</span></dd>
+              <dt class="text-zinc-500">主机</dt>
+              <dd class="text-zinc-600 dark:text-zinc-400">只填域名或 IP，不带 <span class="font-mono-token">http://</span> 和路径。</dd>
+              <dt class="text-zinc-500">端口</dt>
+              <dd class="text-zinc-600 dark:text-zinc-400">填服务商给的端口，比如 <span class="font-mono-token">7890</span>。</dd>
+              <dt class="text-zinc-500">账号密码</dt>
+              <dd class="text-zinc-600 dark:text-zinc-400">没有就留空；有鉴权才填写。</dd>
+            </dl>
+            <p class="mt-2 text-[11px] text-amber-600 dark:text-amber-300 leading-relaxed">
+              保存后，自动签到和“立即签到”都会走这里的出口；记录里的“请求诊断”会显示当次出口 IP。
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div
         class="mb-4 rounded-lg p-3 ring-1"
         :class="proxyEnabled

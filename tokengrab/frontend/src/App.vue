@@ -33,10 +33,8 @@ const captured = ref<null | {
 const residual = ref(false)
 const caInstalled = ref(true) // optimistic; we re-check in onMounted
 
-// wangui base URL is hard-coded — every alpha user points at the same
-// instance. If we ever fork or self-host another wangui, this is the one
-// constant to change.
-const WANGUI_URL = 'https://wangui.gptcodex.top'
+const DEFAULT_WANGUI_URL = 'https://wangui.gptcodex.top'
+const wanguiUrl = ref(localStorage.getItem('wangui:site_url') || DEFAULT_WANGUI_URL)
 
 // Invite code is only needed for the first-time activation. Token refreshes
 // (token expired → grab again) don't need it. Optional input, NOT persisted
@@ -105,8 +103,9 @@ async function copyAgain() {
 async function openWangui() {
   if (!captured.value) return
   try {
+    localStorage.setItem('wangui:site_url', wanguiUrl.value.trim())
     await window.go.main.App.OpenWanguiActivate(
-      WANGUI_URL,
+      wanguiUrl.value.trim(),
       captured.value.token,
       inviteCode.value.trim(),
     )
@@ -395,6 +394,20 @@ const expiryDate = computed(() => {
             class="w-full bg-zinc-950 ring-1 ring-emerald-500/30 focus:!ring-emerald-500/60 rounded-lg px-3 py-2.5 text-base font-mono-token tracking-[0.2em] text-center text-zinc-100 placeholder:text-zinc-700 focus-ring uppercase"
           />
           <p class="text-[10px] text-zinc-500 mt-1.5">已激活账号只是更新 token，留空即可</p>
+        </div>
+
+        <div class="rounded-xl bg-white/[0.02] ring-1 ring-white/[0.05] p-4">
+          <label class="text-xs text-zinc-400 font-medium inline-flex items-center gap-1.5 mb-2">
+            <ExternalLink class="w-3.5 h-3.5" />
+            wangui 网站地址
+          </label>
+          <input
+            v-model="wanguiUrl"
+            placeholder="https://你的域名"
+            autocomplete="url"
+            class="w-full bg-zinc-950 ring-1 ring-white/[0.08] focus:!ring-emerald-500/50 rounded-lg px-3 py-2.5 text-sm font-mono-token text-zinc-100 placeholder:text-zinc-700 focus-ring"
+          />
+          <p class="text-[10px] text-zinc-500 mt-1.5">抓到后会打开这个地址的登录页并自动带上 JWT。</p>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
