@@ -26,11 +26,6 @@ var pinPattern = regexp.MustCompile(`^\d{4,6}$`)
 
 func validPin(s string) bool { return pinPattern.MatchString(s) }
 
-const (
-	siteAccessCodeTTL = 10 * time.Minute
-	siteGatePassTTL   = 24 * time.Hour
-)
-
 type handlers struct {
 	store     *store.Store
 	sched     *scheduler.Multi
@@ -47,41 +42,6 @@ type handlers struct {
 type loginReq struct {
 	UserNumber string `json:"userNumber"`
 	Pin        string `json:"pin"`
-}
-
-type siteGateReq struct {
-	Code string `json:"code"`
-}
-
-func (h *handlers) siteGate(w http.ResponseWriter, r *http.Request) {
-	if !h.loginLimiter.allow(clientIP(r)) {
-		writeErr(w, http.StatusTooManyRequests, "尝试过于频繁，请稍后再试")
-		return
-	}
-	var req siteGateReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErr(w, http.StatusBadRequest, "请求格式错误")
-		return
-	}
-	if strings.TrimSpace(req.Code) == "" {
-		writeErr(w, http.StatusBadRequest, "访问码不能为空")
-		return
-	}
-	if err := h.store.ConsumeSiteAccessCode(r.Context(), req.Code, clientIP(r)); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			writeErr(w, http.StatusUnauthorized, "访问码无效、已过期或已使用")
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, "访问码校验失败")
-		return
-	}
-	passID, exp, err := h.store.CreateSiteGatePass(r.Context(), siteGatePassTTL)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "访问通行证创建失败")
-		return
-	}
-	setSessionCookie(w, siteGateCookie, passID, exp)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "expiresAt": exp.Unix()})
 }
 
 func (h *handlers) login(w http.ResponseWriter, r *http.Request) {
@@ -764,7 +724,7 @@ func (h *handlers) proxyIP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 	start := time.Now()
-	ip, endpoint, err := detectOutboundIP(ctx, client)
+	ip, endpoint, err := apiclient.DetectOutboundIP(ctx, client)
 	writeJSON(w, http.StatusOK, proxyIPDTO(u, time.Since(start), ip, endpoint, err))
 }
 
@@ -778,13 +738,7 @@ func (h *handlers) records(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, rec := range list {
-		out = append(out, map[string]any{
-			"id":         rec.ID,
-			"ruleId":     rec.RuleID,
-			"status":     rec.Status,
-			"message":    rec.Message,
-			"occurredAt": rec.OccurredAt.Unix(),
-		})
+		out = append(out, signRecordDTO(rec))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -803,11 +757,12 @@ func (h *handlers) signNow(w http.ResponseWriter, r *http.Request) {
 	res := h.sched.SignOnce(ctx, u)
 	_ = h.store.AddRecord(ctx, &store.Record{
 		UserID: uid, RuleID: scheduler.DefaultRuleID,
-		Status: res.Status, Message: res.Message,
+		Status: res.Status, Message: res.Message, RequestDebug: res.RequestDebug,
 	})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  res.Status,
-		"message": res.Message,
+		"status":       res.Status,
+		"message":      res.Message,
+		"requestDebug": requestDebugValue(res.RequestDebug),
 	})
 }
 

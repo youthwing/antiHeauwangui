@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS sign_records (
   rule_id      INTEGER NOT NULL,
   status       TEXT NOT NULL,
   message      TEXT,
+  request_debug TEXT NOT NULL DEFAULT '',
   occurred_at  INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
@@ -194,6 +195,7 @@ CREATE TABLE IF NOT EXISTS dorm_locations (
 		// YYYY-MM-DD strings. Scheduler treats any date in the list as
 		// "skip silently" — no sign attempt, no failure record.
 		{"users", "skip_dates", "TEXT NOT NULL DEFAULT '[]'"},
+		{"sign_records", "request_debug", "TEXT NOT NULL DEFAULT ''"},
 		{"dorm_locations", "send_address_fields", "INTEGER NOT NULL DEFAULT 0"},
 		{"web_sessions", "is_admin", "INTEGER NOT NULL DEFAULT 0"},
 	}

@@ -7,13 +7,14 @@ import (
 
 // Record represents a single check-in attempt outcome.
 type Record struct {
-	ID         int64
-	UserID     string
-	UserName   string // joined; only filled by admin queries
-	RuleID     int
-	Status     string // success | already | exempt | failed | skipped
-	Message    string
-	OccurredAt time.Time
+	ID           int64
+	UserID       string
+	UserName     string // joined; only filled by admin queries
+	RuleID       int
+	Status       string // success | already | exempt | failed | skipped
+	Message      string
+	RequestDebug string
+	OccurredAt   time.Time
 }
 
 func (s *Store) AddRecord(ctx context.Context, r *Record) error {
@@ -21,9 +22,9 @@ func (s *Store) AddRecord(ctx context.Context, r *Record) error {
 		r.OccurredAt = time.Now()
 	}
 	res, err := s.db.ExecContext(ctx, `
-INSERT INTO sign_records(user_id, rule_id, status, message, occurred_at)
-VALUES (?,?,?,?,?)
-`, r.UserID, r.RuleID, r.Status, r.Message, r.OccurredAt.Unix())
+INSERT INTO sign_records(user_id, rule_id, status, message, request_debug, occurred_at)
+VALUES (?,?,?,?,?,?)
+`, r.UserID, r.RuleID, r.Status, r.Message, r.RequestDebug, r.OccurredAt.Unix())
 	if err != nil {
 		return err
 	}
@@ -37,7 +38,7 @@ func (s *Store) ListRecords(ctx context.Context, userID string, limit int) ([]Re
 		limit = 100
 	}
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, user_id, rule_id, status, message, occurred_at
+SELECT id, user_id, rule_id, status, message, request_debug, occurred_at
 FROM sign_records WHERE user_id = ? ORDER BY occurred_at DESC LIMIT ?
 `, userID, limit)
 	if err != nil {
@@ -53,7 +54,7 @@ FROM sign_records WHERE user_id = ? ORDER BY occurred_at DESC LIMIT ?
 // hitting an arbitrary LIMIT.
 func (s *Store) ListRecordsBetween(ctx context.Context, userID string, from, to time.Time) ([]Record, error) {
 	rows, err := s.db.QueryContext(ctx, `
-SELECT id, user_id, rule_id, status, message, occurred_at
+SELECT id, user_id, rule_id, status, message, request_debug, occurred_at
 FROM sign_records
 WHERE user_id = ? AND occurred_at >= ? AND occurred_at <= ?
 ORDER BY occurred_at DESC
@@ -70,7 +71,7 @@ ORDER BY occurred_at DESC
 func (s *Store) ListAllRecordsBetween(ctx context.Context, from, to time.Time) ([]Record, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT r.id, r.user_id, COALESCE(u.user_name,'') AS user_name,
-       r.rule_id, r.status, r.message, r.occurred_at
+       r.rule_id, r.status, r.message, r.request_debug, r.occurred_at
 FROM sign_records r LEFT JOIN users u ON u.user_id = r.user_id
 WHERE r.occurred_at >= ? AND r.occurred_at <= ?
 ORDER BY r.occurred_at DESC
@@ -83,7 +84,7 @@ ORDER BY r.occurred_at DESC
 	for rows.Next() {
 		var r Record
 		var ts int64
-		if err := rows.Scan(&r.ID, &r.UserID, &r.UserName, &r.RuleID, &r.Status, &r.Message, &ts); err != nil {
+		if err := rows.Scan(&r.ID, &r.UserID, &r.UserName, &r.RuleID, &r.Status, &r.Message, &r.RequestDebug, &ts); err != nil {
 			return nil, err
 		}
 		r.OccurredAt = time.Unix(ts, 0)
@@ -99,7 +100,7 @@ func (s *Store) ListAllRecords(ctx context.Context, limit int) ([]Record, error)
 	}
 	rows, err := s.db.QueryContext(ctx, `
 SELECT r.id, r.user_id, COALESCE(u.user_name,'') AS user_name,
-       r.rule_id, r.status, r.message, r.occurred_at
+       r.rule_id, r.status, r.message, r.request_debug, r.occurred_at
 FROM sign_records r LEFT JOIN users u ON u.user_id = r.user_id
 ORDER BY r.occurred_at DESC LIMIT ?
 `, limit)
@@ -111,7 +112,7 @@ ORDER BY r.occurred_at DESC LIMIT ?
 	for rows.Next() {
 		var r Record
 		var ts int64
-		if err := rows.Scan(&r.ID, &r.UserID, &r.UserName, &r.RuleID, &r.Status, &r.Message, &ts); err != nil {
+		if err := rows.Scan(&r.ID, &r.UserID, &r.UserName, &r.RuleID, &r.Status, &r.Message, &r.RequestDebug, &ts); err != nil {
 			return nil, err
 		}
 		r.OccurredAt = time.Unix(ts, 0)
@@ -165,7 +166,7 @@ func scanRecords(rows interface {
 	for rows.Next() {
 		var r Record
 		var ts int64
-		if err := rows.Scan(&r.ID, &r.UserID, &r.RuleID, &r.Status, &r.Message, &ts); err != nil {
+		if err := rows.Scan(&r.ID, &r.UserID, &r.RuleID, &r.Status, &r.Message, &r.RequestDebug, &ts); err != nil {
 			return nil, err
 		}
 		r.OccurredAt = time.Unix(ts, 0)

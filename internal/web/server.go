@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -51,11 +50,9 @@ func (s *Server) Run(ctx context.Context) error {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public (no auth)
-		r.Post("/gate", h.siteGate)
 		r.Post("/airvel/login", h.adminLogin)
 
 		r.Group(func(r chi.Router) {
-			r.Use(h.siteGateAuth)
 			r.Post("/login", h.login)
 			r.Post("/activate", h.activate)
 			r.Post("/activate/precheck", h.activatePrecheck)
@@ -92,7 +89,6 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Get("/me", h.adminMe)
 			r.Post("/logout", h.adminLogout)
 			r.Get("/stats", h.adminStats)
-			r.Post("/gate-codes", h.adminCreateSiteAccessCode)
 
 			r.Get("/codes", h.adminListCodes)
 			r.Post("/codes", h.adminCreateCodes)
@@ -174,21 +170,6 @@ func mountSPA(r chi.Router, spa fs.FS, h *handlers) {
 			http.NotFound(w, req)
 			return
 		}
-		if !siteGateFreeSPAPath(req.URL.Path) {
-			ok, err := h.hasSiteGateAccess(req)
-			if err != nil {
-				http.Error(w, "site gate check failed", http.StatusInternalServerError)
-				return
-			}
-			if !ok {
-				target := "/gate"
-				if req.URL.RequestURI() != "" && req.URL.Path != "/" {
-					target += "?redirect=" + url.QueryEscape(req.URL.RequestURI())
-				}
-				http.Redirect(w, req, target, http.StatusSeeOther)
-				return
-			}
-		}
 		clean := strings.TrimPrefix(req.URL.Path, "/")
 		if clean == "" {
 			clean = "index.html"
@@ -207,16 +188,6 @@ func mountSPA(r chi.Router, spa fs.FS, h *handlers) {
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(b)
 	})
-}
-
-func siteGateFreeSPAPath(path string) bool {
-	return path == "/gate" ||
-		path == "/favicon.ico" ||
-		path == "/logo.svg" ||
-		strings.HasPrefix(path, "/assets/") ||
-		strings.HasPrefix(path, "/fonts/") ||
-		path == "/airvel" ||
-		strings.HasPrefix(path, "/airvel/")
 }
 
 func slogRequestLogger(l *slog.Logger) func(http.Handler) http.Handler {

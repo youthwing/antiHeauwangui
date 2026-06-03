@@ -8,6 +8,9 @@ import {
   RefreshCw,
   AlertCircle,
   ListFilter,
+  Network,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-vue-next'
 import type { SignRecord, SignStatus } from '../types'
 import { api } from '../api'
@@ -16,6 +19,7 @@ import { formatDateTime } from '../lib/format'
 const records = ref<SignRecord[]>([])
 const loading = ref(false)
 const filter = ref<SignStatus | 'all'>('all')
+const openDebugIds = ref<Set<number>>(new Set())
 
 async function load() {
   loading.value = true
@@ -102,6 +106,66 @@ const calendarCells = computed(() => {
 function cellColor(s: SignStatus | null): string {
   if (!s) return 'bg-zinc-200 dark:bg-zinc-800/50'
   return info(s).dotBg
+}
+
+type DebugObject = Record<string, any>
+
+function debugObject(value: unknown): DebugObject | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as DebugObject
+}
+
+function debugAt(source: DebugObject | null, path: string[]): unknown {
+  let cur: unknown = source
+  for (const key of path) {
+    if (!cur || typeof cur !== 'object' || Array.isArray(cur)) return undefined
+    cur = (cur as DebugObject)[key]
+  }
+  return cur
+}
+
+function debugText(source: DebugObject | null, path: string[], fallback = '—'): string {
+  const value = debugAt(source, path)
+  if (value === undefined || value === null || value === '') return fallback
+  return String(value)
+}
+
+function requestDebug(r: SignRecord): DebugObject | null {
+  return debugObject(r.requestDebug)
+}
+
+function requestDebugJSON(r: SignRecord): string {
+  const d = requestDebug(r)
+  return d ? JSON.stringify(d, null, 2) : ''
+}
+
+function recordIP(r: SignRecord): string {
+  const d = requestDebug(r)
+  return debugText(d, ['network', 'outboundIP'], debugText(d, ['network', 'ipError'], '暂无'))
+}
+
+function recordProxy(r: SignRecord): string {
+  const d = requestDebug(r)
+  if (!d) return '暂无'
+  return debugAt(d, ['proxy', 'enabled']) === true
+    ? debugText(d, ['proxy', 'outbound'], '已启用')
+    : '直连 / 未启用'
+}
+
+function recordEndpoint(r: SignRecord): string {
+  const d = requestDebug(r)
+  return debugText(d, ['school', 'signRequest', 'path'], debugText(d, ['school', 'statusRequest', 'path'], '—'))
+}
+
+function toggleDebug(id: number) {
+  const next = new Set(openDebugIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  openDebugIds.value = next
+}
+
+function isDebugOpen(id: number): boolean {
+  return openDebugIds.value.has(id)
 }
 </script>
 
@@ -214,6 +278,31 @@ function cellColor(s: SignStatus | null): string {
                 </span>
               </div>
               <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed break-all">{{ r.message || '—' }}</p>
+              <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+                <template v-if="requestDebug(r)">
+                  <span class="inline-flex items-center gap-1 min-w-0">
+                    <Network class="w-3 h-3 shrink-0" />
+                    <span class="font-mono-token truncate max-w-[150px]" :title="recordIP(r)">IP {{ recordIP(r) }}</span>
+                  </span>
+                  <span class="truncate max-w-[190px]" :title="recordProxy(r)">
+                    {{ recordProxy(r) }}
+                  </span>
+                  <span class="font-mono-token">{{ recordEndpoint(r) }}</span>
+                  <button
+                    @click="toggleDebug(r.id)"
+                    class="inline-flex items-center gap-1 text-zinc-500 hover:text-red-400 transition-colors"
+                  >
+                    请求详情
+                    <ChevronUp v-if="isDebugOpen(r.id)" class="w-3 h-3" />
+                    <ChevronDown v-else class="w-3 h-3" />
+                  </button>
+                </template>
+                <span v-else class="text-zinc-400 dark:text-zinc-600">旧记录暂无请求快照</span>
+              </div>
+              <pre
+                v-if="isDebugOpen(r.id) && requestDebug(r)"
+                class="mt-2 max-h-72 overflow-auto rounded-lg bg-zinc-100 dark:bg-[#0d1117] p-3 text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words"
+              >{{ requestDebugJSON(r) }}</pre>
             </div>
             <span class="shrink-0 text-[10px] text-zinc-500 tabular-nums whitespace-nowrap">
               {{ formatDateTime(r.occurredAt) }}

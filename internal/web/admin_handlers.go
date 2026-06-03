@@ -106,20 +106,6 @@ func (h *handlers) adminStats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/v1/airvel/gate-codes — create a one-time site-entry code.
-func (h *handlers) adminCreateSiteAccessCode(w http.ResponseWriter, r *http.Request) {
-	code, err := h.store.CreateSiteAccessCode(r.Context(), adminIDOf(r), siteAccessCodeTTL)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "访问码生成失败")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"code":      code.Code,
-		"createdAt": code.CreatedAt.Unix(),
-		"expiresAt": code.ExpiresAt.Unix(),
-	})
-}
-
 // GET /api/v1/admin/codes
 func (h *handlers) adminListCodes(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
@@ -244,12 +230,7 @@ func (h *handlers) adminListUsers(w http.ResponseWriter, r *http.Request) {
 		if recs, err := h.store.ListRecords(r.Context(), u.UserID, 3); err == nil {
 			rec := make([]map[string]any, 0, len(recs))
 			for _, x := range recs {
-				rec = append(rec, map[string]any{
-					"id":         x.ID,
-					"status":     x.Status,
-					"message":    x.Message,
-					"occurredAt": x.OccurredAt.Unix(),
-				})
+				rec = append(rec, signRecordDTO(x))
 			}
 			dto["recentRecords"] = rec
 		}
@@ -301,12 +282,7 @@ func (h *handlers) adminGetUser(w http.ResponseWriter, r *http.Request) {
 	recs, _ := h.store.ListRecords(r.Context(), id, 50)
 	recDTOs := make([]map[string]any, 0, len(recs))
 	for _, rec := range recs {
-		recDTOs = append(recDTOs, map[string]any{
-			"id":         rec.ID,
-			"status":     rec.Status,
-			"message":    rec.Message,
-			"occurredAt": rec.OccurredAt.Unix(),
-		})
+		recDTOs = append(recDTOs, signRecordDTO(rec))
 	}
 	dto := adminUserDTO(u)
 	if u.DormID != nil {
@@ -534,7 +510,7 @@ func (h *handlers) adminSignNowForUser(w http.ResponseWriter, r *http.Request) {
 	res := h.sched.SignOnce(ctx, u)
 	_ = h.store.AddRecord(ctx, &store.Record{
 		UserID: id, RuleID: -1, // -1 marks "admin-triggered manual sign"
-		Status: res.Status, Message: res.Message,
+		Status: res.Status, Message: res.Message, RequestDebug: res.RequestDebug,
 	})
 	h.log.Info("admin sign-now", "target_user", id, "status", res.Status)
 	if h.bus != nil {
@@ -549,8 +525,9 @@ func (h *handlers) adminSignNowForUser(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  res.Status,
-		"message": res.Message,
+		"status":       res.Status,
+		"message":      res.Message,
+		"requestDebug": requestDebugValue(res.RequestDebug),
 	})
 }
 
@@ -908,7 +885,7 @@ func (h *handlers) adminExportRecordsCSV(w http.ResponseWriter, r *http.Request)
 
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
-	_ = cw.Write([]string{"id", "occurred_at", "user_id", "user_name", "user_number", "status", "message", "rule_id"})
+	_ = cw.Write([]string{"id", "occurred_at", "user_id", "user_name", "user_number", "status", "message", "rule_id", "request_debug"})
 	for _, rec := range recs {
 		name := rec.UserName
 		if name == "" {
@@ -923,6 +900,7 @@ func (h *handlers) adminExportRecordsCSV(w http.ResponseWriter, r *http.Request)
 			rec.Status,
 			rec.Message,
 			strconv.Itoa(rec.RuleID),
+			rec.RequestDebug,
 		})
 	}
 }
@@ -958,14 +936,7 @@ func (h *handlers) adminLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(recs))
 	for _, rec := range recs {
-		out = append(out, map[string]any{
-			"id":         rec.ID,
-			"userId":     rec.UserID,
-			"userName":   rec.UserName,
-			"status":     rec.Status,
-			"message":    rec.Message,
-			"occurredAt": rec.OccurredAt.Unix(),
-		})
+		out = append(out, adminSignRecordDTO(rec))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -1312,12 +1283,7 @@ func (h *handlers) guestDTO(ctx context.Context, u *store.User) map[string]any {
 	if recs, err := h.store.ListRecords(ctx, u.UserID, 5); err == nil {
 		rec := make([]map[string]any, 0, len(recs))
 		for _, r := range recs {
-			rec = append(rec, map[string]any{
-				"id":         r.ID,
-				"status":     r.Status,
-				"message":    r.Message,
-				"occurredAt": r.OccurredAt.Unix(),
-			})
+			rec = append(rec, signRecordDTO(r))
 		}
 		out["recentRecords"] = rec
 	}

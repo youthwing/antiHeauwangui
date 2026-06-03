@@ -15,7 +15,6 @@ import type {
   GuestCreateReq,
   GuestUpdateReq,
   SchoolCheckinStatus,
-  SiteGateCode,
   UserStats,
   ProxyTestResult,
   ProxyIPResult,
@@ -39,13 +38,6 @@ export function listAnnouncements(): Promise<Announcement[]> {
 // Lifetime "已为全站用户签到 N 次" tagline counter. Public, single int.
 export function getPlatformStats(): Promise<{ totalSigns: number }> {
   return request('/platform-stats')
-}
-
-export function enterSite(code: string): Promise<{ ok: boolean; expiresAt: number }> {
-  return request('/gate', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-  })
 }
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -112,7 +104,7 @@ export const api = {
   stats: () => request<UserStats>('/stats'),
   dorms: () => request<Dorm[]>('/dorms'),
   signNow: () =>
-    request<{ status: string; message: string }>('/sign-now', { method: 'POST' }),
+    request<{ status: string; message: string; requestDebug?: unknown }>('/sign-now', { method: 'POST' }),
   // Toggle today (or `date`) in the user's skip-dates list. Used by the
   // Dashboard "今晚不在校" button. Server prunes expired entries.
   skipToday: (date?: string) =>
@@ -151,8 +143,6 @@ export const adminApi = {
   logout: () => request<{ ok: boolean }>('/airvel/logout', { method: 'POST' }),
   me: () => request<{ isAdmin: boolean }>('/airvel/me'),
   stats: () => request<AdminStats>('/airvel/stats'),
-  createSiteGateCode: () =>
-    request<SiteGateCode>('/airvel/gate-codes', { method: 'POST' }),
 
   listCodes: (params: {
     status?: 'used' | 'unused'

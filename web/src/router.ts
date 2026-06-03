@@ -6,8 +6,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/gate',
     name: 'gate',
-    component: () => import('./views/Gate.vue'),
-    meta: { layout: 'none' },
+    redirect: '/login',
   },
   {
     path: '/login',

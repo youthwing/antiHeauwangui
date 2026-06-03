@@ -19,6 +19,9 @@ import {
   ExternalLink,
   CalendarX,
   CalendarCheck2,
+  Network,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-vue-next'
 import type { SignRecord, UserStats } from '../types'
 import { useAuth } from '../stores/auth'
@@ -260,6 +263,54 @@ async function signNow() {
 }
 
 const recentRecords = computed(() => records.value.slice(0, 5))
+
+const requestDebugOpen = ref(false)
+type DebugObject = Record<string, any>
+
+function debugObject(value: unknown): DebugObject | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as DebugObject
+}
+
+function debugAt(source: DebugObject | null, path: string[]): unknown {
+  let cur: unknown = source
+  for (const key of path) {
+    if (!cur || typeof cur !== 'object' || Array.isArray(cur)) return undefined
+    cur = (cur as DebugObject)[key]
+  }
+  return cur
+}
+
+function debugText(source: DebugObject | null, path: string[], fallback = '—'): string {
+  const value = debugAt(source, path)
+  if (value === undefined || value === null || value === '') return fallback
+  return String(value)
+}
+
+const latestDebugRecord = computed(() => todayRecord.value || records.value[0] || null)
+const latestDebug = computed(() => debugObject(latestDebugRecord.value?.requestDebug))
+const latestDebugJSON = computed(() => {
+  if (!latestDebug.value) return ''
+  return JSON.stringify(latestDebug.value, null, 2)
+})
+const latestDebugIP = computed(() => {
+  const d = latestDebug.value
+  return debugText(d, ['network', 'outboundIP'], debugText(d, ['network', 'ipError'], '暂无'))
+})
+const latestDebugProxy = computed(() => {
+  const d = latestDebug.value
+  const enabled = debugAt(d, ['proxy', 'enabled']) === true
+  if (!d) return '暂无'
+  return enabled ? debugText(d, ['proxy', 'outbound'], '已启用') : '直连 / 未启用'
+})
+const latestDebugEndpoint = computed(() => {
+  const d = latestDebug.value
+  return debugText(d, ['school', 'signRequest', 'path'], debugText(d, ['school', 'statusRequest', 'path'], '—'))
+})
+const latestDebugResult = computed(() => {
+  const d = latestDebug.value
+  return debugText(d, ['result', 'status'], latestDebugRecord.value?.status || '暂无')
+})
 
 const recordMeta: Record<string, { label: string; color: string; dotBg: string }> = {
   success: { label: '签到成功', color: 'text-red-400', dotBg: 'bg-red-500' },
@@ -604,6 +655,82 @@ const recordMeta: Record<string, { label: string; color: string; dotBg: string }
         </p>
       </RouterLink>
     </div>
+
+    <!-- Compact request diagnostics for the latest sign attempt -->
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-2.5 min-w-0">
+          <div class="mt-0.5 w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800/70 flex items-center justify-center shrink-0">
+            <Network class="w-4 h-4 text-zinc-500" />
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="text-sm font-semibold text-[#161b22] dark:text-zinc-200">请求诊断</h3>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                JWT 已脱敏
+              </span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-1 truncate">
+              <template v-if="latestDebugRecord">
+                {{ formatDateTime(latestDebugRecord.occurredAt) }}
+                <span class="mx-1 text-zinc-400 dark:text-zinc-700">·</span>
+                {{ (recordMeta[latestDebugRecord.status] || recordMeta.failed).label }}
+              </template>
+              <template v-else>
+                暂无签到记录
+              </template>
+            </p>
+          </div>
+        </div>
+        <button
+          @click="requestDebugOpen = !requestDebugOpen"
+          :disabled="!latestDebugRecord"
+          class="shrink-0 inline-flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800/70 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {{ requestDebugOpen ? '收起详情' : '展开详情' }}
+          <ChevronUp v-if="requestDebugOpen" class="w-3.5 h-3.5" />
+          <ChevronDown v-else class="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div class="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-2 text-xs">
+        <div class="min-w-0">
+          <p class="text-[10px] tracking-wide uppercase text-zinc-500">结果</p>
+          <p class="mt-0.5 font-medium text-zinc-700 dark:text-zinc-300 truncate">{{ latestDebugResult }}</p>
+        </div>
+        <div class="min-w-0">
+          <p class="text-[10px] tracking-wide uppercase text-zinc-500">出口 IP</p>
+          <p class="mt-0.5 font-mono-token text-zinc-700 dark:text-zinc-300 truncate" :title="latestDebugIP">
+            {{ latestDebugIP }}
+          </p>
+        </div>
+        <div class="min-w-0">
+          <p class="text-[10px] tracking-wide uppercase text-zinc-500">代理</p>
+          <p class="mt-0.5 text-zinc-700 dark:text-zinc-300 truncate" :title="latestDebugProxy">
+            {{ latestDebugProxy }}
+          </p>
+        </div>
+        <div class="min-w-0">
+          <p class="text-[10px] tracking-wide uppercase text-zinc-500">接口</p>
+          <p class="mt-0.5 font-mono-token text-zinc-700 dark:text-zinc-300 truncate" :title="latestDebugEndpoint">
+            {{ latestDebugEndpoint }}
+          </p>
+        </div>
+      </div>
+
+      <div v-if="requestDebugOpen" class="mt-3">
+        <pre
+          v-if="latestDebug"
+          class="max-h-72 overflow-auto rounded-lg bg-zinc-100 dark:bg-[#0d1117] p-3 text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words"
+        >{{ latestDebugJSON }}</pre>
+        <div
+          v-else
+          class="rounded-lg bg-zinc-100 dark:bg-[#0d1117] p-3 text-xs text-zinc-500"
+        >
+          这条是旧记录，暂无请求快照；新的签到记录会自动保存完整请求诊断。
+        </div>
+      </div>
+    </section>
 
     <!-- Action row — 4 buttons: 立即签到 / 今晚跳过 / 配置 / 跳学校 H5 -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

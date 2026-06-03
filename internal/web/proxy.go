@@ -1,22 +1,11 @@
 package web
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"strings"
 	"time"
 
 	apiclient "wangui/internal/api"
 	"wangui/internal/store"
 )
-
-var proxyIPCheckEndpoints = []string{
-	"https://api.ipify.org",
-	"https://icanhazip.com",
-}
 
 func schoolAPIClientForUser(u *store.User) (*apiclient.Client, error) {
 	return apiclient.NewWithProxy(u.Token, proxyConfigForUser(u))
@@ -76,40 +65,4 @@ func proxyIPDTO(u *store.User, elapsed time.Duration, ip, endpoint string, err e
 		out["message"] = "探测成功"
 	}
 	return out
-}
-
-func detectOutboundIP(ctx context.Context, client *http.Client) (string, string, error) {
-	var lastErr error
-	for _, endpoint := range proxyIPCheckEndpoints {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		raw, readErr := io.ReadAll(io.LimitReader(resp.Body, 128))
-		_ = resp.Body.Close()
-		if readErr != nil {
-			lastErr = readErr
-			continue
-		}
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			lastErr = fmt.Errorf("%s HTTP %d", endpoint, resp.StatusCode)
-			continue
-		}
-		ip := strings.TrimSpace(string(raw))
-		if net.ParseIP(ip) == nil {
-			lastErr = fmt.Errorf("%s 返回的 IP 格式异常", endpoint)
-			continue
-		}
-		return ip, endpoint, nil
-	}
-	if lastErr == nil {
-		lastErr = fmt.Errorf("没有可用的 IP 探测端点")
-	}
-	return "", "", lastErr
 }

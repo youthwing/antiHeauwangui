@@ -241,14 +241,14 @@ func (m *Multi) runWeeklyDigestSweep(ctx context.Context) {
 
 // WeeklyStats is the per-user summary the digest email + Server酱 receive.
 type WeeklyStats struct {
-	From         time.Time
-	To           time.Time
-	DaysSigned   int      // count of distinct days with success/already/exempt
-	DaysFailed   int      // distinct days with failed
-	DaysSkipped  int      // distinct days with skipped (or user marked skip)
-	TotalAttempts int     // raw record count
-	BestDay      string   // YYYY-MM-DD of fastest successful sign, "" if none
-	BestStatus   string   // best outcome status for BestDay
+	From          time.Time
+	To            time.Time
+	DaysSigned    int    // count of distinct days with success/already/exempt
+	DaysFailed    int    // distinct days with failed
+	DaysSkipped   int    // distinct days with skipped (or user marked skip)
+	TotalAttempts int    // raw record count
+	BestDay       string // YYYY-MM-DD of fastest successful sign, "" if none
+	BestStatus    string // best outcome status for BestDay
 }
 
 func computeWeeklyStats(recs []store.Record, from, to time.Time) WeeklyStats {
@@ -494,7 +494,7 @@ func (m *Multi) runForUser(ctx context.Context, userID string, deadline time.Tim
 		res := m.SignOnce(ctx, cur)
 		_ = m.store.AddRecord(ctx, &store.Record{
 			UserID: userID, RuleID: DefaultRuleID,
-			Status: res.Status, Message: res.Message,
+			Status: res.Status, Message: res.Message, RequestDebug: res.RequestDebug,
 		})
 		m.log.Info("attempt",
 			"user", userID, "attempt", attempt,
@@ -535,8 +535,9 @@ func (m *Multi) runForUser(ctx context.Context, userID string, deadline time.Tim
 
 // SignResult is the outcome of a single sign attempt.
 type SignResult struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
+	Status       string `json:"status"`
+	Message      string `json:"message"`
+	RequestDebug string `json:"requestDebug,omitempty"`
 }
 
 func (r SignResult) Terminal() bool {
@@ -550,31 +551,37 @@ func (r SignResult) Terminal() bool {
 // SignOnce performs a single status + (optional) sign cycle for one user.
 // It never writes records — the caller decides whether to persist.
 func (m *Multi) SignOnce(ctx context.Context, u *store.User) SignResult {
+	debug := newSignDebugSnapshot(u, proxyConfigForUser(u))
 	c, err := schoolAPIClientForUser(u)
 	if err != nil {
-		return SignResult{Status: "failed", Message: "代理配置错误: " + err.Error()}
+		return debug.finish("failed", "代理配置错误: "+err.Error())
 	}
+	debug.detectOutboundIP(ctx, c.HTTP)
+	debug.setStatusRequest(c)
+	start := time.Now()
 	st, err := c.CheckinStatus(ctx, DefaultRuleID)
 	if err != nil {
+		debug.setStatusResponse(nil, time.Since(start), err)
 		if api.IsAuthExpired(err) {
-			return SignResult{Status: "failed", Message: "token 已失效，请更新"}
+			return debug.finish("failed", "token 已失效，请更新")
 		}
-		return SignResult{Status: "failed", Message: "状态获取失败: " + err.Error()}
+		return debug.finish("failed", "状态获取失败: "+err.Error())
 	}
+	debug.setStatusResponse(st, time.Since(start), nil)
 	if st.IsBoarding {
-		return SignResult{Status: "exempt", Message: "外宿学生无需签到"}
+		return debug.finish("exempt", "外宿学生无需签到")
 	}
 	if st.IsExempt != nil && *st.IsExempt {
-		return SignResult{Status: "exempt", Message: nonEmpty(st.Message, "请假中")}
+		return debug.finish("exempt", nonEmpty(st.Message, "请假中"))
 	}
 	if st.HasCheckedIn != nil && *st.HasCheckedIn {
-		return SignResult{Status: "already", Message: nonEmpty(st.Message, "今日已签到")}
+		return debug.finish("already", nonEmpty(st.Message, "今日已签到"))
 	}
 	if !st.CanCheckin {
-		return SignResult{Status: "failed", Message: nonEmpty(st.Message, "当前无法签到")}
+		return debug.finish("failed", nonEmpty(st.Message, "当前无法签到"))
 	}
 	if u.Lat == 0 || u.Lng == 0 {
-		return SignResult{Status: "failed", Message: "未配置打卡坐标"}
+		return debug.finish("failed", "未配置打卡坐标")
 	}
 	req := api.SignRequest{
 		RuleID:       DefaultRuleID,
@@ -591,13 +598,17 @@ func (m *Multi) SignOnce(ctx context.Context, u *store.User) SignResult {
 		req.Road = u.Road
 		req.Poi = u.Poi
 	}
-	if _, err := c.Sign(ctx, req); err != nil {
+	debug.setSignRequest(c, req)
+	start = time.Now()
+	data, err := c.Sign(ctx, req)
+	debug.setSignResponse(data, time.Since(start), err)
+	if err != nil {
 		if api.IsAuthExpired(err) {
-			return SignResult{Status: "failed", Message: "token 已失效，请更新"}
+			return debug.finish("failed", "token 已失效，请更新")
 		}
-		return SignResult{Status: "failed", Message: err.Error()}
+		return debug.finish("failed", err.Error())
 	}
-	return SignResult{Status: "success", Message: "签到成功"}
+	return debug.finish("success", "签到成功")
 }
 
 func nonEmpty(s, fallback string) string {

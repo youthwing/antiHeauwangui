@@ -119,12 +119,17 @@ export interface Me {
 
 export type SignStatus = 'success' | 'already' | 'exempt' | 'failed' | 'skipped'
 
+export interface SignRequestDebug {
+  [key: string]: unknown
+}
+
 export interface SignRecord {
   id: number
   ruleId: number
   status: SignStatus
   message: string
   occurredAt: number
+  requestDebug?: SignRequestDebug | string | null
 }
 
 // Aggregate stats derived from a user's sign records. Computed on each
@@ -195,12 +200,6 @@ export interface InviteCode {
   used: boolean
 }
 
-export interface SiteGateCode {
-  code: string
-  createdAt: number
-  expiresAt: number
-}
-
 export interface AdminUser {
   userId: string
   userName: string
@@ -224,9 +223,11 @@ export interface AdminUser {
   jitterSec: number
   recentRecords?: Array<{
     id: number
+    ruleId?: number
     status: SignStatus
     message: string
     occurredAt: number
+    requestDebug?: SignRequestDebug | string | null
   }>
 }
 
@@ -310,9 +311,11 @@ export interface AdminLog {
   id: number
   userId: string
   userName: string
+  ruleId?: number
   status: SignStatus
   message: string
   occurredAt: number
+  requestDebug?: SignRequestDebug | string | null
 }
 
 export type AnnouncementLevel = 'info' | 'success' | 'warning' | 'critical'
