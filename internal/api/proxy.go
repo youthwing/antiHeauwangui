@@ -158,10 +158,33 @@ func (t *mihomoNodeTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	}
 	mihomoSwitchMu.Lock()
 	defer mihomoSwitchMu.Unlock()
-	if err := selectMihomoNode(req.Context(), t.node); err != nil {
+
+	target := strings.TrimSpace(t.node)
+	previous, err := currentMihomoNode(req.Context())
+	if err != nil {
 		return nil, err
 	}
-	return base.RoundTrip(req)
+	if previous != target {
+		if err := selectMihomoNode(req.Context(), target); err != nil {
+			return nil, err
+		}
+	}
+	resp, roundTripErr := base.RoundTrip(req)
+	if previous != "" && previous != target {
+		restoreCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		restoreErr := restoreMihomoNode(restoreCtx, target, previous)
+		cancel()
+		if restoreErr != nil {
+			if resp != nil && resp.Body != nil {
+				_ = resp.Body.Close()
+			}
+			if roundTripErr != nil {
+				return nil, fmt.Errorf("%w; 恢复 Mihomo 全局节点失败: %v", roundTripErr, restoreErr)
+			}
+			return nil, fmt.Errorf("恢复 Mihomo 全局节点失败: %w", restoreErr)
+		}
+	}
+	return resp, roundTripErr
 }
 
 var mihomoSwitchMu sync.Mutex
@@ -171,35 +194,68 @@ const (
 	mihomoDefaultGroup   = "Proxies"
 )
 
+func currentMihomoNode(ctx context.Context) (string, error) {
+	var out struct {
+		Now string `json:"now"`
+	}
+	if err := mihomoDo(ctx, http.MethodGet, "/proxies/"+url.PathEscape(mihomoDefaultGroup), nil, &out); err != nil {
+		return "", fmt.Errorf("读取 Mihomo 当前节点失败: %w", err)
+	}
+	return strings.TrimSpace(out.Now), nil
+}
+
 func selectMihomoNode(ctx context.Context, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil
 	}
-	body, err := json.Marshal(map[string]string{"name": name})
+	return mihomoDo(ctx, http.MethodPut, "/proxies/"+url.PathEscape(mihomoDefaultGroup), map[string]string{"name": name}, nil)
+}
+
+func restoreMihomoNode(ctx context.Context, target, previous string) error {
+	current, err := currentMihomoNode(ctx)
 	if err != nil {
 		return err
 	}
-	path := "/proxies/" + url.PathEscape(mihomoDefaultGroup)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, mihomoBaseURL()+path, bytes.NewReader(body))
+	if current != strings.TrimSpace(target) {
+		return nil
+	}
+	return selectMihomoNode(ctx, previous)
+}
+
+func mihomoDo(ctx context.Context, method, path string, body any, out any) error {
+	var reader io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		reader = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, mihomoBaseURL()+path, reader)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if secret := strings.TrimSpace(os.Getenv("WANGUI_MIHOMO_SECRET")); secret != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("切换 Mihomo 节点失败: %w", err)
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		return fmt.Errorf("切换 Mihomo 节点失败: HTTP %d %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+		return fmt.Errorf("mihomo %s %s: HTTP %d %s", method, path, resp.StatusCode, strings.TrimSpace(string(raw)))
 	}
-	return nil
+	if out == nil {
+		return nil
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 func mihomoBaseURL() string {
