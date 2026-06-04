@@ -56,6 +56,7 @@ func newSignDebugSnapshot(u *store.User, cfg api.ProxyConfig) *signDebugSnapshot
 			"host":        normalized.Host,
 			"port":        normalized.Port,
 			"outbound":    normalized.OutboundLabel(),
+			"node":        normalized.Node,
 			"usernameSet": normalized.Username != "",
 			"passwordSet": normalized.Password != "",
 		},

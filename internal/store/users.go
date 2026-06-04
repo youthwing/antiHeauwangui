@@ -80,6 +80,7 @@ type User struct {
 	ProxyPort     int
 	ProxyUsername string
 	ProxyPassword string
+	ProxyNode     string
 
 	// TokenWarnedAt is the unix timestamp of the last token-expiry warning
 	// we sent for the *current* token. Reset to 0 on UpdateToken so a fresh
@@ -106,7 +107,7 @@ const userColumns = `user_id, user_name, user_number, user_section, user_class,
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
   server_chan_key, server_chan_enabled,
-  proxy_enabled, proxy_scheme, proxy_host, proxy_port, proxy_username, proxy_password_enc,
+  proxy_enabled, proxy_scheme, proxy_host, proxy_port, proxy_username, proxy_password_enc, proxy_node,
   token_warned_at,
   skip_dates,
   created_at, updated_at`
@@ -172,11 +173,11 @@ INSERT INTO users (
   notify_email, notify_enabled, sign_days,
   is_guest, guest_label, sign_dates, expires_at,
   server_chan_key, server_chan_enabled,
-  proxy_enabled, proxy_scheme, proxy_host, proxy_port, proxy_username, proxy_password_enc,
+  proxy_enabled, proxy_scheme, proxy_host, proxy_port, proxy_username, proxy_password_enc, proxy_node,
   token_warned_at,
   skip_dates,
   created_at, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 ON CONFLICT(user_id) DO UPDATE SET
   user_name        = excluded.user_name,
   user_number      = excluded.user_number,
@@ -198,7 +199,7 @@ ON CONFLICT(user_id) DO UPDATE SET
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
 		boolInt(u.IsGuest), u.GuestLabel, u.SignDates, expiresAt,
 		u.ServerChanKey, boolInt(u.ServerChanEnabled),
-		boolInt(u.ProxyEnabled), u.ProxyScheme, u.ProxyHost, u.ProxyPort, u.ProxyUsername, proxyPasswordEnc,
+		boolInt(u.ProxyEnabled), u.ProxyScheme, u.ProxyHost, u.ProxyPort, u.ProxyUsername, proxyPasswordEnc, u.ProxyNode,
 		u.TokenWarnedAt,
 		u.SkipDates,
 		u.CreatedAt.Unix(), u.UpdatedAt.Unix())
@@ -237,7 +238,7 @@ func (s *Store) scanUser(r rowScanner) (*User, error) {
 		&u.NotifyEmail, &notifyEnabled, &u.SignDays,
 		&isGuest, &u.GuestLabel, &u.SignDates, &expiresAt,
 		&u.ServerChanKey, &serverChanEnabled,
-		&proxyEnabled, &u.ProxyScheme, &u.ProxyHost, &u.ProxyPort, &u.ProxyUsername, &proxyPasswordEnc,
+		&proxyEnabled, &u.ProxyScheme, &u.ProxyHost, &u.ProxyPort, &u.ProxyUsername, &proxyPasswordEnc, &u.ProxyNode,
 		&u.TokenWarnedAt,
 		&u.SkipDates,
 		&createdAt, &updatedAt,
@@ -371,6 +372,7 @@ UPDATE users SET
   proxy_port          = ?,
   proxy_username      = ?,
   proxy_password_enc  = ?,
+  proxy_node          = ?,
   updated_at          = ?
 WHERE user_id = ?
 `,
@@ -379,7 +381,7 @@ WHERE user_id = ?
 		u.TriggerMinute, u.JitterSec, u.RetryCount, u.RetryGapMin, u.SavedLocations,
 		u.NotifyEmail, boolInt(u.NotifyEnabled), u.SignDays,
 		u.ServerChanKey, boolInt(u.ServerChanEnabled),
-		boolInt(u.ProxyEnabled), defaultStr(u.ProxyScheme, "socks5"), u.ProxyHost, u.ProxyPort, u.ProxyUsername, proxyPasswordEnc,
+		boolInt(u.ProxyEnabled), defaultStr(u.ProxyScheme, "socks5"), u.ProxyHost, u.ProxyPort, u.ProxyUsername, proxyPasswordEnc, u.ProxyNode,
 		time.Now().Unix(), u.UserID)
 	return err
 }

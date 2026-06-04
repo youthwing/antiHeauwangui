@@ -188,6 +188,7 @@ CREATE TABLE IF NOT EXISTS dorm_locations (
 		{"users", "proxy_port", "INTEGER NOT NULL DEFAULT 0"},
 		{"users", "proxy_username", "TEXT NOT NULL DEFAULT ''"},
 		{"users", "proxy_password_enc", "BLOB"},
+		{"users", "proxy_node", "TEXT NOT NULL DEFAULT ''"},
 		// Last time a token-expiry warning was sent for the current token.
 		// Reset to 0 on UpdateToken so each token cycle warns at most once.
 		{"users", "token_warned_at", "INTEGER NOT NULL DEFAULT 0"},

@@ -34,6 +34,11 @@ type mihomoDelay struct {
 }
 
 func (h *handlers) proxyNodes(w http.ResponseWriter, r *http.Request) {
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
 	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -41,11 +46,12 @@ func (h *handlers) proxyNodes(w http.ResponseWriter, r *http.Request) {
 			"group":     mihomoDefaultGroup,
 			"message":   err.Error(),
 			"nodes":     []any{},
-			"shared":    true,
+			"selected":  u.ProxyNode,
+			"shared":    false,
 		})
 		return
 	}
-	writeJSON(w, http.StatusOK, mihomoNodesDTO(group, "", nil))
+	writeJSON(w, http.StatusOK, mihomoNodesDTO(group, u.ProxyNode, "", nil))
 }
 
 func (h *handlers) selectProxyNode(w http.ResponseWriter, r *http.Request) {
@@ -70,8 +76,20 @@ func (h *handlers) selectProxyNode(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "节点不存在")
 		return
 	}
-	if err := h.mihomoSelect(r.Context(), mihomoDefaultGroup, name); err != nil {
-		writeErr(w, http.StatusBadGateway, "切换失败: "+err.Error())
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	u.ProxyEnabled = true
+	u.ProxyScheme = "http"
+	u.ProxyHost = "mihomo"
+	u.ProxyPort = 7893
+	u.ProxyUsername = ""
+	u.ProxyPassword = ""
+	u.ProxyNode = name
+	if err := h.store.UpdateSettings(r.Context(), u); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存节点失败")
 		return
 	}
 	updated, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
@@ -79,7 +97,7 @@ func (h *handlers) selectProxyNode(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, "读取节点失败: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, mihomoNodesDTO(updated, name, nil))
+	writeJSON(w, http.StatusOK, mihomoNodesDTO(updated, name, name, nil))
 }
 
 func (h *handlers) autoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
@@ -102,8 +120,20 @@ func (h *handlers) autoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(delays, func(i, j int) bool { return delays[i].Delay < delays[j].Delay })
 	pick := delays[0].Name
-	if err := h.mihomoSelect(r.Context(), mihomoDefaultGroup, pick); err != nil {
-		writeErr(w, http.StatusBadGateway, "切换失败: "+err.Error())
+	u, err := h.store.GetUser(r.Context(), userIDOf(r))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "用户不存在")
+		return
+	}
+	u.ProxyEnabled = true
+	u.ProxyScheme = "http"
+	u.ProxyHost = "mihomo"
+	u.ProxyPort = 7893
+	u.ProxyUsername = ""
+	u.ProxyPassword = ""
+	u.ProxyNode = pick
+	if err := h.store.UpdateSettings(r.Context(), u); err != nil {
+		writeErr(w, http.StatusInternalServerError, "保存节点失败")
 		return
 	}
 	updated, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
@@ -114,7 +144,7 @@ func (h *handlers) autoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
 	if len(delays) > 12 {
 		delays = delays[:12]
 	}
-	writeJSON(w, http.StatusOK, mihomoNodesDTO(updated, pick, delays))
+	writeJSON(w, http.StatusOK, mihomoNodesDTO(updated, pick, pick, delays))
 }
 
 func (h *handlers) mihomoGroup(ctx context.Context, group string) (*mihomoGroup, error) {
@@ -216,7 +246,7 @@ func mihomoBaseURL() string {
 	return strings.TrimRight(v, "/")
 }
 
-func mihomoNodesDTO(group *mihomoGroup, picked string, delays []mihomoDelay) map[string]any {
+func mihomoNodesDTO(group *mihomoGroup, selected, picked string, delays []mihomoDelay) map[string]any {
 	delayByName := map[string]int{}
 	for _, d := range delays {
 		delayByName[d.Name] = d.Delay
@@ -225,7 +255,7 @@ func mihomoNodesDTO(group *mihomoGroup, picked string, delays []mihomoDelay) map
 	for _, name := range group.All {
 		n := map[string]any{
 			"name":    name,
-			"current": name == group.Now,
+			"current": name == selected,
 		}
 		if d, ok := delayByName[name]; ok {
 			n["delayMs"] = d
@@ -237,17 +267,19 @@ func mihomoNodesDTO(group *mihomoGroup, picked string, delays []mihomoDelay) map
 		tested = append(tested, map[string]any{
 			"name":    d.Name,
 			"delayMs": d.Delay,
-			"current": d.Name == group.Now,
+			"current": d.Name == selected,
 		})
 	}
 	return map[string]any{
 		"available": true,
 		"group":     group.Name,
-		"current":   group.Now,
+		"current":   selected,
+		"selected":  selected,
 		"picked":    picked,
+		"mihomoNow": group.Now,
 		"nodes":     nodes,
 		"tested":    tested,
-		"shared":    true,
+		"shared":    false,
 	}
 }
 

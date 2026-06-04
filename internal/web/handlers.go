@@ -357,6 +357,7 @@ func settingsDTO(u *store.User) map[string]any {
 		"proxyHost":         u.ProxyHost,
 		"proxyPort":         u.ProxyPort,
 		"proxyUsername":     u.ProxyUsername,
+		"proxyNode":         u.ProxyNode,
 		"proxyPasswordSet":  u.ProxyPassword != "",
 		"skipDates":         skipDates,
 	}
@@ -523,6 +524,7 @@ type updateSettingsReq struct {
 	ProxyPort         *int    `json:"proxyPort"`
 	ProxyUsername     *string `json:"proxyUsername"`
 	ProxyPassword     *string `json:"proxyPassword"`
+	ProxyNode         *string `json:"proxyNode"`
 	// Legacy raw-coord fields, accepted for backwards compat / admin override.
 	Latitude       *float64         `json:"latitude"`
 	Longitude      *float64         `json:"longitude"`
@@ -633,6 +635,9 @@ func (h *handlers) updateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ProxyPassword != nil {
 		u.ProxyPassword = *req.ProxyPassword
+	}
+	if req.ProxyNode != nil {
+		u.ProxyNode = strings.TrimSpace(*req.ProxyNode)
 	}
 	if _, err := apiclient.NormalizeProxyConfig(proxyConfigForUser(u)); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())

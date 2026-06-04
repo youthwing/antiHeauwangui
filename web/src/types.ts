@@ -47,6 +47,7 @@ export interface Settings {
   proxyPort?: number
   proxyUsername?: string
   proxyPassword?: string // write-only field; server never echoes it back
+  proxyNode?: string
   proxyPasswordSet?: boolean
   // 7-bit bitmask of which weekdays to auto-sign on.
   // bit 0 = Mon, bit 1 = Tue, … bit 5 = Sat, bit 6 = Sun. 127 = every day.
@@ -167,6 +168,25 @@ export interface ProxyIPResult {
   ip: string
   endpoint: string
   message: string
+}
+
+export interface ProxyNode {
+  name: string
+  current: boolean
+  delayMs?: number
+}
+
+export interface ProxyNodesResult {
+  available: boolean
+  group: string
+  current?: string
+  selected?: string
+  picked?: string
+  mihomoNow?: string
+  message?: string
+  nodes: ProxyNode[]
+  tested?: ProxyNode[]
+  shared?: boolean
 }
 
 // ---- Admin types ----

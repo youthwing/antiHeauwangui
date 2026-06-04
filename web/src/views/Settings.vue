@@ -17,8 +17,9 @@ import {
   HelpCircle,
   Network,
   Activity,
+  Shuffle,
 } from 'lucide-vue-next'
-import type { Settings, Dorm, ProxyTestResult, ProxyIPResult } from '../types'
+import type { Settings, Dorm, ProxyTestResult, ProxyIPResult, ProxyNodesResult } from '../types'
 import { useAuth } from '../stores/auth'
 import { api } from '../api'
 import { showToast } from '../lib/toast'
@@ -69,12 +70,38 @@ const loadingProxyIP = ref(false)
 const disablingProxy = ref(false)
 const proxyTestResult = ref<ProxyTestResult | null>(null)
 const proxyIPResult = ref<ProxyIPResult | null>(null)
+const proxyNodes = ref<ProxyNodesResult | null>(null)
+const loadingProxyNodes = ref(false)
+const switchingProxyNode = ref(false)
+const selectedProxyNode = ref('')
+
+const BUILTIN_PROXY = {
+  scheme: 'http',
+  host: 'mihomo',
+  port: 7893,
+} as const
 
 const proxySummary = computed(() => {
   if (!proxyHost.value.trim() || !proxyPort.value) return '尚未配置本账号出口地址'
-  return `${proxyScheme.value}://${proxyHost.value.trim()}:${proxyPort.value}`
+  const label = `${proxyScheme.value}://${proxyHost.value.trim()}:${proxyPort.value}`
+  return selectedProxyNode.value && isBuiltinProxy.value ? `${label} · ${selectedProxyNode.value}` : label
 })
 const proxyReady = computed(() => proxyEnabled.value && !!proxyHost.value.trim() && !!proxyPort.value)
+const isBuiltinProxy = computed(() =>
+  proxyEnabled.value &&
+  proxyScheme.value === BUILTIN_PROXY.scheme &&
+  proxyHost.value.trim().toLowerCase() === BUILTIN_PROXY.host &&
+  Number(proxyPort.value) === BUILTIN_PROXY.port,
+)
+
+function setBuiltinProxyFields() {
+  proxyEnabled.value = true
+  proxyScheme.value = BUILTIN_PROXY.scheme
+  proxyHost.value = BUILTIN_PROXY.host
+  proxyPort.value = BUILTIN_PROXY.port
+  proxyUsername.value = ''
+  proxyPassword.value = ''
+}
 
 function proxySettingsPayload(): Partial<Settings> {
   const payload: Partial<Settings> = {
@@ -83,6 +110,7 @@ function proxySettingsPayload(): Partial<Settings> {
     proxyHost: proxyHost.value.trim(),
     proxyPort: proxyPort.value || 0,
     proxyUsername: proxyUsername.value.trim(),
+    proxyNode: isBuiltinProxy.value ? selectedProxyNode.value.trim() : '',
   }
   if (proxyPassword.value) payload.proxyPassword = proxyPassword.value
   return payload
@@ -144,6 +172,7 @@ function hydrate(s: Settings) {
   proxyUsername.value = s.proxyUsername || ''
   proxyPasswordSet.value = !!s.proxyPasswordSet
   proxyPassword.value = ''
+  selectedProxyNode.value = s.proxyNode || ''
   // Server returns 0 for "never sign" but UI keeps the form's default-127
   // so an empty value doesn't accidentally wipe the schedule. We trust the
   // server's value here, treating 0 as a real "no days selected" state.
@@ -168,6 +197,7 @@ onMounted(async () => {
   await auth.init()
   if (auth.state.me) hydrate(auth.state.me.settings)
   await loadDorms()
+  await loadProxyNodes()
 })
 
 watch(
@@ -298,6 +328,63 @@ function toggleProxy() {
     return
   }
   proxyEnabled.value = true
+}
+
+async function loadProxyNodes() {
+  loadingProxyNodes.value = true
+  try {
+    const res = await api.proxyNodes()
+    proxyNodes.value = res
+    selectedProxyNode.value = res.selected || res.current || selectedProxyNode.value
+  } catch (e: any) {
+    proxyNodes.value = {
+      available: false,
+      group: 'Proxies',
+      message: e.message || '读取节点失败',
+      nodes: [],
+      shared: false,
+    }
+  } finally {
+    loadingProxyNodes.value = false
+  }
+}
+
+async function selectProxyNode() {
+  if (!selectedProxyNode.value || switchingProxyNode.value) return
+  switchingProxyNode.value = true
+  try {
+    const res = await api.selectProxyNode(selectedProxyNode.value)
+    proxyNodes.value = res
+    selectedProxyNode.value = res.selected || res.current || selectedProxyNode.value
+    setBuiltinProxyFields()
+    proxyTestResult.value = null
+    proxyIPResult.value = null
+    showToast('ok', `当前账号已选择 ${selectedProxyNode.value}`)
+    await auth.refresh()
+  } catch (e: any) {
+    showToast('err', e.message || '保存节点失败')
+  } finally {
+    switchingProxyNode.value = false
+  }
+}
+
+async function autoSelectProxyNode() {
+  if (switchingProxyNode.value) return
+  switchingProxyNode.value = true
+  try {
+    const res = await api.autoSelectProxyNode()
+    proxyNodes.value = res
+    selectedProxyNode.value = res.selected || res.current || ''
+    setBuiltinProxyFields()
+    proxyTestResult.value = null
+    proxyIPResult.value = null
+    showToast('ok', selectedProxyNode.value ? `当前账号已选择 ${selectedProxyNode.value}` : '已自动选择节点')
+    await auth.refresh()
+  } catch (e: any) {
+    showToast('err', e.message || '自动选择失败')
+  } finally {
+    switchingProxyNode.value = false
+  }
 }
 
 async function testServerChanPush() {
@@ -814,7 +901,7 @@ const previewSchedule = computed(() => {
               <dd class="text-zinc-600 dark:text-zinc-400">没有就留空；有鉴权才填写。</dd>
             </dl>
             <p class="mt-2 text-[11px] text-amber-600 dark:text-amber-300 leading-relaxed">
-              不再提供全站共享节点切换。保存后，自动签到和“立即签到”都会走当前账号自己的出口；记录里的“请求诊断”会显示当次出口 IP。
+              使用服务器订阅节点时，系统会保存当前账号自己的节点名；自动签到和“立即签到”都会按这个账号保存的节点出站。
             </p>
           </div>
         </div>
@@ -909,6 +996,78 @@ const previewSchedule = computed(() => {
             </div>
           </dl>
         </div>
+      </div>
+
+      <div class="mb-4 rounded-lg bg-white/70 dark:bg-[#0d1117]/60 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-[#161b22] dark:text-zinc-200">服务器订阅节点（当前账号）</p>
+            <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">
+              这里保存的是当前账号的节点偏好；请求学校接口前会临时切到这个节点，不会把其他用户的配置改成这个节点。
+            </p>
+            <p v-if="selectedProxyNode" class="text-[11px] text-zinc-500 mt-1 break-all">
+              当前账号已选：<span class="font-mono-token text-red-700 dark:text-red-200">{{ selectedProxyNode }}</span>
+              <span v-if="proxyNodes?.mihomoNow" class="text-zinc-400"> · Mihomo 当前状态：{{ proxyNodes.mihomoNow }}</span>
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              @click="loadProxyNodes"
+              :disabled="loadingProxyNodes || switchingProxyNode"
+              class="inline-flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
+            >
+              <RotateCcw class="w-3.5 h-3.5" :class="loadingProxyNodes ? 'wangui-spin' : ''" />
+              刷新
+            </button>
+            <button
+              type="button"
+              @click="autoSelectProxyNode"
+              :disabled="switchingProxyNode || !proxyNodes?.available"
+              class="inline-flex items-center gap-1.5 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 ring-1 ring-red-500/25 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg transition-colors"
+            >
+              <Shuffle class="w-3.5 h-3.5" :class="switchingProxyNode ? 'wangui-spin' : ''" />
+              自动选最快
+            </button>
+          </div>
+        </div>
+
+        <div v-if="proxyNodes?.available" class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+          <select
+            v-model="selectedProxyNode"
+            :disabled="switchingProxyNode"
+            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 disabled:opacity-50"
+          >
+            <option value="">选择一个节点</option>
+            <option v-for="n in proxyNodes.nodes" :key="n.name" :value="n.name">
+              {{ n.current ? '✓ ' : '' }}{{ n.name }}{{ n.delayMs ? ` · ${n.delayMs}ms` : '' }}
+            </option>
+          </select>
+          <button
+            type="button"
+            @click="selectProxyNode"
+            :disabled="switchingProxyNode || !selectedProxyNode || selectedProxyNode === proxyNodes.selected"
+            class="inline-flex items-center justify-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+          >
+            <Network class="w-3.5 h-3.5" :class="switchingProxyNode ? 'wangui-spin' : ''" />
+            保存此节点
+          </button>
+        </div>
+        <p v-else class="text-[11px] text-amber-700 dark:text-amber-300">
+          {{ proxyNodes?.message || '未检测到 mihomo 控制接口' }}
+        </p>
+        <div v-if="proxyNodes?.tested?.length" class="mt-3 flex flex-wrap gap-1.5">
+          <span
+            v-for="n in proxyNodes.tested"
+            :key="n.name"
+            class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-300 ring-1 ring-black/[0.04] dark:ring-white/[0.04]"
+          >
+            {{ n.name }} · {{ n.delayMs }}ms
+          </span>
+        </div>
+        <p class="text-[11px] text-zinc-500 mt-3">
+          保存节点会自动把当前账号代理设置为 <span class="font-mono-token">http://mihomo:7893</span>。如果你想用自己的独立外部代理，直接在下面手动填写即可。
+        </p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

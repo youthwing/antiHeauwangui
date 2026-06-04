@@ -18,6 +18,7 @@ import type {
   UserStats,
   ProxyTestResult,
   ProxyIPResult,
+  ProxyNodesResult,
   Announcement,
   AnnouncementUpsertReq,
 } from './types'
@@ -121,6 +122,14 @@ export const api = {
   testProxy: () =>
     request<ProxyTestResult>('/proxy/test', { method: 'POST' }),
   proxyIP: () => request<ProxyIPResult>('/proxy/ip'),
+  proxyNodes: () => request<ProxyNodesResult>('/proxy/nodes'),
+  selectProxyNode: (name: string) =>
+    request<ProxyNodesResult>('/proxy/nodes/select', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  autoSelectProxyNode: () =>
+    request<ProxyNodesResult>('/proxy/nodes/autoselect', { method: 'POST' }),
   logout: () => request<{ ok: boolean }>('/logout', { method: 'POST' }),
   deleteMe: () => request<{ ok: boolean }>('/me', { method: 'DELETE' }),
 }

@@ -17,5 +17,6 @@ func proxyConfigForUser(u *store.User) api.ProxyConfig {
 		Port:     u.ProxyPort,
 		Username: u.ProxyUsername,
 		Password: u.ProxyPassword,
+		Node:     u.ProxyNode,
 	}
 }
