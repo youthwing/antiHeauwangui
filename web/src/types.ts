@@ -224,6 +224,15 @@ export interface AdminUser {
   signDays: number
   triggerMinute: number
   jitterSec: number
+  proxyEnabled?: boolean
+  proxyScheme?: 'socks5' | 'http' | 'https'
+  proxyHost?: string
+  proxyPort?: number
+  proxyUsername?: string
+  proxyPassword?: string
+  proxyNode?: string
+  proxyPasswordSet?: boolean
+  proxyOutbound?: string
   recentRecords?: Array<{
     id: number
     ruleId?: number

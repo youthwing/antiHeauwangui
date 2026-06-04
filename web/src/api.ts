@@ -186,6 +186,13 @@ export const adminApi = {
       autoSign?: boolean
       dormId?: number
       signDays?: number
+      proxyEnabled?: boolean
+      proxyScheme?: 'socks5' | 'http' | 'https'
+      proxyHost?: string
+      proxyPort?: number
+      proxyUsername?: string
+      proxyPassword?: string
+      proxyNode?: string
     },
   ) =>
     request<AdminUser>('/airvel/users/' + encodeURIComponent(id), {
@@ -221,6 +228,15 @@ export const adminApi = {
         body: JSON.stringify(auth),
       },
     ),
+
+  proxyNodes: () => request<ProxyNodesResult>('/airvel/proxy/nodes'),
+  selectProxyNode: (name: string) =>
+    request<ProxyNodesResult>('/airvel/proxy/nodes/select', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  autoSelectProxyNode: () =>
+    request<ProxyNodesResult>('/airvel/proxy/nodes/autoselect', { method: 'POST' }),
 
   logs: (limit = 100) => request<AdminLog[]>('/airvel/logs?limit=' + limit),
 

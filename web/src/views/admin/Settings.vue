@@ -13,12 +13,19 @@ import {
   EyeOff,
   Bell,
   HelpCircle,
+  Network,
+  RotateCcw,
+  Shuffle,
 } from 'lucide-vue-next'
-import type { AdminStats, SmtpUpdate } from '../../types'
+import type { AdminStats, ProxyNodesResult, SmtpUpdate } from '../../types'
 import { adminApi } from '../../api'
 import { showToast } from '../../lib/toast'
 
 const stats = ref<AdminStats | null>(null)
+const globalProxyNodes = ref<ProxyNodesResult | null>(null)
+const selectedGlobalProxyNode = ref('')
+const loadingGlobalProxyNodes = ref(false)
+const switchingGlobalProxyNode = ref(false)
 
 // SMTP form state — now also carries the admin Server酱 fields, since the
 // same PUT /smtp endpoint owns both notification channels' config.
@@ -42,6 +49,55 @@ const testingServerChan = ref(false)
 const showPassword = ref(false)
 const showAdminServerChanKey = ref(false)
 const showServerChanFaq = ref(false)
+
+async function loadGlobalProxyNodes() {
+  loadingGlobalProxyNodes.value = true
+  try {
+    const res = await adminApi.proxyNodes()
+    globalProxyNodes.value = res
+    selectedGlobalProxyNode.value = res.selected || res.current || res.mihomoNow || selectedGlobalProxyNode.value
+  } catch (e: any) {
+    globalProxyNodes.value = {
+      available: false,
+      group: 'Proxies',
+      message: e.message || '节点加载失败',
+      nodes: [],
+      shared: true,
+    }
+  } finally {
+    loadingGlobalProxyNodes.value = false
+  }
+}
+
+async function selectGlobalProxyNode() {
+  if (!selectedGlobalProxyNode.value || switchingGlobalProxyNode.value) return
+  switchingGlobalProxyNode.value = true
+  try {
+    const res = await adminApi.selectProxyNode(selectedGlobalProxyNode.value)
+    globalProxyNodes.value = res
+    selectedGlobalProxyNode.value = res.selected || res.current || selectedGlobalProxyNode.value
+    showToast('ok', `全局 Mihomo 节点已切到 ${selectedGlobalProxyNode.value}`)
+  } catch (e: any) {
+    showToast('err', e.message || '切换失败')
+  } finally {
+    switchingGlobalProxyNode.value = false
+  }
+}
+
+async function autoSelectGlobalProxyNode() {
+  if (switchingGlobalProxyNode.value) return
+  switchingGlobalProxyNode.value = true
+  try {
+    const res = await adminApi.autoSelectProxyNode()
+    globalProxyNodes.value = res
+    selectedGlobalProxyNode.value = res.selected || res.current || res.picked || ''
+    showToast('ok', selectedGlobalProxyNode.value ? `全局 Mihomo 节点已切到 ${selectedGlobalProxyNode.value}` : '已自动选择节点')
+  } catch (e: any) {
+    showToast('err', e.message || '自动选择失败')
+  } finally {
+    switchingGlobalProxyNode.value = false
+  }
+}
 
 async function loadSmtp() {
   loadingSmtp.value = true
@@ -111,6 +167,7 @@ onMounted(async () => {
   try {
     stats.value = await adminApi.stats()
   } catch {}
+  await loadGlobalProxyNodes()
   await loadSmtp()
 })
 </script>
@@ -121,6 +178,80 @@ onMounted(async () => {
       <h1 class="text-2xl font-bold tracking-tight">系统设置</h1>
       <p class="text-sm text-zinc-500 mt-1">运维相关的全局配置与信息。</p>
     </header>
+
+    <!-- Mihomo 全局节点 -->
+    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-4">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <Network class="w-4 h-4 text-zinc-500" />
+            <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">Mihomo 全局节点</h2>
+          </div>
+          <p class="text-xs text-zinc-500 leading-relaxed mt-2">
+            这里控制 Mihomo 当前真实选中的全局节点。用户自己的节点偏好仍在各自账号里保存；用户发起学校请求时，会按该用户配置临时切换到他的节点。
+          </p>
+          <p v-if="globalProxyNodes?.mihomoNow" class="text-[11px] text-zinc-500 mt-2 break-all">
+            当前全局：
+            <span class="font-mono-token text-red-700 dark:text-red-200">{{ globalProxyNodes.mihomoNow }}</span>
+            <span class="text-zinc-400"> · 分组 {{ globalProxyNodes.group || 'Proxies' }}</span>
+          </p>
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <button
+            type="button"
+            @click="loadGlobalProxyNodes"
+            :disabled="loadingGlobalProxyNodes || switchingGlobalProxyNode"
+            class="inline-flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
+          >
+            <RotateCcw class="w-3.5 h-3.5" :class="loadingGlobalProxyNodes ? 'wangui-spin' : ''" />
+            刷新
+          </button>
+          <button
+            type="button"
+            @click="autoSelectGlobalProxyNode"
+            :disabled="switchingGlobalProxyNode || !globalProxyNodes?.available"
+            class="inline-flex items-center gap-1.5 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 ring-1 ring-red-500/25 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg transition-colors"
+          >
+            <Shuffle class="w-3.5 h-3.5" :class="switchingGlobalProxyNode ? 'wangui-spin' : ''" />
+            自动选最快
+          </button>
+        </div>
+      </div>
+
+      <div v-if="globalProxyNodes?.available" class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+        <select
+          v-model="selectedGlobalProxyNode"
+          :disabled="switchingGlobalProxyNode"
+          class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 disabled:opacity-50"
+        >
+          <option value="">选择全局节点</option>
+          <option v-for="n in globalProxyNodes.nodes" :key="n.name" :value="n.name">
+            {{ n.current ? '✓ ' : '' }}{{ n.name }}{{ n.delayMs ? ` · ${n.delayMs}ms` : '' }}
+          </option>
+        </select>
+        <button
+          type="button"
+          @click="selectGlobalProxyNode"
+          :disabled="switchingGlobalProxyNode || !selectedGlobalProxyNode || selectedGlobalProxyNode === globalProxyNodes.selected"
+          class="inline-flex items-center justify-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+        >
+          <Network class="w-3.5 h-3.5" :class="switchingGlobalProxyNode ? 'wangui-spin' : ''" />
+          切换全局节点
+        </button>
+      </div>
+      <p v-else class="text-[11px] text-amber-700 dark:text-amber-300">
+        {{ globalProxyNodes?.message || '未检测到 mihomo 控制接口' }}
+      </p>
+      <div v-if="globalProxyNodes?.tested?.length" class="mt-3 flex flex-wrap gap-1.5">
+        <span
+          v-for="n in globalProxyNodes.tested"
+          :key="n.name"
+          class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-300 ring-1 ring-black/[0.04] dark:ring-white/[0.04]"
+        >
+          {{ n.name }} · {{ n.delayMs }}ms
+        </span>
+      </div>
+    </section>
 
     <!-- SMTP 邮件通知 -->
     <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">

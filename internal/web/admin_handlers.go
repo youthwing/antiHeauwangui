@@ -299,10 +299,17 @@ func (h *handlers) adminGetUser(w http.ResponseWriter, r *http.Request) {
 func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var req struct {
-		IsDisabled *bool  `json:"isDisabled"`
-		AutoSign   *bool  `json:"autoSign"`
-		DormID     *int64 `json:"dormId"`
-		SignDays   *int   `json:"signDays"`
+		IsDisabled    *bool   `json:"isDisabled"`
+		AutoSign      *bool   `json:"autoSign"`
+		DormID        *int64  `json:"dormId"`
+		SignDays      *int    `json:"signDays"`
+		ProxyEnabled  *bool   `json:"proxyEnabled"`
+		ProxyScheme   *string `json:"proxyScheme"`
+		ProxyHost     *string `json:"proxyHost"`
+		ProxyPort     *int    `json:"proxyPort"`
+		ProxyUsername *string `json:"proxyUsername"`
+		ProxyPassword *string `json:"proxyPassword"`
+		ProxyNode     *string `json:"proxyNode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "请求格式错误")
@@ -359,6 +366,45 @@ func (h *handlers) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			u.DormID = &dorm.ID
+		}
+	}
+	proxyTouched := false
+	if req.ProxyEnabled != nil {
+		u.ProxyEnabled = *req.ProxyEnabled
+		proxyTouched = true
+	}
+	if req.ProxyScheme != nil {
+		u.ProxyScheme = strings.TrimSpace(*req.ProxyScheme)
+		proxyTouched = true
+	}
+	if req.ProxyHost != nil {
+		u.ProxyHost = strings.TrimSpace(*req.ProxyHost)
+		proxyTouched = true
+	}
+	if req.ProxyPort != nil {
+		u.ProxyPort = *req.ProxyPort
+		proxyTouched = true
+	}
+	if req.ProxyUsername != nil {
+		u.ProxyUsername = strings.TrimSpace(*req.ProxyUsername)
+		proxyTouched = true
+	}
+	if req.ProxyPassword != nil {
+		u.ProxyPassword = *req.ProxyPassword
+		proxyTouched = true
+	}
+	if req.ProxyNode != nil {
+		u.ProxyNode = strings.TrimSpace(*req.ProxyNode)
+		proxyTouched = true
+	}
+	if proxyTouched {
+		if _, err := apiclient.NormalizeProxyConfig(proxyConfigForUser(u)); err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := h.store.UpdateSettings(r.Context(), u); err != nil {
+			writeErr(w, http.StatusInternalServerError, "保存失败")
+			return
 		}
 	}
 	writeJSON(w, http.StatusOK, adminUserDTO(u))
@@ -1025,25 +1071,34 @@ func generateNumericPin(n int) string {
 }
 
 func adminUserDTO(u *store.User) map[string]any {
+	proxy := proxyConfigForUser(u)
 	return map[string]any{
-		"userId":        u.UserID,
-		"userName":      u.UserName,
-		"userNumber":    u.UserNumber,
-		"userSection":   u.UserSection,
-		"userClass":     u.UserClass,
-		"userAvatarUrl": u.UserAvatarURL,
-		"inviteCode":    u.InviteCode,
-		"isDisabled":    u.IsDisabled,
-		"autoSign":      u.AutoSign,
-		"latitude":      u.Lat,
-		"longitude":     u.Lng,
-		"tokenExp":      u.TokenExp.Unix(),
-		"tokenValid":    time.Now().Before(u.TokenExp),
-		"createdAt":     u.CreatedAt.Unix(),
-		"updatedAt":     u.UpdatedAt.Unix(),
-		"signDays":      u.SignDays,
-		"triggerMinute": u.TriggerMinute,
-		"jitterSec":     u.JitterSec,
+		"userId":           u.UserID,
+		"userName":         u.UserName,
+		"userNumber":       u.UserNumber,
+		"userSection":      u.UserSection,
+		"userClass":        u.UserClass,
+		"userAvatarUrl":    u.UserAvatarURL,
+		"inviteCode":       u.InviteCode,
+		"isDisabled":       u.IsDisabled,
+		"autoSign":         u.AutoSign,
+		"latitude":         u.Lat,
+		"longitude":        u.Lng,
+		"tokenExp":         u.TokenExp.Unix(),
+		"tokenValid":       time.Now().Before(u.TokenExp),
+		"createdAt":        u.CreatedAt.Unix(),
+		"updatedAt":        u.UpdatedAt.Unix(),
+		"signDays":         u.SignDays,
+		"triggerMinute":    u.TriggerMinute,
+		"jitterSec":        u.JitterSec,
+		"proxyEnabled":     u.ProxyEnabled,
+		"proxyScheme":      defaultStr(u.ProxyScheme, "socks5"),
+		"proxyHost":        u.ProxyHost,
+		"proxyPort":        u.ProxyPort,
+		"proxyUsername":    u.ProxyUsername,
+		"proxyNode":        u.ProxyNode,
+		"proxyPasswordSet": u.ProxyPassword != "",
+		"proxyOutbound":    proxy.OutboundLabel(),
 	}
 }
 

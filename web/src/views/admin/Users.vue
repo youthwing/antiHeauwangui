@@ -19,8 +19,9 @@ import {
   PlayCircle,
   CheckSquare,
   Square,
+  Network,
 } from 'lucide-vue-next'
-import type { AdminUser, Dorm, SchoolCheckinStatus } from '../../types'
+import type { AdminUser, Dorm, ProxyNodesResult, SchoolCheckinStatus } from '../../types'
 import { adminApi } from '../../api'
 import { formatDateTime, formatRemaining } from '../../lib/format'
 import { showToast } from '../../lib/toast'
@@ -35,6 +36,7 @@ import UserCard from '../../components/admin/UserCard.vue'
 
 const users = ref<AdminUser[]>([])
 const dorms = ref<Dorm[]>([])
+const proxyNodes = ref<ProxyNodesResult | null>(null)
 const loading = ref(false)
 const search = ref('')
 
@@ -47,6 +49,7 @@ const bindingDorm = ref<Record<string, boolean>>({})
 const togglingAuto = ref<Record<string, boolean>>({})
 const savingDays = ref<Record<string, boolean>>({})
 const togglingDisabled = ref<Record<string, boolean>>({})
+const savingProxy = ref<Record<string, boolean>>({})
 
 // School "today status" per user. 'loading' marker = fetch in flight.
 type StatusEntry = SchoolCheckinStatus | 'loading' | undefined
@@ -188,12 +191,21 @@ const refreshing = ref(false)
 async function load() {
   loading.value = true
   try {
-    const [u, d] = await Promise.all([
+    const proxyPromise = adminApi.proxyNodes().catch((e: any) => ({
+      available: false,
+      group: 'Proxies',
+      message: e?.message || '节点加载失败',
+      nodes: [],
+      shared: true,
+    } as ProxyNodesResult))
+    const [u, d, p] = await Promise.all([
       adminApi.listUsers(search.value.trim()),
       adminApi.listDorms(),
+      proxyPromise,
     ])
     users.value = u
     dorms.value = d as unknown as Dorm[]
+    proxyNodes.value = p
     fetchAllStatus()
   } catch (e: any) {
     showToast('err', e.message || '加载失败')
@@ -317,6 +329,31 @@ async function toggleDisabled(u: AdminUser) {
     showToast('err', e.message || '操作失败')
   } finally {
     togglingDisabled.value[u.userId] = false
+  }
+}
+
+async function saveProxy(
+  u: AdminUser,
+  patch: {
+    proxyEnabled: boolean
+    proxyScheme: 'socks5' | 'http' | 'https'
+    proxyHost: string
+    proxyPort: number
+    proxyUsername: string
+    proxyPassword?: string
+    proxyNode: string
+  },
+) {
+  if (savingProxy.value[u.userId]) return
+  savingProxy.value[u.userId] = true
+  try {
+    const updated = await adminApi.updateUser(u.userId, patch)
+    Object.assign(u, updated)
+    showToast('ok', `${u.userName} 的代理配置已保存`)
+  } catch (e: any) {
+    showToast('err', e.message || '代理配置保存失败')
+  } finally {
+    savingProxy.value[u.userId] = false
   }
 }
 
@@ -474,6 +511,7 @@ function busyFor(u: AdminUser) {
     days: !!savingDays.value[u.userId],
     disabled: !!togglingDisabled.value[u.userId],
     resetting: resetting.value,
+    proxy: !!savingProxy.value[u.userId],
   }
 }
 </script>
@@ -554,6 +592,7 @@ function busyFor(u: AdminUser) {
         :key="u.userId"
         :user="u"
         :dorms="dorms"
+        :proxy-nodes="proxyNodes"
         :status="statusByUser[u.userId]"
         :now="now"
         :busy="busyFor(u)"
@@ -565,6 +604,7 @@ function busyFor(u: AdminUser) {
         @reset-pin="resetPin(u)"
         @refresh-token="openRefresh(u)"
         @refresh-status="refreshStatus(u)"
+        @save-proxy="(patch) => saveProxy(u, patch)"
         @remove="remove(u)"
       />
     </section>
@@ -595,6 +635,7 @@ function busyFor(u: AdminUser) {
               <th class="px-4 py-3 font-medium">学院 / 班级</th>
               <th class="px-4 py-3 font-medium">宿舍楼</th>
               <th class="px-4 py-3 font-medium">自动 / 周次</th>
+              <th class="px-4 py-3 font-medium">代理</th>
               <th class="px-4 py-3 font-medium">时刻</th>
               <th class="px-4 py-3 font-medium">学校状态</th>
               <th class="px-4 py-3 font-medium">Token</th>
@@ -663,6 +704,21 @@ function busyFor(u: AdminUser) {
                   </span>
                 </div>
                 <div class="text-[11px] text-zinc-500 mt-0.5">{{ signDaysSummary(u.signDays) }}</div>
+              </td>
+              <!-- Proxy -->
+              <td class="px-4 py-2.5 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <Network
+                    class="w-3 h-3"
+                    :class="u.proxyEnabled ? 'text-red-500' : 'text-zinc-500'"
+                  />
+                  <span :class="u.proxyEnabled ? 'text-red-600 dark:text-red-300' : 'text-zinc-500'">
+                    {{ u.proxyEnabled ? '代理开' : '代理关' }}
+                  </span>
+                </div>
+                <div class="text-[11px] text-zinc-500 mt-0.5 max-w-40 truncate" :title="u.proxyOutbound || u.proxyNode || '未配置'">
+                  {{ u.proxyNode || u.proxyOutbound || '未配置' }}
+                </div>
               </td>
               <!-- Trigger time -->
               <td class="px-4 py-2.5 text-xs">
@@ -771,6 +827,7 @@ function busyFor(u: AdminUser) {
           <UserCard
             :user="drawerUser"
             :dorms="dorms"
+            :proxy-nodes="proxyNodes"
             :status="statusByUser[drawerUser.userId]"
             :now="now"
             :busy="busyFor(drawerUser)"
@@ -783,6 +840,7 @@ function busyFor(u: AdminUser) {
             @reset-pin="drawerUser && resetPin(drawerUser)"
             @refresh-token="drawerUser && openRefresh(drawerUser)"
             @refresh-status="drawerUser && refreshStatus(drawerUser)"
+            @save-proxy="(patch) => drawerUser && saveProxy(drawerUser, patch)"
             @remove="drawerUser && remove(drawerUser)"
           />
         </aside>

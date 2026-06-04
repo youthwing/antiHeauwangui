@@ -147,6 +147,97 @@ func (h *handlers) autoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mihomoNodesDTO(updated, pick, pick, delays))
 }
 
+func (h *handlers) adminProxyNodes(w http.ResponseWriter, r *http.Request) {
+	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"available": false,
+			"group":     mihomoDefaultGroup,
+			"message":   err.Error(),
+			"nodes":     []any{},
+			"selected":  "",
+			"shared":    true,
+		})
+		return
+	}
+	dto := mihomoNodesDTO(group, group.Now, "", nil)
+	dto["shared"] = true
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *handlers) adminSelectProxyNode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		writeErr(w, http.StatusBadRequest, "节点不能为空")
+		return
+	}
+	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "mihomo 不可用: "+err.Error())
+		return
+	}
+	if !containsString(group.All, name) {
+		writeErr(w, http.StatusBadRequest, "节点不存在")
+		return
+	}
+	if err := h.mihomoSelect(r.Context(), mihomoDefaultGroup, name); err != nil {
+		writeErr(w, http.StatusBadGateway, "切换节点失败: "+err.Error())
+		return
+	}
+	updated, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "读取节点失败: "+err.Error())
+		return
+	}
+	dto := mihomoNodesDTO(updated, updated.Now, name, nil)
+	dto["shared"] = true
+	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *handlers) adminAutoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
+	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "mihomo 不可用: "+err.Error())
+		return
+	}
+	candidates := mihomoCandidateNodes(group.All)
+	if len(candidates) == 0 {
+		writeErr(w, http.StatusBadGateway, "没有可测速的节点")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 18*time.Second)
+	defer cancel()
+	delays := h.mihomoDelays(ctx, candidates)
+	if len(delays) == 0 {
+		writeErr(w, http.StatusBadGateway, "没有测到可用节点")
+		return
+	}
+	sort.Slice(delays, func(i, j int) bool { return delays[i].Delay < delays[j].Delay })
+	pick := delays[0].Name
+	if err := h.mihomoSelect(r.Context(), mihomoDefaultGroup, pick); err != nil {
+		writeErr(w, http.StatusBadGateway, "切换节点失败: "+err.Error())
+		return
+	}
+	updated, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "读取节点失败: "+err.Error())
+		return
+	}
+	if len(delays) > 12 {
+		delays = delays[:12]
+	}
+	dto := mihomoNodesDTO(updated, updated.Now, pick, delays)
+	dto["shared"] = true
+	writeJSON(w, http.StatusOK, dto)
+}
+
 func (h *handlers) mihomoGroup(ctx context.Context, group string) (*mihomoGroup, error) {
 	var out mihomoGroup
 	if err := h.mihomoDo(ctx, http.MethodGet, "/proxies/"+url.PathEscape(group), nil, &out); err != nil {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import {
   Building2,
   PlayCircle,
@@ -13,8 +13,11 @@ import {
   Trash2,
   Bell,
   BellOff,
+  ChevronDown,
+  Network,
+  Save,
 } from 'lucide-vue-next'
-import type { AdminUser, Dorm, SchoolCheckinStatus } from '../../types'
+import type { AdminUser, Dorm, ProxyNodesResult, SchoolCheckinStatus } from '../../types'
 import { formatDateTime } from '../../lib/format'
 import Avatar from '../Avatar.vue'
 
@@ -31,11 +34,22 @@ import Avatar from '../Avatar.vue'
 // (busy flags, API calls, toasts, reload). Keeps this component pure.
 
 type StatusEntry = SchoolCheckinStatus | 'loading' | undefined
+type ProxyScheme = 'socks5' | 'http' | 'https'
+type ProxyPatch = {
+  proxyEnabled: boolean
+  proxyScheme: ProxyScheme
+  proxyHost: string
+  proxyPort: number
+  proxyUsername: string
+  proxyNode: string
+  proxyPassword?: string
+}
 
 const props = withDefaults(
   defineProps<{
     user: AdminUser
     dorms: Dorm[]
+    proxyNodes?: ProxyNodesResult | null
     status: StatusEntry
     now: Date
     /** Per-action in-flight flags so we can disable controls cleanly. */
@@ -46,6 +60,7 @@ const props = withDefaults(
       days?: boolean
       disabled?: boolean
       resetting?: boolean
+      proxy?: boolean
     }
     /** When rendered inside a drawer, the outer ring/background is provided
      *  by the drawer wrapper; setting this to true drops the card's own
@@ -64,6 +79,7 @@ const emit = defineEmits<{
   'reset-pin': []
   'refresh-token': []
   'refresh-status': []
+  'save-proxy': [ProxyPatch]
   remove: []
 }>()
 
@@ -169,6 +185,84 @@ function recordLabel(status: string): string {
 }
 
 const u = computed(() => props.user)
+
+const proxyOpen = ref(false)
+const proxyForm = reactive<{
+  enabled: boolean
+  scheme: ProxyScheme
+  host: string
+  port: number | null
+  username: string
+  password: string
+  node: string
+}>({
+  enabled: false,
+  scheme: 'socks5',
+  host: '',
+  port: null,
+  username: '',
+  password: '',
+  node: '',
+})
+
+function hydrateProxyForm() {
+  proxyForm.enabled = !!props.user.proxyEnabled
+  proxyForm.scheme = props.user.proxyScheme || 'socks5'
+  proxyForm.host = props.user.proxyHost || ''
+  proxyForm.port = props.user.proxyPort && props.user.proxyPort > 0 ? props.user.proxyPort : null
+  proxyForm.username = props.user.proxyUsername || ''
+  proxyForm.password = ''
+  proxyForm.node = props.user.proxyNode || ''
+}
+
+watch(
+  () => [
+    props.user.userId,
+    props.user.proxyEnabled,
+    props.user.proxyScheme,
+    props.user.proxyHost,
+    props.user.proxyPort,
+    props.user.proxyUsername,
+    props.user.proxyNode,
+  ],
+  hydrateProxyForm,
+  { immediate: true },
+)
+
+const availableProxyNodes = computed(() => props.proxyNodes?.available ? props.proxyNodes.nodes : [])
+const hasNodeList = computed(() => availableProxyNodes.value.length > 0)
+const proxyStatusText = computed(() => props.user.proxyEnabled ? '已开启' : '已关闭')
+const proxySummary = computed(() => {
+  if (props.user.proxyEnabled) return props.user.proxyOutbound || '代理已开启'
+  if (props.user.proxyNode) return `已保存节点：${props.user.proxyNode}`
+  const outbound = props.user.proxyOutbound || ''
+  return outbound && outbound !== '未配置' ? `已保存：${outbound}` : '未配置'
+})
+
+function applyBuiltinNode() {
+  proxyForm.enabled = true
+  proxyForm.scheme = 'http'
+  proxyForm.host = 'mihomo'
+  proxyForm.port = 7893
+  proxyForm.username = ''
+  proxyForm.password = ''
+  if (!proxyForm.node) {
+    proxyForm.node = props.proxyNodes?.selected || props.proxyNodes?.current || props.proxyNodes?.mihomoNow || ''
+  }
+}
+
+function saveProxy() {
+  const patch: ProxyPatch = {
+    proxyEnabled: proxyForm.enabled,
+    proxyScheme: proxyForm.scheme,
+    proxyHost: proxyForm.host.trim(),
+    proxyPort: proxyForm.port || 0,
+    proxyUsername: proxyForm.username.trim(),
+    proxyNode: proxyForm.node.trim(),
+  }
+  if (proxyForm.password) patch.proxyPassword = proxyForm.password
+  emit('save-proxy', patch)
+}
 </script>
 
 <template>
@@ -376,6 +470,142 @@ const u = computed(() => props.user)
           <RefreshCw class="w-3 h-3" />
           刷新
         </button>
+      </div>
+
+      <!-- Per-user proxy control -->
+      <div class="rounded-lg bg-zinc-100/70 dark:bg-[#0d1117]/50 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-2.5">
+        <div class="flex items-center gap-2">
+          <Network class="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+          <span class="text-zinc-500 shrink-0 w-14">代理</span>
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0"
+            :class="u.proxyEnabled
+              ? 'bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500/25'
+              : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-500/20'"
+          >
+            <span class="w-1 h-1 rounded-full bg-current opacity-70" />
+            {{ proxyStatusText }}
+          </span>
+          <span class="min-w-0 flex-1 text-[10px] text-zinc-500 truncate" :title="proxySummary">
+            {{ proxySummary }}
+          </span>
+          <button
+            type="button"
+            @click="proxyOpen = !proxyOpen"
+            class="p-1 rounded text-zinc-500 hover:text-[#161b22] dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            :title="proxyOpen ? '收起代理配置' : '编辑代理配置'"
+          >
+            <ChevronDown class="w-3.5 h-3.5 transition-transform" :class="proxyOpen ? 'rotate-180' : ''" />
+          </button>
+        </div>
+
+        <Transition name="proxy-expand">
+          <div v-if="proxyOpen" class="mt-2 pt-2 border-t border-black/[0.05] dark:border-white/[0.04] space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] text-zinc-500">这个用户的学校请求走独立代理</span>
+              <button
+                type="button"
+                @click="proxyForm.enabled = !proxyForm.enabled"
+                :class="proxyForm.enabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'"
+                class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+              >
+                <span
+                  :class="proxyForm.enabled ? 'translate-x-4' : 'translate-x-0.5'"
+                  class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                />
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2">
+              <div v-if="hasNodeList" class="grid grid-cols-[1fr_auto] gap-2">
+                <select
+                  v-model="proxyForm.node"
+                  @change="proxyForm.node && applyBuiltinNode()"
+                  class="min-w-0 bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs focus-ring text-[#161b22] dark:text-zinc-200"
+                >
+                  <option value="">不指定 Mihomo 节点</option>
+                  <option v-for="n in availableProxyNodes" :key="n.name" :value="n.name">
+                    {{ n.name }}{{ n.delayMs ? ` · ${n.delayMs}ms` : '' }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  @click="applyBuiltinNode"
+                  :disabled="!proxyForm.node"
+                  class="inline-flex items-center justify-center px-2.5 py-1.5 rounded-md text-[11px] font-medium bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-40 ring-1 ring-sky-500/25 text-blue-700 dark:text-blue-300 transition-colors"
+                >
+                  套用节点
+                </button>
+              </div>
+              <input
+                v-else
+                v-model="proxyForm.node"
+                placeholder="Mihomo 节点名（可选）"
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+              />
+
+              <div class="grid grid-cols-[1fr_88px] gap-2">
+                <select
+                  v-model="proxyForm.scheme"
+                  :disabled="!proxyForm.enabled"
+                  class="bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs focus-ring text-[#161b22] dark:text-zinc-200 disabled:opacity-50"
+                >
+                  <option value="socks5">socks5</option>
+                  <option value="http">http</option>
+                  <option value="https">https</option>
+                </select>
+                <input
+                  v-model.number="proxyForm.port"
+                  type="number"
+                  min="1"
+                  max="65535"
+                  placeholder="端口"
+                  :disabled="!proxyForm.enabled"
+                  class="bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 disabled:opacity-50"
+                />
+              </div>
+              <input
+                v-model="proxyForm.host"
+                placeholder="主机：mihomo / proxy.example.com / IP"
+                :disabled="!proxyForm.enabled"
+                autocomplete="off"
+                class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
+              />
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  v-model="proxyForm.username"
+                  placeholder="用户名（可选）"
+                  :disabled="!proxyForm.enabled"
+                  autocomplete="off"
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
+                />
+                <input
+                  v-model="proxyForm.password"
+                  type="password"
+                  :placeholder="u.proxyPasswordSet ? '密码已设置，留空保持' : '密码（可选）'"
+                  :disabled="!proxyForm.enabled"
+                  autocomplete="new-password"
+                  class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-md px-2 py-1.5 text-xs font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[10px] text-zinc-500 truncate">
+                {{ proxyForm.node ? '保存后该用户请求前会切到此节点。' : '不开启时只保存配置，不参与请求。' }}
+              </p>
+              <button
+                type="button"
+                @click="saveProxy"
+                :disabled="busy.proxy"
+                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium bg-red-500 hover:bg-red-400 disabled:opacity-50 text-[#0d1117] transition-colors"
+              >
+                <Save class="w-3 h-3" :class="busy.proxy ? 'wangui-spin' : ''" />
+                保存
+              </button>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 

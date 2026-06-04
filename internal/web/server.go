@@ -125,6 +125,10 @@ func (s *Server) Run(ctx context.Context) error {
 			r.Put("/announcements/{id}", h.adminUpdateAnnouncement)
 			r.Delete("/announcements/{id}", h.adminDeleteAnnouncement)
 
+			r.Get("/proxy/nodes", h.adminProxyNodes)
+			r.Post("/proxy/nodes/select", h.adminSelectProxyNode)
+			r.Post("/proxy/nodes/autoselect", h.adminAutoSelectProxyNode)
+
 			r.Get("/smtp", h.adminGetSMTP)
 			r.Put("/smtp", h.adminUpdateSMTP)
 			r.Post("/smtp/test", h.adminTestSMTP)
