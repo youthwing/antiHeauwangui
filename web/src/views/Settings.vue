@@ -17,9 +17,8 @@ import {
   HelpCircle,
   Network,
   Activity,
-  Shuffle,
 } from 'lucide-vue-next'
-import type { Settings, Dorm, ProxyTestResult, ProxyIPResult, ProxyNodesResult } from '../types'
+import type { Settings, Dorm, ProxyTestResult, ProxyIPResult } from '../types'
 import { useAuth } from '../stores/auth'
 import { api } from '../api'
 import { showToast } from '../lib/toast'
@@ -67,43 +66,15 @@ const proxyPasswordSet = ref(false)
 const showProxyPassword = ref(false)
 const testingProxy = ref(false)
 const loadingProxyIP = ref(false)
-const applyingBuiltinProxy = ref(false)
 const disablingProxy = ref(false)
 const proxyTestResult = ref<ProxyTestResult | null>(null)
 const proxyIPResult = ref<ProxyIPResult | null>(null)
-const proxyNodes = ref<ProxyNodesResult | null>(null)
-const loadingProxyNodes = ref(false)
-const switchingProxyNode = ref(false)
-const selectedProxyNode = ref('')
 
-const BUILTIN_PROXY = {
-  scheme: 'http',
-  host: 'mihomo',
-  port: 7893,
-} as const
-
-const isMihomoProxy = computed(() => proxyHost.value.trim().toLowerCase() === BUILTIN_PROXY.host)
-const isBuiltinProxy = computed(() =>
-  proxyEnabled.value &&
-  proxyScheme.value === BUILTIN_PROXY.scheme &&
-  isMihomoProxy.value &&
-  Number(proxyPort.value) === BUILTIN_PROXY.port,
-)
 const proxySummary = computed(() => {
-  if (!proxyHost.value.trim() || !proxyPort.value) return '尚未配置出口地址'
+  if (!proxyHost.value.trim() || !proxyPort.value) return '尚未配置本账号出口地址'
   return `${proxyScheme.value}://${proxyHost.value.trim()}:${proxyPort.value}`
 })
-
-function setBuiltinProxyFields() {
-  proxyEnabled.value = true
-  proxyScheme.value = BUILTIN_PROXY.scheme
-  proxyHost.value = BUILTIN_PROXY.host
-  proxyPort.value = BUILTIN_PROXY.port
-  proxyUsername.value = ''
-  proxyPassword.value = ''
-  proxyTestResult.value = null
-  proxyIPResult.value = null
-}
+const proxyReady = computed(() => proxyEnabled.value && !!proxyHost.value.trim() && !!proxyPort.value)
 
 function proxySettingsPayload(): Partial<Settings> {
   const payload: Partial<Settings> = {
@@ -197,8 +168,6 @@ onMounted(async () => {
   await auth.init()
   if (auth.state.me) hydrate(auth.state.me.settings)
   await loadDorms()
-  await loadProxyNodes()
-  if (isBuiltinProxy.value) await refreshProxyIP(true)
 })
 
 watch(
@@ -251,9 +220,6 @@ async function saveAll() {
 
 async function testProxy() {
   if (testingProxy.value) return
-  if (proxyEnabled.value && !proxyHost.value.trim() && !proxyPort.value) {
-    setBuiltinProxyFields()
-  }
   testingProxy.value = true
   proxyTestResult.value = null
   try {
@@ -276,9 +242,6 @@ async function testProxy() {
 
 async function refreshProxyIP(silent = false) {
   if (loadingProxyIP.value) return
-  if (proxyEnabled.value && !proxyHost.value.trim() && !proxyPort.value) {
-    setBuiltinProxyFields()
-  }
   loadingProxyIP.value = true
   proxyIPResult.value = null
   try {
@@ -297,29 +260,6 @@ async function refreshProxyIP(silent = false) {
     if (!silent) showToast('err', e.message || 'IP 探测失败')
   } finally {
     loadingProxyIP.value = false
-  }
-}
-
-async function enableBuiltinProxy() {
-  if (applyingBuiltinProxy.value) return
-  applyingBuiltinProxy.value = true
-  try {
-    setBuiltinProxyFields()
-    const saved = await api.updateSettings({
-      proxyEnabled: true,
-      proxyScheme: BUILTIN_PROXY.scheme,
-      proxyHost: BUILTIN_PROXY.host,
-      proxyPort: BUILTIN_PROXY.port,
-      proxyUsername: '',
-    })
-    hydrate(saved)
-    await loadProxyNodes()
-    await refreshProxyIP(true)
-    showToast('ok', '已启用内置 Mihomo 代理')
-  } catch (e: any) {
-    showToast('err', e.message || '启用失败')
-  } finally {
-    applyingBuiltinProxy.value = false
   }
 }
 
@@ -347,62 +287,17 @@ function toggleProxy() {
     return
   }
   if (!proxyHost.value.trim() && !proxyPort.value) {
-    setBuiltinProxyFields()
-    loadProxyNodes()
+    proxyScheme.value = 'socks5'
+    proxyHost.value = ''
+    proxyPort.value = null
+    proxyUsername.value = ''
+    proxyPassword.value = ''
+    proxyTestResult.value = null
+    proxyIPResult.value = null
+    proxyEnabled.value = true
     return
   }
   proxyEnabled.value = true
-}
-
-async function loadProxyNodes() {
-  loadingProxyNodes.value = true
-  try {
-    const res = await api.proxyNodes()
-    proxyNodes.value = res
-    selectedProxyNode.value = res.current || ''
-  } catch (e: any) {
-    proxyNodes.value = {
-      available: false,
-      group: 'Proxies',
-      message: e.message || '读取节点失败',
-      nodes: [],
-      shared: true,
-    }
-  } finally {
-    loadingProxyNodes.value = false
-  }
-}
-
-async function selectProxyNode() {
-  if (!selectedProxyNode.value || switchingProxyNode.value) return
-  switchingProxyNode.value = true
-  try {
-    const res = await api.selectProxyNode(selectedProxyNode.value)
-    proxyNodes.value = res
-    selectedProxyNode.value = res.current || selectedProxyNode.value
-    if (isBuiltinProxy.value) await refreshProxyIP(true)
-    showToast('ok', `已切换到 ${selectedProxyNode.value}`)
-  } catch (e: any) {
-    showToast('err', e.message || '切换节点失败')
-  } finally {
-    switchingProxyNode.value = false
-  }
-}
-
-async function autoSelectProxyNode() {
-  if (switchingProxyNode.value) return
-  switchingProxyNode.value = true
-  try {
-    const res = await api.autoSelectProxyNode()
-    proxyNodes.value = res
-    selectedProxyNode.value = res.current || ''
-    if (isBuiltinProxy.value) await refreshProxyIP(true)
-    showToast('ok', res.picked ? `已选择 ${res.picked}` : '已自动选择节点')
-  } catch (e: any) {
-    showToast('err', e.message || '自动选择失败')
-  } finally {
-    switchingProxyNode.value = false
-  }
 }
 
 async function testServerChanPush() {
@@ -887,7 +782,7 @@ const previewSchedule = computed(() => {
         </button>
       </div>
       <p class="text-xs text-zinc-500 leading-relaxed mb-4">
-        开启后，该账号的学校接口请求会从这里配置的代理出口发出；未开启时继续使用服务器默认出口。
+        开启后，只有当前账号的学校接口请求会从这里配置的代理出口发出；其他账号不会共用这份配置。
       </p>
 
       <div class="mb-4 rounded-xl bg-white/70 dark:bg-[#0d1117]/60 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-4">
@@ -897,17 +792,17 @@ const previewSchedule = computed(() => {
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div class="rounded-lg bg-red-500/[0.06] ring-1 ring-red-500/20 p-3">
-            <p class="text-xs font-semibold text-red-700 dark:text-red-200">推荐：使用内置 Mihomo</p>
+            <p class="text-xs font-semibold text-red-700 dark:text-red-200">推荐：每个账号填自己的代理</p>
             <ol class="mt-2 space-y-1.5 text-[12px] text-zinc-600 dark:text-zinc-400 leading-relaxed list-decimal list-inside">
-              <li>服务器上确保 <span class="font-mono-token">docker compose ps</span> 里有 <span class="font-mono-token">mihomo</span>。</li>
-              <li>点下面的“使用内置 Mihomo”，系统会自动填 <span class="font-mono-token">http://mihomo:7893</span>。</li>
-              <li>点“刷新 IP”查看当前出口 IP。</li>
-              <li>点“一键测试”，学校接口成功响应就说明配置可用。</li>
-              <li>需要换节点时，在“Mihomo 节点”里选节点或点“自动选最快”。</li>
+              <li>打开开关后，按服务商给的信息填写协议、主机、端口。</li>
+              <li>这个配置只保存到当前账号；每个用户登录后都可以填自己的代理。</li>
+              <li>点“刷新 IP”查看当前账号的出口 IP。</li>
+              <li>点“一键测试”，学校接口成功响应就说明这个账号的代理可用。</li>
+              <li>需要换节点时，改成本账号自己的新代理地址后保存即可。</li>
             </ol>
           </div>
           <div class="rounded-lg bg-zinc-100/80 dark:bg-[#161b22]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
-            <p class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">外部代理：手动填写</p>
+            <p class="text-xs font-semibold text-zinc-700 dark:text-zinc-200">填写规则</p>
             <dl class="mt-2 grid grid-cols-[72px_1fr] gap-x-3 gap-y-1.5 text-[12px] leading-relaxed">
               <dt class="text-zinc-500">协议</dt>
               <dd class="text-zinc-600 dark:text-zinc-400">按服务商给的填：<span class="font-mono-token">socks5</span> / <span class="font-mono-token">http</span> / <span class="font-mono-token">https</span></dd>
@@ -919,7 +814,7 @@ const previewSchedule = computed(() => {
               <dd class="text-zinc-600 dark:text-zinc-400">没有就留空；有鉴权才填写。</dd>
             </dl>
             <p class="mt-2 text-[11px] text-amber-600 dark:text-amber-300 leading-relaxed">
-              保存后，自动签到和“立即签到”都会走这里的出口；记录里的“请求诊断”会显示当次出口 IP。
+              不再提供全站共享节点切换。保存后，自动签到和“立即签到”都会走当前账号自己的出口；记录里的“请求诊断”会显示当次出口 IP。
             </p>
           </div>
         </div>
@@ -934,7 +829,7 @@ const previewSchedule = computed(() => {
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div class="min-w-0">
             <p class="text-sm font-medium" :class="proxyEnabled ? 'text-red-700 dark:text-red-200' : 'text-zinc-600 dark:text-zinc-400'">
-              {{ proxyEnabled ? (isBuiltinProxy ? '内置 Mihomo 已启用' : '代理已启用') : '代理未启用' }}
+              {{ proxyEnabled ? '当前账号代理已启用' : '当前账号代理未启用' }}
             </p>
             <p class="text-[11px] text-zinc-500 mt-1 break-all">
               {{ proxySummary }}
@@ -951,15 +846,6 @@ const previewSchedule = computed(() => {
           </div>
           <div class="flex flex-wrap justify-start sm:justify-end gap-2">
             <button
-              type="button"
-              @click="enableBuiltinProxy"
-              :disabled="applyingBuiltinProxy"
-              class="inline-flex items-center justify-center gap-1.5 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 ring-1 ring-red-500/25 text-red-700 dark:text-red-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
-            >
-              <Network class="w-3.5 h-3.5" :class="applyingBuiltinProxy ? 'wangui-spin' : ''" />
-              {{ isBuiltinProxy ? '刷新内置代理' : '使用内置 Mihomo' }}
-            </button>
-            <button
               v-if="proxyEnabled"
               type="button"
               @click="disableProxy"
@@ -972,7 +858,7 @@ const previewSchedule = computed(() => {
             <button
               type="button"
               @click="refreshProxyIP()"
-              :disabled="loadingProxyIP || !proxyEnabled"
+              :disabled="loadingProxyIP || !proxyReady"
               class="inline-flex items-center justify-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
             >
               <Activity class="w-3.5 h-3.5" :class="loadingProxyIP ? 'wangui-spin' : ''" />
@@ -981,7 +867,7 @@ const previewSchedule = computed(() => {
             <button
               type="button"
               @click="testProxy"
-              :disabled="testingProxy"
+              :disabled="testingProxy || !proxyReady"
               class="inline-flex items-center justify-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-50 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
             >
               <Activity class="w-3.5 h-3.5" :class="testingProxy ? 'wangui-spin' : ''" />
@@ -1025,77 +911,6 @@ const previewSchedule = computed(() => {
         </div>
       </div>
 
-      <div
-        v-if="isMihomoProxy"
-        class="mb-4 rounded-lg bg-white/70 dark:bg-[#0d1117]/60 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
-      >
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-[#161b22] dark:text-zinc-200">Mihomo 节点</p>
-            <p class="text-[11px] text-zinc-500 mt-1 break-all">
-              当前：{{ proxyNodes?.current || (loadingProxyNodes ? '读取中…' : '未知') }}
-              <span v-if="proxyNodes?.shared" class="ml-1 text-zinc-400">· 全站共享出口</span>
-            </p>
-          </div>
-          <div class="flex gap-2">
-            <button
-              type="button"
-              @click="loadProxyNodes"
-              :disabled="loadingProxyNodes || switchingProxyNode"
-              class="inline-flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
-            >
-              <RotateCcw class="w-3.5 h-3.5" :class="loadingProxyNodes ? 'wangui-spin' : ''" />
-              刷新
-            </button>
-            <button
-              type="button"
-              @click="autoSelectProxyNode"
-              :disabled="switchingProxyNode || !proxyNodes?.available"
-              class="inline-flex items-center gap-1.5 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 ring-1 ring-red-500/25 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg transition-colors"
-            >
-              <Shuffle class="w-3.5 h-3.5" :class="switchingProxyNode ? 'wangui-spin' : ''" />
-              自动选最快
-            </button>
-          </div>
-        </div>
-
-        <div v-if="proxyNodes?.available" class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-          <select
-            v-model="selectedProxyNode"
-            :disabled="switchingProxyNode"
-            class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm focus-ring text-[#161b22] dark:text-zinc-200 disabled:opacity-50"
-          >
-            <option v-for="n in proxyNodes.nodes" :key="n.name" :value="n.name">
-              {{ n.current ? '✓ ' : '' }}{{ n.name }}{{ n.delayMs ? ` · ${n.delayMs}ms` : '' }}
-            </option>
-          </select>
-          <button
-            type="button"
-            @click="selectProxyNode"
-            :disabled="switchingProxyNode || !selectedProxyNode || selectedProxyNode === proxyNodes.current"
-            class="inline-flex items-center justify-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-40 disabled:cursor-not-allowed ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
-          >
-            <Network class="w-3.5 h-3.5" :class="switchingProxyNode ? 'wangui-spin' : ''" />
-            切换
-          </button>
-        </div>
-        <p v-else class="text-[11px] text-amber-700 dark:text-amber-300">
-          {{ proxyNodes?.message || '未检测到 mihomo 控制接口' }}
-        </p>
-        <div v-if="proxyNodes?.tested?.length" class="mt-3 flex flex-wrap gap-1.5">
-          <span
-            v-for="n in proxyNodes.tested"
-            :key="n.name"
-            class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-300 ring-1 ring-black/[0.04] dark:ring-white/[0.04]"
-          >
-            {{ n.name }} · {{ n.delayMs }}ms
-          </span>
-        </div>
-        <p class="text-[11px] text-zinc-500 mt-3">
-          切换的是 mihomo 的共享策略组；所有使用 <span class="font-mono-token">mihomo:7893</span> 的账号都会走当前节点。
-        </p>
-      </div>
-
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="block text-[10px] text-zinc-500 tracking-wide uppercase mb-1">协议</label>
@@ -1116,7 +931,7 @@ const previewSchedule = computed(() => {
             type="number"
             min="1"
             max="65535"
-            placeholder="7893"
+            placeholder="7890"
             :disabled="!proxyEnabled"
             class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
           />
@@ -1126,7 +941,7 @@ const previewSchedule = computed(() => {
           <input
             v-model="proxyHost"
             type="text"
-            placeholder="mihomo 或 proxy.example.com"
+            placeholder="proxy.example.com 或 1.2.3.4"
             :disabled="!proxyEnabled"
             autocomplete="off"
             class="w-full bg-white dark:bg-[#0d1117] ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-lg px-3 py-2 text-sm font-mono-token focus-ring text-[#161b22] dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 disabled:opacity-50"
@@ -1174,7 +989,7 @@ const previewSchedule = computed(() => {
       </div>
 
       <p class="text-[11px] text-zinc-500 mt-3">
-        测试只读取学校 available-rules 接口，不会写入签到数据。配置保存后，自动签到和立即签到都会走同一个出口。
+        测试只读取学校 available-rules 接口，不会写入签到数据。配置保存后，自动签到和立即签到都会走当前账号自己的出口。
       </p>
     </section>
 

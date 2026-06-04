@@ -169,23 +169,6 @@ export interface ProxyIPResult {
   message: string
 }
 
-export interface ProxyNode {
-  name: string
-  current: boolean
-  delayMs?: number
-}
-
-export interface ProxyNodesResult {
-  available: boolean
-  group: string
-  current?: string
-  picked?: string
-  message?: string
-  nodes: ProxyNode[]
-  tested?: ProxyNode[]
-  shared?: boolean
-}
-
 // ---- Admin types ----
 
 export interface InviteCode {
