@@ -16,16 +16,20 @@ import {
   Network,
   RotateCcw,
   Shuffle,
+  Activity,
 } from 'lucide-vue-next'
-import type { AdminStats, ProxyNodesResult, SmtpUpdate } from '../../types'
+import type { AdminStats, ProxyIPResult, ProxyNodesResult, SmtpUpdate } from '../../types'
 import { adminApi } from '../../api'
 import { showToast } from '../../lib/toast'
 
 const stats = ref<AdminStats | null>(null)
 const globalProxyNodes = ref<ProxyNodesResult | null>(null)
+const globalProxyIP = ref<ProxyIPResult | null>(null)
 const selectedGlobalProxyNode = ref('')
 const loadingGlobalProxyNodes = ref(false)
 const switchingGlobalProxyNode = ref(false)
+const testingGlobalProxyNodes = ref(false)
+const loadingGlobalProxyIP = ref(false)
 
 // SMTP form state — now also carries the admin Server酱 fields, since the
 // same PUT /smtp endpoint owns both notification channels' config.
@@ -76,6 +80,7 @@ async function selectGlobalProxyNode() {
     const res = await adminApi.selectProxyNode(selectedGlobalProxyNode.value)
     globalProxyNodes.value = res
     selectedGlobalProxyNode.value = res.selected || res.current || selectedGlobalProxyNode.value
+    globalProxyIP.value = null
     showToast('ok', `全局 Mihomo 节点已切到 ${selectedGlobalProxyNode.value}`)
   } catch (e: any) {
     showToast('err', e.message || '切换失败')
@@ -91,11 +96,44 @@ async function autoSelectGlobalProxyNode() {
     const res = await adminApi.autoSelectProxyNode()
     globalProxyNodes.value = res
     selectedGlobalProxyNode.value = res.selected || res.current || res.picked || ''
+    globalProxyIP.value = null
     showToast('ok', selectedGlobalProxyNode.value ? `全局 Mihomo 节点已切到 ${selectedGlobalProxyNode.value}` : '已自动选择节点')
   } catch (e: any) {
     showToast('err', e.message || '自动选择失败')
   } finally {
     switchingGlobalProxyNode.value = false
+  }
+}
+
+async function testGlobalProxyNodes() {
+  if (testingGlobalProxyNodes.value) return
+  testingGlobalProxyNodes.value = true
+  try {
+    const res = await adminApi.testProxyNodes()
+    globalProxyNodes.value = res
+    selectedGlobalProxyNode.value = res.selected || res.current || res.mihomoNow || selectedGlobalProxyNode.value
+    showToast('ok', '全局节点延迟已刷新')
+  } catch (e: any) {
+    showToast('err', e.message || '延迟测试失败')
+  } finally {
+    testingGlobalProxyNodes.value = false
+  }
+}
+
+async function refreshGlobalProxyIP() {
+  if (loadingGlobalProxyIP.value) return
+  loadingGlobalProxyIP.value = true
+  try {
+    globalProxyIP.value = await adminApi.proxyIP()
+    if (globalProxyIP.value.ok) {
+      showToast('ok', `当前出口 IP：${globalProxyIP.value.ip || '未知'}`)
+    } else {
+      showToast('err', globalProxyIP.value.message || '出口 IP 探测失败')
+    }
+  } catch (e: any) {
+    showToast('err', e.message || '出口 IP 探测失败')
+  } finally {
+    loadingGlobalProxyIP.value = false
   }
 }
 
@@ -195,12 +233,45 @@ onMounted(async () => {
             <span class="font-mono-token text-red-700 dark:text-red-200">{{ globalProxyNodes.mihomoNow }}</span>
             <span class="text-zinc-400"> · 分组 {{ globalProxyNodes.group || 'Proxies' }}</span>
           </p>
+          <p v-if="loadingGlobalProxyIP || globalProxyIP" class="text-[11px] text-zinc-500 mt-1 break-all">
+            出口 IP：
+            <span
+              class="font-mono-token"
+              :class="globalProxyIP?.ok ? 'text-red-700 dark:text-red-200' : 'text-amber-700 dark:text-amber-300'"
+            >
+              {{ loadingGlobalProxyIP ? '探测中...' : (globalProxyIP?.ip || globalProxyIP?.message || '未知') }}
+            </span>
+            <span v-if="globalProxyIP?.elapsedMs" class="text-zinc-400">
+              · {{ globalProxyIP.elapsedMs }} ms
+            </span>
+            <span v-if="globalProxyIP?.endpoint" class="text-zinc-400">
+              · {{ globalProxyIP.endpoint }}
+            </span>
+          </p>
         </div>
-        <div class="flex gap-2 shrink-0">
+        <div class="flex flex-wrap gap-2 shrink-0 justify-start lg:justify-end">
+          <button
+            type="button"
+            @click="refreshGlobalProxyIP"
+            :disabled="loadingGlobalProxyIP || !globalProxyNodes?.available"
+            class="inline-flex items-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-50 ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs px-3 py-2 rounded-lg transition-colors"
+          >
+            <Activity class="w-3.5 h-3.5" :class="loadingGlobalProxyIP ? 'wangui-spin' : ''" />
+            {{ loadingGlobalProxyIP ? '探测中...' : '刷新 IP' }}
+          </button>
+          <button
+            type="button"
+            @click="testGlobalProxyNodes"
+            :disabled="testingGlobalProxyNodes || switchingGlobalProxyNode || !globalProxyNodes?.available"
+            class="inline-flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
+          >
+            <Activity class="w-3.5 h-3.5" :class="testingGlobalProxyNodes ? 'wangui-spin' : ''" />
+            测试延迟
+          </button>
           <button
             type="button"
             @click="loadGlobalProxyNodes"
-            :disabled="loadingGlobalProxyNodes || switchingGlobalProxyNode"
+            :disabled="loadingGlobalProxyNodes || switchingGlobalProxyNode || testingGlobalProxyNodes"
             class="inline-flex items-center gap-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 ring-1 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300 text-xs px-3 py-2 rounded-lg transition-colors"
           >
             <RotateCcw class="w-3.5 h-3.5" :class="loadingGlobalProxyNodes ? 'wangui-spin' : ''" />
@@ -209,7 +280,7 @@ onMounted(async () => {
           <button
             type="button"
             @click="autoSelectGlobalProxyNode"
-            :disabled="switchingGlobalProxyNode || !globalProxyNodes?.available"
+            :disabled="switchingGlobalProxyNode || testingGlobalProxyNodes || !globalProxyNodes?.available"
             class="inline-flex items-center gap-1.5 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 ring-1 ring-red-500/25 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg transition-colors"
           >
             <Shuffle class="w-3.5 h-3.5" :class="switchingGlobalProxyNode ? 'wangui-spin' : ''" />

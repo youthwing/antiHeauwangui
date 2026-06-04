@@ -52,6 +52,20 @@ func proxyTestDTO(u *store.User, elapsed time.Duration, rules int, err error) ma
 
 func proxyIPDTO(u *store.User, elapsed time.Duration, ip, endpoint string, err error) map[string]any {
 	cfg := proxyConfigForUser(u)
+	return proxyIPForConfigDTO(cfg, elapsed, ip, endpoint, err)
+}
+
+func adminMihomoProxyConfig(node string) apiclient.ProxyConfig {
+	return apiclient.ProxyConfig{
+		Enabled: true,
+		Scheme:  "http",
+		Host:    "mihomo",
+		Port:    7893,
+		Node:    node,
+	}
+}
+
+func proxyIPForConfigDTO(cfg apiclient.ProxyConfig, elapsed time.Duration, ip, endpoint string, err error) map[string]any {
 	out := map[string]any{
 		"ok":        err == nil,
 		"enabled":   cfg.Enabled,

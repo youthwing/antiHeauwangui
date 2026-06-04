@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	apiclient "wangui/internal/api"
 )
 
 const (
@@ -165,6 +167,33 @@ func (h *handlers) adminProxyNodes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, dto)
 }
 
+func (h *handlers) adminTestProxyNodes(w http.ResponseWriter, r *http.Request) {
+	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "mihomo 不可用: "+err.Error())
+		return
+	}
+	candidates := mihomoCandidateNodes(group.All)
+	if len(candidates) == 0 {
+		writeErr(w, http.StatusBadGateway, "没有可测速的节点")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 18*time.Second)
+	defer cancel()
+	delays := h.mihomoDelays(ctx, candidates)
+	if len(delays) == 0 {
+		writeErr(w, http.StatusBadGateway, "没有测到可用节点")
+		return
+	}
+	sort.Slice(delays, func(i, j int) bool { return delays[i].Delay < delays[j].Delay })
+	if len(delays) > 24 {
+		delays = delays[:24]
+	}
+	dto := mihomoNodesDTO(group, group.Now, "", delays)
+	dto["shared"] = true
+	writeJSON(w, http.StatusOK, dto)
+}
+
 func (h *handlers) adminSelectProxyNode(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`
@@ -236,6 +265,26 @@ func (h *handlers) adminAutoSelectProxyNode(w http.ResponseWriter, r *http.Reque
 	dto := mihomoNodesDTO(updated, updated.Now, pick, delays)
 	dto["shared"] = true
 	writeJSON(w, http.StatusOK, dto)
+}
+
+func (h *handlers) adminProxyIP(w http.ResponseWriter, r *http.Request) {
+	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
+	if err != nil {
+		cfg := adminMihomoProxyConfig("")
+		writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, 0, "", "", err))
+		return
+	}
+	cfg := adminMihomoProxyConfig(group.Now)
+	client, err := apiclient.HTTPClientForProxy(cfg)
+	if err != nil {
+		writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, 0, "", "", err))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	defer cancel()
+	start := time.Now()
+	ip, endpoint, err := apiclient.DetectOutboundIP(ctx, client)
+	writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, time.Since(start), ip, endpoint, err))
 }
 
 func (h *handlers) mihomoGroup(ctx context.Context, group string) (*mihomoGroup, error) {

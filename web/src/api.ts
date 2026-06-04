@@ -230,6 +230,8 @@ export const adminApi = {
     ),
 
   proxyNodes: () => request<ProxyNodesResult>('/airvel/proxy/nodes'),
+  testProxyNodes: () =>
+    request<ProxyNodesResult>('/airvel/proxy/nodes/test', { method: 'POST' }),
   selectProxyNode: (name: string) =>
     request<ProxyNodesResult>('/airvel/proxy/nodes/select', {
       method: 'POST',
@@ -237,6 +239,7 @@ export const adminApi = {
     }),
   autoSelectProxyNode: () =>
     request<ProxyNodesResult>('/airvel/proxy/nodes/autoselect', { method: 'POST' }),
+  proxyIP: () => request<ProxyIPResult>('/airvel/proxy/ip'),
 
   logs: (limit = 100) => request<AdminLog[]>('/airvel/logs?limit=' + limit),
 
