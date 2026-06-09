@@ -76,6 +76,7 @@ func HTTPClientForProxy(cfg ProxyConfig) (*http.Client, error) {
 	}
 	var rt http.RoundTripper = t
 	if cfg.MihomoNodeEnabled() {
+		t.DisableKeepAlives = true
 		rt = &mihomoNodeTransport{
 			base: rt,
 			node: cfg.Node,
@@ -157,70 +158,201 @@ func (t *mihomoNodeTransport) RoundTrip(req *http.Request) (*http.Response, erro
 		base = http.DefaultTransport
 	}
 	mihomoSwitchMu.Lock()
-	defer mihomoSwitchMu.Unlock()
 
 	target := strings.TrimSpace(t.node)
-	previous, err := currentMihomoNode(req.Context())
+	state, err := activateMihomoNode(req.Context(), target)
 	if err != nil {
+		restoreCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		restoreErr := restoreMihomoState(restoreCtx, target, state)
+		cancel()
+		mihomoSwitchMu.Unlock()
+		if restoreErr != nil {
+			return nil, fmt.Errorf("%w; 恢复 Mihomo 状态失败: %v", err, restoreErr)
+		}
 		return nil, err
 	}
-	if previous != target {
-		if err := selectMihomoNode(req.Context(), target); err != nil {
-			return nil, err
-		}
-	}
 	resp, roundTripErr := base.RoundTrip(req)
-	if previous != "" && previous != target {
-		restoreCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		restoreErr := restoreMihomoNode(restoreCtx, target, previous)
-		cancel()
-		if restoreErr != nil {
-			if resp != nil && resp.Body != nil {
-				_ = resp.Body.Close()
-			}
-			if roundTripErr != nil {
-				return nil, fmt.Errorf("%w; 恢复 Mihomo 全局节点失败: %v", roundTripErr, restoreErr)
-			}
-			return nil, fmt.Errorf("恢复 Mihomo 全局节点失败: %w", restoreErr)
+	if roundTripErr == nil && resp != nil && resp.Body != nil {
+		resp.Body = &mihomoRestoreBody{
+			ReadCloser: resp.Body,
+			target:     target,
+			state:      state,
 		}
+		return resp, nil
 	}
+	restoreCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	restoreErr := restoreMihomoState(restoreCtx, target, state)
+	cancel()
+	if restoreErr != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		if roundTripErr != nil {
+			return nil, fmt.Errorf("%w; 恢复 Mihomo 状态失败: %v", roundTripErr, restoreErr)
+		}
+		return nil, fmt.Errorf("恢复 Mihomo 状态失败: %w", restoreErr)
+	}
+	mihomoSwitchMu.Unlock()
 	return resp, roundTripErr
 }
 
 var mihomoSwitchMu sync.Mutex
 
+type mihomoRestoreBody struct {
+	io.ReadCloser
+	target string
+	state  mihomoState
+	once   sync.Once
+	err    error
+}
+
+func (b *mihomoRestoreBody) Close() error {
+	closeErr := b.ReadCloser.Close()
+	b.once.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		b.err = restoreMihomoState(ctx, b.target, b.state)
+		cancel()
+		mihomoSwitchMu.Unlock()
+	})
+	if closeErr != nil {
+		return closeErr
+	}
+	return b.err
+}
+
 const (
 	mihomoDefaultBaseURL = "http://mihomo:9090"
 	mihomoDefaultGroup   = "Proxies"
+	mihomoGlobalGroup    = "GLOBAL"
 )
 
-func currentMihomoNode(ctx context.Context) (string, error) {
+type mihomoState struct {
+	mode      string
+	proxies   string
+	global    string
+	hasGlobal bool
+}
+
+func activateMihomoNode(ctx context.Context, target string) (mihomoState, error) {
+	state, err := currentMihomoState(ctx)
+	if err != nil {
+		return state, err
+	}
+	if !state.hasGlobal {
+		return state, errors.New("Mihomo 未暴露 GLOBAL 选择器，无法强制按用户节点出站")
+	}
+	if state.proxies != target {
+		if err := selectMihomoNode(ctx, mihomoDefaultGroup, target); err != nil {
+			return state, err
+		}
+	}
+	if state.hasGlobal && state.global != target {
+		if err := selectMihomoNode(ctx, mihomoGlobalGroup, target); err != nil {
+			return state, err
+		}
+	}
+	if !strings.EqualFold(state.mode, "global") {
+		if err := setMihomoMode(ctx, "global"); err != nil {
+			return state, err
+		}
+	}
+	return state, nil
+}
+
+func currentMihomoState(ctx context.Context) (mihomoState, error) {
+	mode, err := currentMihomoMode(ctx)
+	if err != nil {
+		return mihomoState{}, err
+	}
+	proxies, err := currentMihomoNode(ctx, mihomoDefaultGroup)
+	if err != nil {
+		return mihomoState{mode: mode}, err
+	}
+	state := mihomoState{mode: mode, proxies: proxies}
+	if global, err := currentMihomoNode(ctx, mihomoGlobalGroup); err == nil {
+		state.global = global
+		state.hasGlobal = true
+	}
+	return state, nil
+}
+
+func restoreMihomoState(ctx context.Context, target string, state mihomoState) error {
+	var errs []string
+	if state.hasGlobal && state.global != "" && state.global != target {
+		if current, err := currentMihomoNode(ctx, mihomoGlobalGroup); err != nil {
+			errs = append(errs, err.Error())
+		} else if current == target {
+			if err := selectMihomoNode(ctx, mihomoGlobalGroup, state.global); err != nil {
+				errs = append(errs, err.Error())
+			}
+		}
+	}
+	if state.proxies != "" && state.proxies != target {
+		if current, err := currentMihomoNode(ctx, mihomoDefaultGroup); err != nil {
+			errs = append(errs, err.Error())
+		} else if current == target {
+			if err := selectMihomoNode(ctx, mihomoDefaultGroup, state.proxies); err != nil {
+				errs = append(errs, err.Error())
+			}
+		}
+	}
+	if state.mode != "" && !strings.EqualFold(state.mode, "global") {
+		if current, err := currentMihomoMode(ctx); err != nil {
+			errs = append(errs, err.Error())
+		} else if strings.EqualFold(current, "global") {
+			if err := setMihomoMode(ctx, state.mode); err != nil {
+				errs = append(errs, err.Error())
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func currentMihomoMode(ctx context.Context) (string, error) {
+	var out struct {
+		Mode string `json:"mode"`
+	}
+	if err := mihomoDo(ctx, http.MethodGet, "/configs", nil, &out); err != nil {
+		return "", fmt.Errorf("读取 Mihomo 模式失败: %w", err)
+	}
+	return strings.TrimSpace(out.Mode), nil
+}
+
+func setMihomoMode(ctx context.Context, mode string) error {
+	mode = strings.TrimSpace(mode)
+	if mode == "" {
+		return nil
+	}
+	switch strings.ToLower(mode) {
+	case "global":
+		mode = "global"
+	case "rule":
+		mode = "rule"
+	case "direct":
+		mode = "direct"
+	}
+	return mihomoDo(ctx, http.MethodPatch, "/configs", map[string]string{"mode": mode}, nil)
+}
+
+func currentMihomoNode(ctx context.Context, group string) (string, error) {
 	var out struct {
 		Now string `json:"now"`
 	}
-	if err := mihomoDo(ctx, http.MethodGet, "/proxies/"+url.PathEscape(mihomoDefaultGroup), nil, &out); err != nil {
+	if err := mihomoDo(ctx, http.MethodGet, "/proxies/"+url.PathEscape(group), nil, &out); err != nil {
 		return "", fmt.Errorf("读取 Mihomo 当前节点失败: %w", err)
 	}
 	return strings.TrimSpace(out.Now), nil
 }
 
-func selectMihomoNode(ctx context.Context, name string) error {
+func selectMihomoNode(ctx context.Context, group, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil
 	}
-	return mihomoDo(ctx, http.MethodPut, "/proxies/"+url.PathEscape(mihomoDefaultGroup), map[string]string{"name": name}, nil)
-}
-
-func restoreMihomoNode(ctx context.Context, target, previous string) error {
-	current, err := currentMihomoNode(ctx)
-	if err != nil {
-		return err
-	}
-	if current != strings.TrimSpace(target) {
-		return nil
-	}
-	return selectMihomoNode(ctx, previous)
+	return mihomoDo(ctx, http.MethodPut, "/proxies/"+url.PathEscape(group), map[string]string{"name": name}, nil)
 }
 
 func mihomoDo(ctx context.Context, method, path string, body any, out any) error {
