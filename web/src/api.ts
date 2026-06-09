@@ -19,6 +19,7 @@ import type {
   ProxyTestResult,
   ProxyIPResult,
   ProxyNodesResult,
+  ProxyConfigResult,
   Announcement,
   AnnouncementUpsertReq,
 } from './types'
@@ -230,6 +231,12 @@ export const adminApi = {
     ),
 
   proxyNodes: () => request<ProxyNodesResult>('/airvel/proxy/nodes'),
+  proxyConfig: () => request<ProxyConfigResult>('/airvel/proxy/config'),
+  updateProxyConfig: (patch: { builtinEnabled?: boolean }) =>
+    request<ProxyConfigResult>('/airvel/proxy/config', {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    }),
   testProxyNodes: () =>
     request<ProxyNodesResult>('/airvel/proxy/nodes/test', { method: 'POST' }),
   selectProxyNode: (name: string) =>

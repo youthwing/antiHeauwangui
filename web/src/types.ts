@@ -187,6 +187,19 @@ export interface ProxyNodesResult {
   nodes: ProxyNode[]
   tested?: ProxyNode[]
   shared?: boolean
+  builtinEnabled?: boolean
+  builtinProxy?: string
+  builtinHost?: string
+  builtinPort?: number
+  builtinScheme?: 'socks5' | 'http' | 'https'
+}
+
+export interface ProxyConfigResult {
+  builtinEnabled: boolean
+  builtinProxy: string
+  builtinHost: string
+  builtinPort: number
+  builtinScheme: 'socks5' | 'http' | 'https'
 }
 
 // ---- Admin types ----

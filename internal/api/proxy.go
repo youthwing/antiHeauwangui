@@ -20,6 +20,11 @@ import (
 
 const defaultTimeout = 15 * time.Second
 
+const (
+	defaultMihomoProxyHost = "mihomo"
+	defaultMihomoProxyPort = 7893
+)
+
 // ProxyConfig describes an optional per-user outbound proxy for school API calls.
 type ProxyConfig struct {
 	Enabled  bool
@@ -94,6 +99,10 @@ func NormalizeProxyConfig(cfg ProxyConfig) (ProxyConfig, error) {
 	cfg.Host = strings.TrimSpace(cfg.Host)
 	cfg.Username = strings.TrimSpace(cfg.Username)
 	cfg.Node = strings.TrimSpace(cfg.Node)
+	if cfg.UsesBuiltinMihomoProxy() {
+		cfg.Host = BuiltinMihomoProxyHost()
+		cfg.Port = resolveBuiltinMihomoProxyPort(cfg.Scheme, cfg.Host, cfg.Port)
+	}
 	if !cfg.Enabled {
 		return cfg, nil
 	}
@@ -124,14 +133,110 @@ func (cfg ProxyConfig) OutboundLabel() string {
 		scheme = "socks5"
 	}
 	host := strings.TrimSpace(cfg.Host)
-	if host == "" || cfg.Port == 0 {
+	port := cfg.Port
+	if cfg.UsesBuiltinMihomoProxy() {
+		host = BuiltinMihomoProxyHost()
+		port = configuredBuiltinMihomoProxyPort(port)
+	}
+	if host == "" || port == 0 {
 		return "未配置"
 	}
-	label := scheme + "://" + net.JoinHostPort(host, strconv.Itoa(cfg.Port))
+	label := scheme + "://" + net.JoinHostPort(host, strconv.Itoa(port))
 	if node := strings.TrimSpace(cfg.Node); node != "" {
 		label += " · " + node
 	}
 	return label
+}
+
+func BuiltinMihomoProxyHost() string {
+	v := strings.TrimSpace(os.Getenv("WANGUI_MIHOMO_PROXY_HOST"))
+	if v == "" {
+		return defaultMihomoProxyHost
+	}
+	return v
+}
+
+func BuiltinMihomoProxyPort() int {
+	return configuredBuiltinMihomoProxyPort(0)
+}
+
+func BuiltinMihomoProxyConfig(enabled bool, node string) ProxyConfig {
+	return ProxyConfig{
+		Enabled: enabled,
+		Scheme:  "http",
+		Host:    BuiltinMihomoProxyHost(),
+		Port:    BuiltinMihomoProxyPort(),
+		Node:    strings.TrimSpace(node),
+	}
+}
+
+func (cfg ProxyConfig) UsesBuiltinMihomoProxy() bool {
+	host := strings.ToLower(strings.TrimSpace(cfg.Host))
+	if host == "" {
+		return false
+	}
+	if host != strings.ToLower(BuiltinMihomoProxyHost()) && host != defaultMihomoProxyHost {
+		return false
+	}
+	if strings.TrimSpace(cfg.Node) != "" {
+		return true
+	}
+	switch cfg.Port {
+	case 0, 7890, 7891, defaultMihomoProxyPort:
+		return true
+	default:
+		return cfg.Port == BuiltinMihomoProxyPort()
+	}
+}
+
+func configuredBuiltinMihomoProxyPort(preferred int) int {
+	if v := strings.TrimSpace(os.Getenv("WANGUI_MIHOMO_PROXY_PORT")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
+			return n
+		}
+	}
+	if preferred > 0 {
+		return preferred
+	}
+	return defaultMihomoProxyPort
+}
+
+func resolveBuiltinMihomoProxyPort(scheme, host string, preferred int) int {
+	envPort := configuredBuiltinMihomoProxyPort(0)
+	if v := strings.TrimSpace(os.Getenv("WANGUI_MIHOMO_PROXY_PORT")); v != "" {
+		return envPort
+	}
+	candidates := []int{}
+	add := func(port int) {
+		if port <= 0 || port > 65535 {
+			return
+		}
+		for _, existing := range candidates {
+			if existing == port {
+				return
+			}
+		}
+		candidates = append(candidates, port)
+	}
+	add(preferred)
+	add(defaultMihomoProxyPort)
+	switch strings.ToLower(strings.TrimSpace(scheme)) {
+	case "socks5":
+		add(7891)
+	default:
+		add(7890)
+	}
+	for _, port := range candidates {
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(port)), 250*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			return port
+		}
+	}
+	if preferred > 0 {
+		return preferred
+	}
+	return envPort
 }
 
 // MihomoNodeEnabled reports whether cfg targets the bundled Mihomo HTTP port
@@ -143,8 +248,7 @@ func (cfg ProxyConfig) MihomoNodeEnabled() bool {
 		return false
 	}
 	scheme := strings.ToLower(strings.TrimSpace(cfg.Scheme))
-	host := strings.ToLower(strings.TrimSpace(cfg.Host))
-	return scheme == "http" && host == "mihomo" && cfg.Port == 7893
+	return scheme == "http" && cfg.UsesBuiltinMihomoProxy()
 }
 
 type mihomoNodeTransport struct {

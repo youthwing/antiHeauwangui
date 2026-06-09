@@ -482,7 +482,7 @@ func (h *handlers) adminCheckinStatusForUser(w http.ResponseWriter, r *http.Requ
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	c, err := schoolAPIClientForUser(u)
+	c, err := h.schoolAPIClientForUser(r, u)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"state":   "error",

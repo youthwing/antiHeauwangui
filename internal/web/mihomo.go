@@ -43,17 +43,10 @@ func (h *handlers) proxyNodes(w http.ResponseWriter, r *http.Request) {
 	}
 	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"available": false,
-			"group":     mihomoDefaultGroup,
-			"message":   err.Error(),
-			"nodes":     []any{},
-			"selected":  u.ProxyNode,
-			"shared":    false,
-		})
+		writeJSON(w, http.StatusOK, h.unavailableProxyNodesDTO(r, u.ProxyNode, err.Error(), false))
 		return
 	}
-	writeJSON(w, http.StatusOK, mihomoNodesDTO(group, u.ProxyNode, "", nil))
+	writeJSON(w, http.StatusOK, h.proxyNodesDTO(r, group, u.ProxyNode, "", nil))
 }
 
 func (h *handlers) selectProxyNode(w http.ResponseWriter, r *http.Request) {
@@ -83,13 +76,14 @@ func (h *handlers) selectProxyNode(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "用户不存在")
 		return
 	}
-	u.ProxyEnabled = true
-	u.ProxyScheme = "http"
-	u.ProxyHost = "mihomo"
-	u.ProxyPort = 7893
+	cfg := apiclient.BuiltinMihomoProxyConfig(true, name)
+	u.ProxyEnabled = cfg.Enabled
+	u.ProxyScheme = cfg.Scheme
+	u.ProxyHost = cfg.Host
+	u.ProxyPort = cfg.Port
 	u.ProxyUsername = ""
 	u.ProxyPassword = ""
-	u.ProxyNode = name
+	u.ProxyNode = cfg.Node
 	if err := h.store.UpdateSettings(r.Context(), u); err != nil {
 		writeErr(w, http.StatusInternalServerError, "保存节点失败")
 		return
@@ -99,7 +93,7 @@ func (h *handlers) selectProxyNode(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, "读取节点失败: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, mihomoNodesDTO(updated, name, name, nil))
+	writeJSON(w, http.StatusOK, h.proxyNodesDTO(r, updated, name, name, nil))
 }
 
 func (h *handlers) autoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
@@ -127,13 +121,14 @@ func (h *handlers) autoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "用户不存在")
 		return
 	}
-	u.ProxyEnabled = true
-	u.ProxyScheme = "http"
-	u.ProxyHost = "mihomo"
-	u.ProxyPort = 7893
+	cfg := apiclient.BuiltinMihomoProxyConfig(true, pick)
+	u.ProxyEnabled = cfg.Enabled
+	u.ProxyScheme = cfg.Scheme
+	u.ProxyHost = cfg.Host
+	u.ProxyPort = cfg.Port
 	u.ProxyUsername = ""
 	u.ProxyPassword = ""
-	u.ProxyNode = pick
+	u.ProxyNode = cfg.Node
 	if err := h.store.UpdateSettings(r.Context(), u); err != nil {
 		writeErr(w, http.StatusInternalServerError, "保存节点失败")
 		return
@@ -146,28 +141,67 @@ func (h *handlers) autoSelectProxyNode(w http.ResponseWriter, r *http.Request) {
 	if len(delays) > 12 {
 		delays = delays[:12]
 	}
-	writeJSON(w, http.StatusOK, mihomoNodesDTO(updated, pick, pick, delays))
+	writeJSON(w, http.StatusOK, h.proxyNodesDTO(r, updated, pick, pick, delays))
 }
 
 func (h *handlers) adminProxyNodes(w http.ResponseWriter, r *http.Request) {
+	builtinEnabled := h.mihomoBuiltinProxyEnabled(r)
 	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"available": false,
-			"group":     mihomoDefaultGroup,
-			"message":   err.Error(),
-			"nodes":     []any{},
-			"selected":  "",
-			"shared":    true,
-		})
+		writeJSON(w, http.StatusOK, h.unavailableProxyNodesDTO(r, "", err.Error(), true))
 		return
 	}
 	dto := mihomoNodesDTO(group, group.Now, "", nil)
 	dto["shared"] = true
+	for k, v := range mihomoProxyConfigDTOFor(builtinEnabled, group.Now) {
+		dto[k] = v
+	}
 	writeJSON(w, http.StatusOK, dto)
 }
 
+func (h *handlers) proxyNodesDTO(r *http.Request, group *mihomoGroup, selected, picked string, delays []mihomoDelay) map[string]any {
+	dto := mihomoNodesDTO(group, selected, picked, delays)
+	enabled := h.mihomoBuiltinProxyEnabled(r)
+	for k, v := range mihomoProxyConfigDTOFor(enabled, selected) {
+		dto[k] = v
+	}
+	return dto
+}
+
+func (h *handlers) unavailableProxyNodesDTO(r *http.Request, selected, message string, shared bool) map[string]any {
+	dto := h.mihomoProxyConfigDTO(r)
+	dto["available"] = false
+	dto["group"] = mihomoDefaultGroup
+	dto["message"] = message
+	dto["nodes"] = []any{}
+	dto["selected"] = selected
+	dto["shared"] = shared
+	return dto
+}
+
+func (h *handlers) adminGetProxyConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.mihomoProxyConfigDTO(r))
+}
+
+func (h *handlers) adminUpdateProxyConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		BuiltinEnabled *bool `json:"builtinEnabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if req.BuiltinEnabled != nil {
+		if err := h.store.SetMihomoBuiltinProxyEnabled(r.Context(), *req.BuiltinEnabled); err != nil {
+			writeErr(w, http.StatusInternalServerError, "保存代理开关失败")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, h.mihomoProxyConfigDTO(r))
+}
+
 func (h *handlers) adminTestProxyNodes(w http.ResponseWriter, r *http.Request) {
+	builtinEnabled := h.mihomoBuiltinProxyEnabled(r)
 	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, "mihomo 不可用: "+err.Error())
@@ -191,6 +225,9 @@ func (h *handlers) adminTestProxyNodes(w http.ResponseWriter, r *http.Request) {
 	}
 	dto := mihomoNodesDTO(group, group.Now, "", delays)
 	dto["shared"] = true
+	for k, v := range mihomoProxyConfigDTOFor(builtinEnabled, group.Now) {
+		dto[k] = v
+	}
 	writeJSON(w, http.StatusOK, dto)
 }
 
@@ -227,6 +264,9 @@ func (h *handlers) adminSelectProxyNode(w http.ResponseWriter, r *http.Request) 
 	}
 	dto := mihomoNodesDTO(updated, updated.Now, name, nil)
 	dto["shared"] = true
+	for k, v := range mihomoProxyConfigDTOFor(h.mihomoBuiltinProxyEnabled(r), updated.Now) {
+		dto[k] = v
+	}
 	writeJSON(w, http.StatusOK, dto)
 }
 
@@ -264,17 +304,25 @@ func (h *handlers) adminAutoSelectProxyNode(w http.ResponseWriter, r *http.Reque
 	}
 	dto := mihomoNodesDTO(updated, updated.Now, pick, delays)
 	dto["shared"] = true
+	for k, v := range mihomoProxyConfigDTOFor(h.mihomoBuiltinProxyEnabled(r), updated.Now) {
+		dto[k] = v
+	}
 	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *handlers) adminProxyIP(w http.ResponseWriter, r *http.Request) {
+	builtinEnabled := h.mihomoBuiltinProxyEnabled(r)
 	group, err := h.mihomoGroup(r.Context(), mihomoDefaultGroup)
 	if err != nil {
-		cfg := adminMihomoProxyConfig("")
+		cfg := adminMihomoProxyConfig(builtinEnabled, "")
 		writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, 0, "", "", err))
 		return
 	}
-	cfg := adminMihomoProxyConfig(group.Now)
+	cfg := adminMihomoProxyConfig(builtinEnabled, group.Now)
+	if !cfg.Enabled {
+		writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, 0, "", "", fmt.Errorf("内置 Mihomo 代理已关闭")))
+		return
+	}
 	client, err := apiclient.HTTPClientForProxy(cfg)
 	if err != nil {
 		writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, 0, "", "", err))
@@ -285,6 +333,31 @@ func (h *handlers) adminProxyIP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	ip, endpoint, err := apiclient.DetectOutboundIP(ctx, client)
 	writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, time.Since(start), ip, endpoint, err))
+}
+
+func (h *handlers) mihomoBuiltinProxyEnabled(r *http.Request) bool {
+	enabled, err := h.store.GetMihomoBuiltinProxyEnabled(r.Context())
+	if err != nil {
+		h.log.Warn("read mihomo builtin proxy switch", "err", err.Error())
+		return true
+	}
+	return enabled
+}
+
+func (h *handlers) mihomoProxyConfigDTO(r *http.Request) map[string]any {
+	enabled := h.mihomoBuiltinProxyEnabled(r)
+	return mihomoProxyConfigDTOFor(enabled, "")
+}
+
+func mihomoProxyConfigDTOFor(enabled bool, node string) map[string]any {
+	cfg := normalizedProxyConfigForDisplay(apiclient.BuiltinMihomoProxyConfig(enabled, node))
+	return map[string]any{
+		"builtinEnabled": enabled,
+		"builtinProxy":   cfg.OutboundLabel(),
+		"builtinHost":    cfg.Host,
+		"builtinPort":    cfg.Port,
+		"builtinScheme":  cfg.Scheme,
+	}
 }
 
 func (h *handlers) mihomoGroup(ctx context.Context, group string) (*mihomoGroup, error) {

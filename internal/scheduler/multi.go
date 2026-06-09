@@ -137,7 +137,7 @@ func (m *Multi) runRulesWatchSweep(ctx context.Context) {
 		m.log.Warn("rules-watch: no healthy user to probe with")
 		return
 	}
-	c, err := schoolAPIClientForUser(probe)
+	c, err := m.schoolAPIClientForUser(ctx, probe)
 	if err != nil {
 		m.log.Warn("rules-watch proxy config invalid", "user", probe.UserID, "err", err.Error())
 		return
@@ -551,8 +551,9 @@ func (r SignResult) Terminal() bool {
 // SignOnce performs a single status + (optional) sign cycle for one user.
 // It never writes records — the caller decides whether to persist.
 func (m *Multi) SignOnce(ctx context.Context, u *store.User) SignResult {
-	debug := newSignDebugSnapshot(u, proxyConfigForUser(u))
-	c, err := schoolAPIClientForUser(u)
+	proxy := m.proxyConfigForUser(ctx, u)
+	debug := newSignDebugSnapshot(u, proxy)
+	c, err := m.schoolAPIClientForUser(ctx, u)
 	if err != nil {
 		return debug.finish("failed", "代理配置错误: "+err.Error())
 	}

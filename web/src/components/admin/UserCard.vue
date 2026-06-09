@@ -232,6 +232,9 @@ watch(
 const availableProxyNodes = computed(() => props.proxyNodes?.available ? props.proxyNodes.nodes : [])
 const hasNodeList = computed(() => availableProxyNodes.value.length > 0)
 const proxyStatusText = computed(() => props.user.proxyEnabled ? '已开启' : '已关闭')
+const builtinProxyScheme = computed<ProxyScheme>(() => props.proxyNodes?.builtinScheme || 'http')
+const builtinProxyHost = computed(() => props.proxyNodes?.builtinHost || 'mihomo')
+const builtinProxyPort = computed(() => props.proxyNodes?.builtinPort || 7893)
 const proxySummary = computed(() => {
   if (props.user.proxyEnabled) return props.user.proxyOutbound || '代理已开启'
   if (props.user.proxyNode) return `已保存节点：${props.user.proxyNode}`
@@ -241,9 +244,9 @@ const proxySummary = computed(() => {
 
 function applyBuiltinNode() {
   proxyForm.enabled = true
-  proxyForm.scheme = 'http'
-  proxyForm.host = 'mihomo'
-  proxyForm.port = 7893
+  proxyForm.scheme = builtinProxyScheme.value
+  proxyForm.host = builtinProxyHost.value
+  proxyForm.port = builtinProxyPort.value
   proxyForm.username = ''
   proxyForm.password = ''
   if (!proxyForm.node) {

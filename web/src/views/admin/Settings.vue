@@ -14,6 +14,7 @@ import {
   Bell,
   HelpCircle,
   Network,
+  Power,
   RotateCcw,
   Shuffle,
   Activity,
@@ -30,6 +31,14 @@ const loadingGlobalProxyNodes = ref(false)
 const switchingGlobalProxyNode = ref(false)
 const testingGlobalProxyNodes = ref(false)
 const loadingGlobalProxyIP = ref(false)
+const savingGlobalProxySwitch = ref(false)
+const globalBuiltinProxyEnabled = ref(true)
+const globalBuiltinProxyLabel = ref('内置 Mihomo 代理')
+
+function applyGlobalProxyMeta(res: Partial<ProxyNodesResult>) {
+  if (res.builtinEnabled !== undefined) globalBuiltinProxyEnabled.value = res.builtinEnabled
+  if (res.builtinProxy) globalBuiltinProxyLabel.value = res.builtinProxy
+}
 
 // SMTP form state — now also carries the admin Server酱 fields, since the
 // same PUT /smtp endpoint owns both notification channels' config.
@@ -59,6 +68,7 @@ async function loadGlobalProxyNodes() {
   try {
     const res = await adminApi.proxyNodes()
     globalProxyNodes.value = res
+    applyGlobalProxyMeta(res)
     selectedGlobalProxyNode.value = res.selected || res.current || res.mihomoNow || selectedGlobalProxyNode.value
   } catch (e: any) {
     globalProxyNodes.value = {
@@ -68,6 +78,7 @@ async function loadGlobalProxyNodes() {
       nodes: [],
       shared: true,
     }
+    applyGlobalProxyMeta(globalProxyNodes.value)
   } finally {
     loadingGlobalProxyNodes.value = false
   }
@@ -79,6 +90,7 @@ async function selectGlobalProxyNode() {
   try {
     const res = await adminApi.selectProxyNode(selectedGlobalProxyNode.value)
     globalProxyNodes.value = res
+    applyGlobalProxyMeta(res)
     selectedGlobalProxyNode.value = res.selected || res.current || selectedGlobalProxyNode.value
     globalProxyIP.value = null
     showToast('ok', `全局 Mihomo 节点已切到 ${selectedGlobalProxyNode.value}`)
@@ -95,6 +107,7 @@ async function autoSelectGlobalProxyNode() {
   try {
     const res = await adminApi.autoSelectProxyNode()
     globalProxyNodes.value = res
+    applyGlobalProxyMeta(res)
     selectedGlobalProxyNode.value = res.selected || res.current || res.picked || ''
     globalProxyIP.value = null
     showToast('ok', selectedGlobalProxyNode.value ? `全局 Mihomo 节点已切到 ${selectedGlobalProxyNode.value}` : '已自动选择节点')
@@ -111,6 +124,7 @@ async function testGlobalProxyNodes() {
   try {
     const res = await adminApi.testProxyNodes()
     globalProxyNodes.value = res
+    applyGlobalProxyMeta(res)
     selectedGlobalProxyNode.value = res.selected || res.current || res.mihomoNow || selectedGlobalProxyNode.value
     showToast('ok', '全局节点延迟已刷新')
   } catch (e: any) {
@@ -134,6 +148,25 @@ async function refreshGlobalProxyIP() {
     showToast('err', e.message || '出口 IP 探测失败')
   } finally {
     loadingGlobalProxyIP.value = false
+  }
+}
+
+async function toggleGlobalBuiltinProxy() {
+  if (savingGlobalProxySwitch.value) return
+  const next = !globalBuiltinProxyEnabled.value
+  savingGlobalProxySwitch.value = true
+  try {
+    const res = await adminApi.updateProxyConfig({ builtinEnabled: next })
+    applyGlobalProxyMeta(res)
+    if (globalProxyNodes.value) {
+      globalProxyNodes.value = { ...globalProxyNodes.value, ...res }
+    }
+    globalProxyIP.value = null
+    showToast('ok', next ? '内置 Mihomo 代理已开启' : '内置 Mihomo 代理已关闭')
+  } catch (e: any) {
+    showToast('err', e.message || '保存代理开关失败')
+  } finally {
+    savingGlobalProxySwitch.value = false
   }
 }
 
@@ -224,9 +257,26 @@ onMounted(async () => {
           <div class="flex items-center gap-2">
             <Network class="w-4 h-4 text-zinc-500" />
             <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">Mihomo 全局节点</h2>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] ring-1"
+              :class="globalBuiltinProxyEnabled
+                ? 'bg-red-500/10 text-red-700 dark:text-red-300 ring-red-500/25'
+                : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 ring-zinc-500/20'"
+            >
+              {{ globalBuiltinProxyEnabled ? '内置代理开启' : '内置代理关闭' }}
+            </span>
           </div>
           <p class="text-xs text-zinc-500 leading-relaxed mt-2">
-            这里控制 Mihomo 当前真实选中的全局节点。用户自己的节点偏好仍在各自账号里保存；用户发起学校请求时，会按该用户配置临时切换到他的节点。
+            这里控制 Mihomo 当前真实选中的全局节点。上面的开关决定是否允许系统使用内置 Mihomo 作为学校请求出口；用户自己的节点偏好仍在各自账号里保存。
+          </p>
+          <p class="text-[11px] text-zinc-500 mt-2 break-all">
+            内置出口：
+            <span
+              class="font-mono-token"
+              :class="globalBuiltinProxyEnabled ? 'text-red-700 dark:text-red-200' : 'text-zinc-500'"
+            >
+              {{ globalBuiltinProxyLabel }}
+            </span>
           </p>
           <p v-if="globalProxyNodes?.mihomoNow" class="text-[11px] text-zinc-500 mt-2 break-all">
             当前全局：
@@ -252,8 +302,20 @@ onMounted(async () => {
         <div class="flex flex-wrap gap-2 shrink-0 justify-start lg:justify-end">
           <button
             type="button"
+            @click="toggleGlobalBuiltinProxy"
+            :disabled="savingGlobalProxySwitch"
+            class="inline-flex items-center gap-1.5 disabled:opacity-50 ring-1 text-xs px-3 py-2 rounded-lg transition-colors"
+            :class="globalBuiltinProxyEnabled
+              ? 'bg-red-500/15 hover:bg-red-500/25 ring-red-500/25 text-red-700 dark:text-red-300'
+              : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 ring-black/[0.06] dark:ring-white/[0.06] text-zinc-700 dark:text-zinc-300'"
+          >
+            <Power class="w-3.5 h-3.5" :class="savingGlobalProxySwitch ? 'wangui-spin' : ''" />
+            {{ savingGlobalProxySwitch ? '保存中...' : (globalBuiltinProxyEnabled ? '关闭内置代理' : '开启内置代理') }}
+          </button>
+          <button
+            type="button"
             @click="refreshGlobalProxyIP"
-            :disabled="loadingGlobalProxyIP || !globalProxyNodes?.available"
+            :disabled="loadingGlobalProxyIP || !globalProxyNodes?.available || !globalBuiltinProxyEnabled"
             class="inline-flex items-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 disabled:opacity-50 ring-1 ring-sky-500/30 text-blue-700 dark:text-blue-300 text-xs px-3 py-2 rounded-lg transition-colors"
           >
             <Activity class="w-3.5 h-3.5" :class="loadingGlobalProxyIP ? 'wangui-spin' : ''" />

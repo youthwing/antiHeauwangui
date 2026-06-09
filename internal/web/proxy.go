@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net/http"
 	"time"
 
 	apiclient "wangui/internal/api"
@@ -23,6 +24,26 @@ func proxyConfigForUser(u *store.User) apiclient.ProxyConfig {
 	}
 }
 
+func (h *handlers) proxyConfigForUser(r *http.Request, u *store.User) apiclient.ProxyConfig {
+	cfg := proxyConfigForUser(u)
+	if !cfg.UsesBuiltinMihomoProxy() {
+		return cfg
+	}
+	enabled, err := h.store.GetMihomoBuiltinProxyEnabled(r.Context())
+	if err != nil {
+		h.log.Warn("read mihomo builtin proxy switch", "err", err.Error())
+		return cfg
+	}
+	if !enabled {
+		cfg.Enabled = false
+	}
+	return cfg
+}
+
+func (h *handlers) schoolAPIClientForUser(r *http.Request, u *store.User) (*apiclient.Client, error) {
+	return apiclient.NewWithProxy(u.Token, h.proxyConfigForUser(r, u))
+}
+
 func defaultStr(s, fallback string) string {
 	if s == "" {
 		return fallback
@@ -32,6 +53,11 @@ func defaultStr(s, fallback string) string {
 
 func proxyTestDTO(u *store.User, elapsed time.Duration, rules int, err error) map[string]any {
 	cfg := proxyConfigForUser(u)
+	return proxyTestForConfigDTO(cfg, elapsed, rules, err)
+}
+
+func proxyTestForConfigDTO(cfg apiclient.ProxyConfig, elapsed time.Duration, rules int, err error) map[string]any {
+	cfg = normalizedProxyConfigForDisplay(cfg)
 	out := map[string]any{
 		"ok":        err == nil,
 		"enabled":   cfg.Enabled,
@@ -55,17 +81,12 @@ func proxyIPDTO(u *store.User, elapsed time.Duration, ip, endpoint string, err e
 	return proxyIPForConfigDTO(cfg, elapsed, ip, endpoint, err)
 }
 
-func adminMihomoProxyConfig(node string) apiclient.ProxyConfig {
-	return apiclient.ProxyConfig{
-		Enabled: true,
-		Scheme:  "http",
-		Host:    "mihomo",
-		Port:    7893,
-		Node:    node,
-	}
+func adminMihomoProxyConfig(enabled bool, node string) apiclient.ProxyConfig {
+	return apiclient.BuiltinMihomoProxyConfig(enabled, node)
 }
 
 func proxyIPForConfigDTO(cfg apiclient.ProxyConfig, elapsed time.Duration, ip, endpoint string, err error) map[string]any {
+	cfg = normalizedProxyConfigForDisplay(cfg)
 	out := map[string]any{
 		"ok":        err == nil,
 		"enabled":   cfg.Enabled,
@@ -80,4 +101,12 @@ func proxyIPForConfigDTO(cfg apiclient.ProxyConfig, elapsed time.Duration, ip, e
 		out["message"] = "探测成功"
 	}
 	return out
+}
+
+func normalizedProxyConfigForDisplay(cfg apiclient.ProxyConfig) apiclient.ProxyConfig {
+	normalized, err := apiclient.NormalizeProxyConfig(cfg)
+	if err != nil {
+		return cfg
+	}
+	return normalized
 }

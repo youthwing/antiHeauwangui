@@ -95,7 +95,37 @@ const (
 	cfgSMTPAdminBcc      = "smtp.admin_bcc"
 	cfgSCKAdminKey       = "serverchan.admin_key"
 	cfgSCKAdminEnabled   = "serverchan.admin_enabled"
+	cfgMihomoBuiltinOn   = "mihomo.builtin_proxy_enabled"
 )
+
+type MihomoProxyConfig struct {
+	BuiltinEnabled bool `json:"builtinEnabled"`
+}
+
+func (s *Store) GetMihomoProxyConfig(ctx context.Context) (*MihomoProxyConfig, error) {
+	raw, err := s.GetConfig(ctx, cfgMihomoBuiltinOn)
+	if err != nil {
+		return nil, err
+	}
+	return &MihomoProxyConfig{
+		BuiltinEnabled: raw == "" || raw == "1" || raw == "true" || raw == "yes",
+	}, nil
+}
+
+func (s *Store) GetMihomoBuiltinProxyEnabled(ctx context.Context) (bool, error) {
+	c, err := s.GetMihomoProxyConfig(ctx)
+	if err != nil {
+		return true, err
+	}
+	return c.BuiltinEnabled, nil
+}
+
+func (s *Store) SetMihomoBuiltinProxyEnabled(ctx context.Context, enabled bool) error {
+	if enabled {
+		return s.SetConfig(ctx, cfgMihomoBuiltinOn, "1")
+	}
+	return s.SetConfig(ctx, cfgMihomoBuiltinOn, "0")
+}
 
 // SMTPConfig is the full notify-config bundle. Despite the historical name,
 // it now also carries the admin's Server酱 push key — both channels share one

@@ -75,30 +75,35 @@ const loadingProxyNodes = ref(false)
 const switchingProxyNode = ref(false)
 const selectedProxyNode = ref('')
 
-const BUILTIN_PROXY = {
-  scheme: 'http',
-  host: 'mihomo',
-  port: 7893,
-} as const
+const builtinProxyScheme = computed(() => proxyNodes.value?.builtinScheme || 'http')
+const builtinProxyHost = computed(() => proxyNodes.value?.builtinHost || 'mihomo')
+const builtinProxyPort = computed(() => proxyNodes.value?.builtinPort || 7893)
+const builtinProxyEnabled = computed(() => proxyNodes.value?.builtinEnabled !== false)
+const builtinProxyLabel = computed(() => proxyNodes.value?.builtinProxy || `${builtinProxyScheme.value}://${builtinProxyHost.value}:${builtinProxyPort.value}`)
 
 const proxySummary = computed(() => {
   if (!proxyHost.value.trim() || !proxyPort.value) return '尚未配置本账号出口地址'
   const label = `${proxyScheme.value}://${proxyHost.value.trim()}:${proxyPort.value}`
   return selectedProxyNode.value && isBuiltinProxy.value ? `${label} · ${selectedProxyNode.value}` : label
 })
-const proxyReady = computed(() => proxyEnabled.value && !!proxyHost.value.trim() && !!proxyPort.value)
+const proxyReady = computed(() =>
+  proxyEnabled.value &&
+  !!proxyHost.value.trim() &&
+  !!proxyPort.value &&
+  (!isBuiltinProxy.value || builtinProxyEnabled.value),
+)
 const isBuiltinProxy = computed(() =>
   proxyEnabled.value &&
-  proxyScheme.value === BUILTIN_PROXY.scheme &&
-  proxyHost.value.trim().toLowerCase() === BUILTIN_PROXY.host &&
-  Number(proxyPort.value) === BUILTIN_PROXY.port,
+  proxyScheme.value === builtinProxyScheme.value &&
+  proxyHost.value.trim().toLowerCase() === builtinProxyHost.value.toLowerCase() &&
+  [builtinProxyPort.value, 7893, 7890, 7891].includes(Number(proxyPort.value)),
 )
 
 function setBuiltinProxyFields() {
   proxyEnabled.value = true
-  proxyScheme.value = BUILTIN_PROXY.scheme
-  proxyHost.value = BUILTIN_PROXY.host
-  proxyPort.value = BUILTIN_PROXY.port
+  proxyScheme.value = builtinProxyScheme.value
+  proxyHost.value = builtinProxyHost.value
+  proxyPort.value = builtinProxyPort.value
   proxyUsername.value = ''
   proxyPassword.value = ''
 }
@@ -1009,6 +1014,12 @@ const previewSchedule = computed(() => {
               当前账号已选：<span class="font-mono-token text-red-700 dark:text-red-200">{{ selectedProxyNode }}</span>
               <span v-if="proxyNodes?.mihomoNow" class="text-zinc-400"> · Mihomo 当前状态：{{ proxyNodes.mihomoNow }}</span>
             </p>
+            <p
+              v-if="isBuiltinProxy && !builtinProxyEnabled"
+              class="text-[11px] text-amber-700 dark:text-amber-300 mt-1"
+            >
+              管理员已关闭内置 Mihomo 代理，当前账号保存的节点会保留，但学校请求暂时不会走该出口。
+            </p>
           </div>
           <div class="flex gap-2">
             <button
@@ -1066,7 +1077,7 @@ const previewSchedule = computed(() => {
           </span>
         </div>
         <p class="text-[11px] text-zinc-500 mt-3">
-          保存节点会自动把当前账号代理设置为 <span class="font-mono-token">http://mihomo:7893</span>。如果你想用自己的独立外部代理，直接在下面手动填写即可。
+          保存节点会自动把当前账号代理设置为 <span class="font-mono-token">{{ builtinProxyLabel }}</span>。如果你想用自己的独立外部代理，直接在下面手动填写即可。
         </p>
       </div>
 

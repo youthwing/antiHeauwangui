@@ -696,16 +696,21 @@ func (h *handlers) testProxy(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "用户不存在")
 		return
 	}
-	c, err := schoolAPIClientForUser(u)
+	cfg := h.proxyConfigForUser(r, u)
+	if !cfg.Enabled {
+		writeJSON(w, http.StatusOK, proxyTestForConfigDTO(cfg, 0, 0, fmt.Errorf("代理未启用")))
+		return
+	}
+	c, err := apiclient.NewWithProxy(u.Token, cfg)
 	if err != nil {
-		writeJSON(w, http.StatusOK, proxyTestDTO(u, 0, 0, err))
+		writeJSON(w, http.StatusOK, proxyTestForConfigDTO(cfg, 0, 0, err))
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	start := time.Now()
 	rules, err := c.AvailableRules(ctx)
-	writeJSON(w, http.StatusOK, proxyTestDTO(u, time.Since(start), len(rules), err))
+	writeJSON(w, http.StatusOK, proxyTestForConfigDTO(cfg, time.Since(start), len(rules), err))
 }
 
 // ---------- GET /api/v1/proxy/ip ----------
@@ -716,21 +721,21 @@ func (h *handlers) proxyIP(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "用户不存在")
 		return
 	}
-	cfg := proxyConfigForUser(u)
+	cfg := h.proxyConfigForUser(r, u)
 	if !cfg.Enabled {
-		writeJSON(w, http.StatusOK, proxyIPDTO(u, 0, "", "", fmt.Errorf("代理未启用")))
+		writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, 0, "", "", fmt.Errorf("代理未启用")))
 		return
 	}
 	client, err := apiclient.HTTPClientForProxy(cfg)
 	if err != nil {
-		writeJSON(w, http.StatusOK, proxyIPDTO(u, 0, "", "", err))
+		writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, 0, "", "", err))
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 	start := time.Now()
 	ip, endpoint, err := apiclient.DetectOutboundIP(ctx, client)
-	writeJSON(w, http.StatusOK, proxyIPDTO(u, time.Since(start), ip, endpoint, err))
+	writeJSON(w, http.StatusOK, proxyIPForConfigDTO(cfg, time.Since(start), ip, endpoint, err))
 }
 
 // ---------- GET /api/v1/records ----------
