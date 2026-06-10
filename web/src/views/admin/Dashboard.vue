@@ -67,16 +67,16 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
 </script>
 
 <template>
-  <div class="space-y-3">
-    <header class="mb-1">
-      <h1 class="text-2xl font-bold tracking-tight">概览</h1>
-      <p class="text-sm text-zinc-500 mt-1">系统当前状态。</p>
+  <div class="space-y-4">
+    <header class="console-hero p-5">
+      <h1 class="text-2xl font-semibold">管理概览</h1>
+      <p class="text-sm text-zinc-400 mt-1">用户、邀请码、今日签到和告警状态集中看。</p>
     </header>
 
     <!-- KPI cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <RouterLink to="/airvel/users" class="block">
-        <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-3.5 transition-all">
+        <div class="metric-panel hover:border-zinc-300 dark:hover:border-white/[0.14] p-3.5 transition-colors">
           <div class="flex items-center gap-2 mb-3">
             <Users class="w-4 h-4 text-zinc-500" />
             <span class="text-[10px] text-zinc-500 tracking-wide uppercase">用户</span>
@@ -95,7 +95,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
       </RouterLink>
 
       <RouterLink to="/airvel/codes" class="block">
-        <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] p-3.5 transition-all">
+        <div class="metric-panel hover:border-zinc-300 dark:hover:border-white/[0.14] p-3.5 transition-colors">
           <div class="flex items-center gap-2 mb-3">
             <Ticket class="w-4 h-4 text-zinc-500" />
             <span class="text-[10px] text-zinc-500 tracking-wide uppercase">邀请码</span>
@@ -108,7 +108,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
         </div>
       </RouterLink>
 
-      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="metric-panel p-3.5">
         <div class="flex items-center gap-2 mb-3">
           <Activity class="w-4 h-4 text-zinc-500" />
           <span class="text-[10px] text-zinc-500 tracking-wide uppercase">今日签到</span>
@@ -121,7 +121,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
         </p>
       </div>
 
-      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
+      <div class="metric-panel p-3.5">
         <div class="flex items-center gap-2 mb-3">
           <AlertTriangle class="w-4 h-4 text-zinc-500" />
           <span class="text-[10px] text-zinc-500 tracking-wide uppercase">告警</span>
@@ -134,7 +134,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
     </div>
 
     <!-- Today breakdown -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center gap-2 mb-4">
         <TrendingUp class="w-4 h-4 text-zinc-500" />
         <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">今日活动</h2>
@@ -152,7 +152,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
 
     <!-- School rules snapshot — refreshed daily at 18:00 by the scheduler;
          admin gets emailed if it changes between two probes. -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center justify-between mb-3 gap-2">
         <div class="flex items-center gap-2 min-w-0">
           <ScrollText class="w-4 h-4 text-zinc-500" />
@@ -169,7 +169,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
         <li
           v-for="r in schoolRules"
           :key="r.ruleId"
-          class="rounded-lg bg-white/70 dark:bg-[#0d1117]/40 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
+          class="inner-panel p-3"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
@@ -190,7 +190,7 @@ function info(s: string) { return logMeta[s] || logMeta.failed }
     </section>
 
     <!-- Recent activity -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">最近活动</h2>
         <RouterLink to="/airvel/logs" class="text-xs text-zinc-500 hover:text-red-400 inline-flex items-center gap-1">

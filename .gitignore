@@ -16,8 +16,13 @@
 *.db-wal
 *.log
 
-# --- Local-only Claude harness state ---
+# --- Local-only AI/editor harness state ---
 .claude/
+.agents/
+.cursor/
+.gemini/
+.kiro/
+.opencode/
 
 # --- Build outputs ---
 /wangui

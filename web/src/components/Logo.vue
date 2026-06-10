@@ -13,7 +13,7 @@ withDefaults(
   <div class="flex items-center gap-3">
     <div
       :style="{ width: size + 'px', height: size + 'px' }"
-      class="relative shrink-0 rounded-xl bg-[#e50914] ring-1 ring-[#e50914]/30 shadow-sm shadow-[#e50914]/20 flex items-center justify-center"
+      class="relative shrink-0 rounded-xl bg-[#e50914] ring-1 ring-black/10 shadow-[0_10px_24px_rgba(229,9,20,0.22)] flex items-center justify-center"
     >
       <svg
         :width="size * 0.6"
@@ -35,10 +35,10 @@ withDefaults(
       </svg>
     </div>
     <div v-if="text" class="min-w-0">
-      <p class="font-bold tracking-tight text-[#161b22] dark:text-zinc-50 text-sm leading-tight truncate">
+      <p class="logo-title font-semibold text-[#161b22] dark:text-zinc-50 text-sm leading-tight truncate">
         {{ text }}
       </p>
-      <p v-if="subtitle" class="text-[10px] text-zinc-500 tracking-wider mt-0.5 truncate">
+      <p v-if="subtitle" class="logo-subtitle text-[10px] text-zinc-500 mt-0.5 truncate">
         {{ subtitle }}
       </p>
     </div>

@@ -170,16 +170,16 @@ function isDebugOpen(id: number): boolean {
 </script>
 
 <template>
-  <div class="space-y-3">
-    <header class="flex items-end justify-between gap-3 mb-1">
+  <div class="space-y-4">
+    <header class="console-hero flex items-end justify-between gap-3 p-5">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight">签到记录</h1>
-        <p class="text-sm text-zinc-500 mt-1">所有签到尝试的历史流水。</p>
+        <h1 class="text-2xl font-semibold">签到记录</h1>
+        <p class="text-sm text-zinc-400 mt-1">历史流水、出口 IP、代理与完整请求快照。</p>
       </div>
       <button
         @click="load"
         :disabled="loading"
-        class="shrink-0 text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200 px-3 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors inline-flex items-center gap-1.5"
+        class="shrink-0 text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/[0.08] transition-colors inline-flex items-center gap-1.5"
       >
         <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'wangui-spin' : ''" />
         刷新
@@ -188,26 +188,26 @@ function isDebugOpen(id: number): boolean {
 
     <!-- Stats row -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
-        <p class="text-[10px] text-zinc-500 tracking-wide uppercase">总计</p>
+      <div class="metric-panel p-3.5">
+        <p class="text-[10px] text-zinc-500">总计</p>
         <p class="text-2xl font-bold tabular-nums mt-1">{{ records.length }}</p>
       </div>
-      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
-        <p class="text-[10px] text-zinc-500 tracking-wide uppercase">成功率</p>
+      <div class="metric-panel p-3.5">
+        <p class="text-[10px] text-zinc-500">成功率</p>
         <p class="text-2xl font-bold tabular-nums mt-1 text-red-400">{{ successRate }}<span class="text-sm text-zinc-500">%</span></p>
       </div>
-      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
-        <p class="text-[10px] text-zinc-500 tracking-wide uppercase">成功 / 已签</p>
+      <div class="metric-panel p-3.5">
+        <p class="text-[10px] text-zinc-500">成功 / 已签</p>
         <p class="text-2xl font-bold tabular-nums mt-1 text-blue-300">{{ (stats.success || 0) + (stats.already || 0) }}</p>
       </div>
-      <div class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-3.5">
-        <p class="text-[10px] text-zinc-500 tracking-wide uppercase">失败</p>
+      <div class="metric-panel p-3.5">
+        <p class="text-[10px] text-zinc-500">失败</p>
         <p class="text-2xl font-bold tabular-nums mt-1 text-red-300">{{ stats.failed || 0 }}</p>
       </div>
     </div>
 
     <!-- Last 30 days calendar -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">最近 30 天</h2>
         <div class="flex items-center gap-2 text-[10px] text-zinc-500">
@@ -240,7 +240,7 @@ function isDebugOpen(id: number): boolean {
         @click="filter = opt.key"
         :class="filter === opt.key
           ? 'bg-red-500/20 text-red-300 ring-1 ring-red-500/30'
-          : 'bg-white/85 dark:bg-[#161b22]/60 text-zinc-500 dark:text-zinc-400 ring-1 ring-black/[0.05] dark:ring-white/[0.04] hover:text-[#161b22] dark:hover:text-zinc-200'"
+          : 'inner-panel text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-200'"
         class="text-xs px-3 py-1 rounded-full transition-colors"
       >
         {{ opt.label }}
@@ -251,7 +251,7 @@ function isDebugOpen(id: number): boolean {
     </div>
 
     <!-- Full list -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div v-if="loading" class="flex items-center justify-center py-10">
         <div class="h-5 w-5 rounded-full border-2 border-zinc-800 border-t-red-400 wangui-spin" />
       </div>

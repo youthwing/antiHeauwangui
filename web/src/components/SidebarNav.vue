@@ -11,7 +11,7 @@ defineProps<{ items: NavItem[] }>()
 </script>
 
 <template>
-  <nav class="space-y-1">
+  <nav class="space-y-1.5">
     <RouterLink
       v-for="item in items"
       :key="item.to"
@@ -23,16 +23,20 @@ defineProps<{ items: NavItem[] }>()
         :href="item.to"
         @click.prevent="$router.push(item.to)"
         :class="[
-          'group flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all',
+          'group relative flex min-h-11 items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all',
           isExactActive
-            ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/25'
-            : 'text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5',
+            ? 'bg-white/[0.12] text-white ring-1 ring-white/[0.12]'
+            : 'text-zinc-400 hover:text-white hover:bg-white/[0.07]',
         ]"
       >
+        <span
+          v-if="isExactActive"
+          class="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full bg-[#e50914]"
+        />
         <component
           :is="item.icon"
           class="w-4 h-4 transition-colors"
-          :class="isExactActive ? 'text-red-400' : 'text-zinc-500 group-hover:text-zinc-400 dark:text-zinc-300'"
+          :class="isExactActive ? 'text-[#ff4b55]' : 'text-zinc-500 group-hover:text-zinc-200'"
         />
         <span class="font-medium">{{ item.label }}</span>
       </a>

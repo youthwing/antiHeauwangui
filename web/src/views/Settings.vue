@@ -447,14 +447,14 @@ const previewSchedule = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-3">
-    <header class="mb-2">
-      <h1 class="text-2xl font-bold tracking-tight">配置</h1>
-      <p class="text-sm text-zinc-500 mt-1">自动签到的行为、打卡位置和设备信息。</p>
+  <div class="space-y-4">
+    <header class="console-hero p-5">
+      <h1 class="text-2xl font-semibold">配置中心</h1>
+      <p class="text-sm text-zinc-400 mt-1">自动签到、代理出口、通知和设备画像统一在这里维护。</p>
     </header>
 
     <!-- Section 1: 自动签到 -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center justify-between mb-4 gap-3">
         <div class="flex items-center gap-2">
           <Power class="w-4 h-4 text-zinc-500" />
@@ -541,41 +541,41 @@ const previewSchedule = computed(() => {
           class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-red-400 transition-colors inline-flex items-center gap-1"
         >
           <span>ⓘ 这 4 个数字啥意思？</span>
-          <span class="text-zinc-600">{{ showScheduleFaq ? '收起' : '展开看说明' }}</span>
+          <span class="text-zinc-600 dark:text-zinc-300">{{ showScheduleFaq ? '收起' : '展开看说明' }}</span>
         </button>
         <Transition name="expand">
-          <div v-if="showScheduleFaq" class="mt-2 rounded-lg bg-sky-500/[0.05] ring-1 ring-sky-500/20 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-2.5 overflow-hidden">
+          <div v-if="showScheduleFaq" class="mt-2 rounded-lg bg-[#eff8ff] dark:bg-[#071827] ring-1 ring-sky-500/20 p-3 text-[11px] text-[#10354e] dark:text-[#d9f0ff] leading-relaxed space-y-2.5 overflow-hidden">
             <p>
               系统每天 22:00 整点醒来，但不会让所有用户都在 22:00:00 这一秒同时签到 —— 那样 5 个学号同 IP 集中发请求会很显眼，且每天看你都"卡在 22:00 没结果"也会焦虑。下面 4 个参数控制具体的延迟。
             </p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
               <div>
-                <p class="text-red-300 font-medium">首次触发分钟</p>
-                <p class="text-zinc-500 mt-0.5">
+                <p class="text-[#b0000b] dark:text-[#ff8b92] font-medium">首次触发分钟</p>
+                <p class="text-[#244c63] dark:text-[#afd8ef] mt-0.5">
                   从 22:00 起再等几分钟。<strong>激活账号时系统已为你随机分配过一次（0–27 分钟）</strong>，每个用户不同。你的当前值意味着每天大约 22:{{ String(form.triggerMinute).padStart(2, '0') }} 左右签。
                 </p>
               </div>
               <div>
-                <p class="text-red-300 font-medium">抖动秒数</p>
-                <p class="text-zinc-500 mt-0.5">
+                <p class="text-[#b0000b] dark:text-[#ff8b92] font-medium">抖动秒数</p>
+                <p class="text-[#244c63] dark:text-[#afd8ef] mt-0.5">
                   在上面那个分钟基础上，再随机往后推 0–{{ form.jitterSec }} 秒。每天具体的"秒数"都不同，避免每天精确到秒的规律。
                 </p>
               </div>
               <div>
-                <p class="text-red-300 font-medium">重试次数</p>
-                <p class="text-zinc-500 mt-0.5">
+                <p class="text-[#b0000b] dark:text-[#ff8b92] font-medium">重试次数</p>
+                <p class="text-[#244c63] dark:text-[#afd8ef] mt-0.5">
                   第一次签失败（网络问题 / 学校 API 抽风）后，再试几次。默认 3 次，4 次机会总共。
                 </p>
               </div>
               <div>
-                <p class="text-red-300 font-medium">重试间隔</p>
-                <p class="text-zinc-500 mt-0.5">
+                <p class="text-[#b0000b] dark:text-[#ff8b92] font-medium">重试间隔</p>
+                <p class="text-[#244c63] dark:text-[#afd8ef] mt-0.5">
                   两次重试之间等几分钟。默认 5 分钟，配合"重试 3 次" = 最多覆盖 20 分钟（接近 22:30 截止）。
                 </p>
               </div>
             </div>
-            <p class="text-zinc-500 mt-2">
-              <strong class="text-zinc-400">大白话总结</strong>：你的预定签到时刻 ≈ <span class="font-mono-token text-red-300">22:{{ String(form.triggerMinute).padStart(2, '0') }}</span>，实际可能再往后 0–{{ form.jitterSec }} 秒。如果你没动过这些参数，<strong>什么都不用改，默认很合理</strong>。
+            <p class="text-[#244c63] dark:text-[#afd8ef] mt-2">
+              <strong class="text-[#10354e] dark:text-[#d9f0ff]">大白话总结</strong>：你的预定签到时刻 ≈ <span class="font-mono-token text-[#b0000b] dark:text-[#ff8b92]">22:{{ String(form.triggerMinute).padStart(2, '0') }}</span>，实际可能再往后 0–{{ form.jitterSec }} 秒。如果你没动过这些参数，<strong>什么都不用改，默认很合理</strong>。
             </p>
           </div>
         </Transition>
@@ -635,14 +635,14 @@ const previewSchedule = computed(() => {
       <div class="mt-5 p-3 rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04]">
         <div class="flex items-center gap-2 mb-2">
           <Clock class="w-3.5 h-3.5 text-zinc-500" />
-          <span class="text-[10px] text-zinc-500 tracking-wide uppercase">本配置下的尝试时刻</span>
+          <span class="text-[10px] text-zinc-500">本配置下的尝试时刻</span>
         </div>
         <div class="flex flex-wrap gap-1.5">
           <span
             v-for="(t, i) in previewSchedule"
             :key="t"
             class="px-2 py-0.5 rounded text-xs font-mono-token tabular-nums"
-            :class="i === 0 ? 'bg-red-500/15 text-red-300 ring-1 ring-red-500/30' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
+            :class="i === 0 ? 'bg-[#fff1f2] text-[#b0000b] ring-1 ring-red-500/20 dark:bg-[#2a1114] dark:text-[#ff8b92]' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'"
           >
             {{ t }}<span v-if="i === 0" class="ml-1 text-[9px] opacity-70">主</span>
           </span>
@@ -652,7 +652,7 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 2: 我的宿舍楼 -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center gap-2 mb-4">
         <Building2 class="w-4 h-4 text-zinc-500" />
         <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">我的宿舍楼</h2>
@@ -721,7 +721,7 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 3: 邮件通知 -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center justify-between mb-4 gap-3">
         <div class="flex items-center gap-2">
           <Mail class="w-4 h-4 text-zinc-500" />
@@ -755,7 +755,7 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 3.5: Server酱 微信推送 -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center justify-between mb-3 gap-3">
         <div class="flex items-center gap-2">
           <Bell class="w-4 h-4 text-zinc-500" />
@@ -856,7 +856,7 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 3.7: 代理出口 -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center justify-between mb-3 gap-3">
         <div class="flex items-center gap-2">
           <Network class="w-4 h-4 text-zinc-500" />
@@ -877,7 +877,7 @@ const previewSchedule = computed(() => {
         开启后，只有当前账号的学校接口请求会从这里配置的代理出口发出；其他账号不会共用这份配置。
       </p>
 
-      <div class="mb-4 rounded-xl bg-white/70 dark:bg-[#0d1117]/60 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-4">
+      <div class="mb-4 inner-panel p-4">
         <div class="flex items-center gap-1.5 mb-3">
           <HelpCircle class="w-3.5 h-3.5 text-zinc-500" />
           <p class="text-sm font-semibold text-[#161b22] dark:text-zinc-200">代理怎么配置</p>
@@ -970,7 +970,7 @@ const previewSchedule = computed(() => {
 
         <div
           v-if="proxyTestResult"
-          class="mt-3 rounded-lg bg-white/70 dark:bg-[#0d1117]/70 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3"
+          class="mt-3 inner-panel p-3"
         >
           <p
             class="text-sm font-medium mb-2"
@@ -1003,7 +1003,7 @@ const previewSchedule = computed(() => {
         </div>
       </div>
 
-      <div class="mb-4 rounded-lg bg-white/70 dark:bg-[#0d1117]/60 ring-1 ring-black/[0.05] dark:ring-white/[0.04] p-3">
+      <div class="mb-4 inner-panel p-3">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
           <div class="min-w-0">
             <p class="text-sm font-medium text-[#161b22] dark:text-zinc-200">服务器订阅节点（当前账号）</p>
@@ -1164,7 +1164,7 @@ const previewSchedule = computed(() => {
     </section>
 
     <!-- Section 4: 设备信息 -->
-    <section class="rounded-xl bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] p-5">
+    <section class="section-panel p-5">
       <div class="flex items-center gap-2 mb-4">
         <Smartphone class="w-4 h-4 text-zinc-500" />
         <h2 class="text-base font-semibold text-[#161b22] dark:text-zinc-200">设备信息</h2>

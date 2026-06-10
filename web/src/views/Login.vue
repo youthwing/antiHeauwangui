@@ -282,17 +282,17 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center px-4 py-10 relative">
-    <div class="w-full max-w-md">
-      <div class="flex flex-col items-center mb-8">
-        <Logo :size="56" />
-        <h1 class="text-3xl font-bold tracking-tight mt-5 text-center">
+  <div class="min-h-screen flex items-center justify-center px-4 py-8 relative">
+    <div class="w-full max-w-[460px]">
+      <div class="flex flex-col items-center mb-6">
+        <Logo :size="50" />
+        <h1 class="text-3xl font-semibold mt-5 text-center">
           antiWG
         </h1>
-        <p class="text-sm text-zinc-500 mt-2">登录 / 激活</p>
+        <p class="text-sm text-zinc-500 mt-2">自动签到工作台</p>
       </div>
 
-      <div class="bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-2xl backdrop-blur-sm overflow-hidden">
+      <div class="surface-panel rounded-2xl overflow-hidden">
         <!-- Tabs -->
         <div class="flex relative border-b border-black/[0.08] dark:border-white/[0.06]">
           <button
@@ -355,7 +355,7 @@ onMounted(async () => {
           <button
             @click="submit"
             :disabled="!canSubmit"
-            class="mt-5 w-full inline-flex items-center justify-center gap-2 bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
+            class="mt-5 w-full inline-flex min-h-11 items-center justify-center gap-2 bg-[#171717] hover:bg-black disabled:bg-zinc-200 dark:bg-white dark:hover:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-white dark:text-[#111111] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
           >
             <span>{{ submitting ? '登录中…' : '登录' }}</span>
             <ArrowRight v-if="!submitting" class="w-4 h-4" />
@@ -433,13 +433,15 @@ onMounted(async () => {
                 />
               </div>
 
-              <!-- PIN warning -->
-              <div class="rounded-lg bg-amber-500/[0.07] ring-1 ring-amber-500/25 p-3 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                <p>
-                  <strong class="text-amber-300">⚠️ PIN 就是你以后登录 antiWG 的密码</strong>，
-                  4–6 位数字，自己定，<strong>记牢别忘</strong>。
+              <div class="rounded-lg bg-[#fff8e1] dark:bg-[#2a220f] ring-1 ring-amber-500/25 p-3 text-[11px] text-[#513a04] dark:text-[#f5d98f] leading-relaxed">
+                <p class="flex gap-2">
+                  <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b26b00] dark:text-[#ffd166]" />
+                  <span>
+                    <strong class="text-[#7a4b00] dark:text-[#ffd166]">PIN 就是你以后登录 antiWG 的密码</strong>，
+                    4–6 位数字，自己定，<strong>记牢别忘</strong>。
+                  </span>
                 </p>
-                <p class="text-zinc-500 dark:text-zinc-400 mt-1">
+                <p class="text-[#6b520d] dark:text-[#d8bd72] mt-1 pl-5">
                   以后登录用「学号 + 这个 PIN」就行，不需要再扫码。<br />
                   忘了的话只能让管理员给你重置。
                 </p>
@@ -642,7 +644,7 @@ onMounted(async () => {
           <button
             @click="submit"
             :disabled="!canSubmit"
-            class="mt-5 w-full inline-flex items-center justify-center gap-2 bg-red-500 hover:bg-red-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
+            class="mt-5 w-full inline-flex min-h-11 items-center justify-center gap-2 bg-[#171717] hover:bg-black disabled:bg-zinc-200 dark:bg-white dark:hover:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-white dark:text-[#111111] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
           >
             <span v-if="submitting">激活中…</span>
             <span v-else-if="activateStep === 'credentials' && !precheckLoading">下一步：粘贴学校 JWT</span>

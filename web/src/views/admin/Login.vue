@@ -42,12 +42,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center px-4 py-10 relative">
-    <div class="w-full max-w-sm">
-      <div class="flex flex-col items-center mb-8">
-        <Logo :size="56" />
+  <div class="min-h-screen flex items-center justify-center px-4 py-8 relative">
+    <div class="w-full max-w-[420px]">
+      <div class="flex flex-col items-center mb-6">
+        <Logo :size="50" />
         <div class="flex items-center gap-2 mt-5">
-          <h1 class="text-2xl font-bold tracking-tight">antiWG 管理端</h1>
+          <h1 class="text-2xl font-semibold">antiWG 管理端</h1>
           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30">
             <ShieldCheck class="w-2.5 h-2.5" />
             ADMIN
@@ -56,7 +56,7 @@ onMounted(async () => {
         <p class="text-sm text-zinc-500 mt-1.5">仅供运维人员</p>
       </div>
 
-      <div class="bg-white/85 dark:bg-[#161b22]/60 ring-1 ring-black/[0.08] dark:ring-white/[0.06] rounded-2xl p-6 backdrop-blur-sm">
+      <div class="surface-panel rounded-2xl p-6">
         <label class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">密码</label>
         <input
           v-model="password"
@@ -69,7 +69,7 @@ onMounted(async () => {
         <button
           @click="submit"
           :disabled="submitting || !password.trim()"
-          class="mt-4 w-full inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-[#0d1117] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
+          class="mt-4 w-full inline-flex min-h-11 items-center justify-center gap-2 bg-[#171717] hover:bg-black disabled:bg-zinc-200 dark:bg-white dark:hover:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-500 text-white dark:text-[#111111] font-medium py-2.5 rounded-xl transition-all disabled:cursor-not-allowed"
         >
           <span>{{ submitting ? '校验中…' : '登录' }}</span>
           <ArrowRight v-if="!submitting" class="w-4 h-4" />

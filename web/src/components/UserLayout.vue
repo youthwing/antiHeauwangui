@@ -80,19 +80,19 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative flex flex-col md:flex-row mx-auto max-w-[1700px] bg-white dark:bg-[#0d1117] min-h-screen">
+  <div class="relative flex flex-col md:flex-row gap-4 mx-auto max-w-[1760px] min-h-screen md:p-4">
     <!-- Sidebar (desktop, sticky below the global banner) -->
     <aside
-      class="hidden md:flex flex-col w-64 shrink-0 sticky top-0 h-screen border-r border-black/[0.06] dark:border-white/[0.05] bg-white/60 dark:bg-[#0d1117]/60 backdrop-blur-xl overflow-y-auto"
+      class="hidden md:flex flex-col w-64 shrink-0 sticky top-4 h-[calc(100vh-2rem)] side-rail rounded-2xl overflow-y-auto"
     >
-      <div class="px-5 py-5 border-b border-black/[0.05] dark:border-white/[0.04]">
+      <div class="px-5 py-5 border-b border-white/[0.08]">
         <Logo :size="34" text="antiWG" />
         <!-- Lifetime success-sign counter — small system-wide "brag" chip
              so users on every page can see the platform's accumulated
              impact. Hidden until the first count loads to avoid a 0 flash. -->
         <div
           v-if="totalSigns !== null && totalSigns > 0"
-          class="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-gradient-to-r from-red-500/10 to-amber-500/10 ring-1 ring-red-500/20 text-zinc-700 dark:text-zinc-300"
+          class="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] bg-white/[0.08] ring-1 ring-white/[0.1] text-zinc-200"
           :title="`从开服至今，antiWG 已成功为大家签到 ${totalSigns.toLocaleString()} 次`"
         >
           <Sparkles class="w-3 h-3 text-amber-400" />
@@ -105,7 +105,7 @@ onUnmounted(() => {
       </div>
 
       <div class="px-3 py-5">
-        <p class="px-3 mb-2 text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-600 font-medium">导航</p>
+        <p class="px-3 mb-2 text-[10px] text-zinc-500 font-medium">导航</p>
         <SidebarNav :items="items" />
       </div>
 
@@ -117,9 +117,9 @@ onUnmounted(() => {
            sidebar; scrollable if there are many. -->
       <div
         v-if="announcements.length > 0"
-        class="px-3 py-3 border-t border-black/[0.05] dark:border-white/[0.04] space-y-1.5 max-h-[40vh] overflow-y-auto"
+        class="px-3 py-3 border-t border-white/[0.08] space-y-1.5 max-h-[40vh] overflow-y-auto"
       >
-        <p class="px-1 mb-1 text-[10px] uppercase tracking-wider text-zinc-500 dark:text-zinc-600 font-medium flex items-center gap-1">
+        <p class="px-1 mb-1 text-[10px] text-zinc-500 font-medium flex items-center gap-1">
           <Megaphone class="w-3 h-3" />
           公告 · {{ announcements.length }}
         </p>
@@ -131,10 +131,10 @@ onUnmounted(() => {
         />
       </div>
 
-      <div class="px-3 py-3 border-t border-black/[0.05] dark:border-white/[0.04] space-y-1">
+      <div class="px-3 py-3 border-t border-white/[0.08] space-y-1">
         <div
           v-if="auth.state.me"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg"
+          class="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.06] ring-1 ring-white/[0.08]"
         >
           <Avatar
             :src="auth.state.me.userAvatarUrl"
@@ -143,14 +143,14 @@ onUnmounted(() => {
             rounded="lg"
           />
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-[#161b22] dark:text-zinc-200 truncate">{{ auth.state.me.userName }}</p>
+            <p class="text-sm font-medium text-white truncate">{{ auth.state.me.userName }}</p>
             <p class="text-[11px] text-zinc-500 font-mono-token truncate">{{ auth.state.me.userNumber }}</p>
           </div>
           <ThemeToggle />
         </div>
         <button
           @click="logout"
-          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-zinc-400 hover:text-white hover:bg-white/[0.07] transition-colors"
         >
           <LogOut class="w-4 h-4 text-zinc-500" />
           <span>退出</span>
@@ -159,13 +159,13 @@ onUnmounted(() => {
     </aside>
 
     <!-- Mobile top bar (sits below the global banner) -->
-    <header class="md:hidden sticky top-0 z-30 bg-white/85 dark:bg-[#0d1117]/85 backdrop-blur-xl border-b border-black/[0.08] dark:border-white/[0.06] h-12 flex items-center justify-between px-4">
+    <header class="md:hidden sticky top-0 z-30 bg-white/92 dark:bg-[#0d1117]/92 backdrop-blur-xl border-b border-black/[0.08] dark:border-white/[0.06] h-14 flex items-center justify-between px-4">
       <Logo :size="26" text="antiWG" />
       <div class="flex items-center gap-1">
         <ThemeToggle />
         <button
           @click="logout"
-          class="text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+          class="text-zinc-500 dark:text-zinc-400 hover:text-[#161b22] dark:hover:text-zinc-100 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
         >
           <LogOut class="w-4 h-4" />
         </button>
@@ -188,7 +188,7 @@ onUnmounted(() => {
         />
       </div>
 
-      <div class="px-3 sm:px-6 md:px-10 lg:px-14 py-4 sm:py-6 md:py-8 pb-24 md:pb-16">
+      <div class="px-3 sm:px-6 md:px-4 lg:px-8 py-4 sm:py-6 md:py-2 pb-24 md:pb-10">
         <RouterView v-slot="{ Component }">
           <Transition name="fade" mode="out-in">
             <component :is="Component" />
@@ -197,7 +197,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Mobile bottom nav -->
-      <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/90 dark:bg-[#0d1117]/90 backdrop-blur-xl border-t border-black/[0.08] dark:border-white/[0.06] flex justify-around py-2">
+      <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/92 dark:bg-[#0d1117]/92 backdrop-blur-xl border-t border-black/[0.08] dark:border-white/[0.06] flex justify-around py-2">
         <RouterLink
           v-for="item in items"
           :key="item.to"
@@ -208,8 +208,8 @@ onUnmounted(() => {
           <a
             :href="item.to"
             @click.prevent="$router.push(item.to)"
-            class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg"
-            :class="isExactActive ? 'text-red-400' : 'text-zinc-500'"
+            class="flex min-w-14 flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors"
+            :class="isExactActive ? 'text-[#b0000b] dark:text-[#ff6b72] bg-[#fff1f2] dark:bg-[#2a1114]' : 'text-zinc-500'"
           >
             <component :is="item.icon" class="w-5 h-5" />
             <span class="text-[10px]">{{ item.label }}</span>
